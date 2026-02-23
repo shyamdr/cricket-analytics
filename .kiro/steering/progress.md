@@ -24,8 +24,8 @@
 - fact_match_summary: 2,333 rows
 
 ## Pending
-- [ ] Dagster orchestration (wire ingestion + dbt as assets)
-- [ ] FastAPI endpoints (query gold layer)
+- [x] Dagster orchestration (wire ingestion + dbt as assets)
+- [x] FastAPI endpoints (query gold layer)
 - [ ] Streamlit UI (player pages, team analytics, trend viz)
 - [ ] pytest unit/integration tests
 - [ ] ML module (future)
