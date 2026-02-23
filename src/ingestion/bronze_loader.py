@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 import duckdb
 import structlog
@@ -58,7 +60,9 @@ def _parse_match_info(match_id: str, data: dict[str, Any]) -> dict[str, Any]:
             info.get("players", {}).get(info["teams"][0], []) if info.get("teams") else []
         ),
         "players_team2_json": json.dumps(
-            info.get("players", {}).get(info["teams"][1], []) if len(info.get("teams", [])) > 1 else []
+            info.get("players", {}).get(info["teams"][1], [])
+            if len(info.get("teams", [])) > 1
+            else []
         ),
         "registry_json": json.dumps(info.get("registry", {}).get("people", {})),
     }
@@ -148,9 +152,9 @@ def load_matches_to_bronze(matches_dir: Path) -> int:
     )
     conn.unregister("_tmp_deliveries")
 
-    match_count = conn.execute(
-        f"SELECT COUNT(*) FROM {settings.bronze_schema}.matches"
-    ).fetchone()[0]
+    match_count = conn.execute(f"SELECT COUNT(*) FROM {settings.bronze_schema}.matches").fetchone()[
+        0
+    ]
     delivery_count = conn.execute(
         f"SELECT COUNT(*) FROM {settings.bronze_schema}.deliveries"
     ).fetchone()[0]
@@ -177,9 +181,7 @@ def load_people_to_bronze(people_csv: Path) -> int:
         """
     )
 
-    count = conn.execute(
-        f"SELECT COUNT(*) FROM {settings.bronze_schema}.people"
-    ).fetchone()[0]
+    count = conn.execute(f"SELECT COUNT(*) FROM {settings.bronze_schema}.people").fetchone()[0]
 
     logger.info("people_load_complete", count=count)
     conn.close()
