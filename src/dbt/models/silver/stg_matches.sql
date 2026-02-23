@@ -6,8 +6,13 @@ with source as (
 select
     match_id,
     data_version,
-    -- Normalize season: "2007/08" → "2008", "2020/21" → "2021", else keep as-is
+    -- Normalize season: extract the calendar year matches were actually played in.
+    -- "2007/08" → "2008" (IPL 1, played Apr-Jun 2008)
+    -- "2009/10" → "2010" (IPL 3, played Mar-Apr 2010)
+    -- "2020/21" → "2020" (IPL played Sep-Nov 2020 in UAE due to COVID)
     case
+        when season = '2020/21'
+            then '2020'
         when season like '%/%'
             then '20' || split_part(season, '/', 2)
         else season
