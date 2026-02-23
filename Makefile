@@ -1,4 +1,4 @@
-.PHONY: setup ingest transform test lint all api ui clean help
+.PHONY: setup ingest transform test lint all api ui clean help dagster
 
 PYTHON := python3
 PIP := pip
@@ -36,6 +36,9 @@ format: ## Auto-format code
 	black src/ tests/
 
 all: setup ingest transform ## Full pipeline: setup + ingest + transform
+
+dagster: ## Start Dagster webserver (orchestration UI)
+	DAGSTER_HOME=.dagster dagster dev -m src.orchestration
 
 api: ## Start FastAPI server
 	uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload
