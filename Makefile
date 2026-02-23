@@ -38,7 +38,8 @@ format: ## Auto-format code
 all: setup ingest transform ## Full pipeline: setup + ingest + transform
 
 dagster: ## Start Dagster webserver (orchestration UI)
-	DAGSTER_HOME=.dagster dagster dev -m src.orchestration
+	@mkdir -p .dagster
+	export DAGSTER_HOME="$$(pwd)/.dagster" && dagster dev -m src.orchestration
 
 api: ## Start FastAPI server
 	uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload

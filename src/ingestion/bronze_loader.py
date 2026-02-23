@@ -174,12 +174,10 @@ def load_people_to_bronze(people_csv: Path) -> int:
     logger.info("loading_people_to_bronze", path=str(people_csv))
 
     conn.execute(f"DROP TABLE IF EXISTS {settings.bronze_schema}.people")
-    conn.execute(
-        f"""
+    conn.execute(f"""
         CREATE TABLE {settings.bronze_schema}.people AS
         SELECT * FROM read_csv_auto('{people_csv}', header=true)
-        """
-    )
+        """)
 
     count = conn.execute(f"SELECT COUNT(*) FROM {settings.bronze_schema}.people").fetchone()[0]
 
