@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: bronze
+    schema: bronze
+    tables:
+      - name: matches
+        description: "Raw match metadata from Cricsheet JSON files"
+      - name: deliveries
+        description: "Raw ball-by-ball delivery data from Cricsheet JSON files"
+      - name: people
+        description: "Player/official registry from Cricsheet people.csv"

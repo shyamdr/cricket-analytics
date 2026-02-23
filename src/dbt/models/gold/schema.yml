@@ -1,0 +1,58 @@
+version: 2
+
+models:
+  - name: dim_players
+    description: "Player dimension — one row per player who appeared in IPL"
+    columns:
+      - name: player_id
+        description: "8-char hex Cricsheet identifier"
+        tests:
+          - not_null
+      - name: player_name
+        tests:
+          - not_null
+
+  - name: dim_teams
+    description: "Team dimension with historical name mappings"
+    columns:
+      - name: team_name
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_venues
+    description: "Venue dimension with match counts"
+    tests:
+      - unique:
+          column_name: "venue || '|' || coalesce(city, '')"
+    columns:
+      - name: venue
+        tests:
+          - not_null
+
+  - name: dim_matches
+    description: "Match dimension — one row per IPL match"
+    columns:
+      - name: match_id
+        tests:
+          - unique
+          - not_null
+
+  - name: fact_deliveries
+    description: "Core fact table — one row per ball bowled (excluding super overs)"
+    columns:
+      - name: match_id
+        tests:
+          - not_null
+      - name: batter
+        tests:
+          - not_null
+
+  - name: fact_batting_innings
+    description: "Batting aggregates per batter per match innings"
+
+  - name: fact_bowling_innings
+    description: "Bowling aggregates per bowler per match innings"
+
+  - name: fact_match_summary
+    description: "Team-level match innings aggregates"

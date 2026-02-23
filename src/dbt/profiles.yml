@@ -1,0 +1,8 @@
+cricket_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "../../data/cricket.duckdb"
+      schema: main
+      threads: 4
