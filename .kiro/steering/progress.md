@@ -26,7 +26,7 @@
 ## Pending
 - [x] Dagster orchestration (wire ingestion + dbt as assets)
 - [x] FastAPI endpoints (query gold layer)
-- [ ] Streamlit UI (player pages, team analytics, trend viz)
+- [x] Streamlit UI (player pages, team analytics, trend viz)
 - [ ] pytest unit/integration tests
 - [ ] ML module (future)
 - [ ] Delete old data/ folder from parent Projects directory .git issue
