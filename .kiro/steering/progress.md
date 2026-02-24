@@ -32,11 +32,13 @@
 - [ ] Streamlit UI improvements — functional but needs polish
 
 ## Recently Completed
-- [x] pytest test suite: 79 tests (27 unit, 38 integration, 14 smoke) — all passing
+- [x] pytest test suite: 79 tests (27 unit, 38 integration, 14 smoke) — all passing, pushed to GitHub
   - Unit: ingestion JSON parsing (match info + deliveries), config validation
   - Integration: gold layer data quality (row counts, constraints, referential integrity, season regression), all API endpoints
   - Smoke: DB connectivity, schema existence, API startup, imports
   - Regression test for 2020/2021 season merge bug
+- [x] CI updated: split into lint → unit-tests (no DB) → integration-tests (builds DB, runs integration + smoke + dbt tests)
+  - Pytest markers registered in pyproject.toml (unit, integration, smoke)
 
 ## Pending — Next Up
 - [ ] Data enrichment Phase 1: venue coordinates + weather (Open-Meteo)

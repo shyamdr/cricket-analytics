@@ -6,7 +6,6 @@ import json
 
 import duckdb
 import pytest
-from fastapi.testclient import TestClient
 
 from src.config import settings
 
@@ -53,6 +52,8 @@ def api_client(db_available: bool):
     """FastAPI TestClient backed by the real DuckDB."""
     if not db_available:
         pytest.skip("DuckDB not found — run `make all` first")
+    from fastapi.testclient import TestClient
+
     from src.api.app import app
 
     with TestClient(app) as client:
