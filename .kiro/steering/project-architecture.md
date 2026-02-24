@@ -20,6 +20,7 @@ testing, scalability, documentation. Everything free/open-source.
 | Transformation   | dbt-core + dbt-duckdb       | Industry standard, lineage, testing, docs        |
 | API              | FastAPI                     | Async, auto OpenAPI docs, lightweight            |
 | UI               | Streamlit                   | Free, flexible, good for interactive exploration  |
+| Data Enrichment  | python-espncricinfo, Open-Meteo | ESPN match data via Playwright, free weather API |
 | ML (future)      | scikit-learn, XGBoost, MLflow | All free, MLflow for experiment tracking        |
 | CI/CD            | GitHub Actions              | Free for public repos                            |
 | Linting/Format   | ruff, black                 | Fast, standard                                   |
@@ -52,6 +53,7 @@ cricket-analytics/
 ├── docs/                       # ADRs, data dictionary, architecture diagrams
 ├── src/
 │   ├── ingestion/              # raw data loaders (download + load into DuckDB bronze)
+│   ├── enrichment/             # data enrichment (ESPN scraper, weather, geocoding)
 │   ├── dbt/                    # dbt project (bronze → silver → gold)
 │   ├── orchestration/          # Dagster definitions (assets, jobs, schedules)
 │   ├── api/                    # FastAPI serving layer
@@ -76,14 +78,40 @@ cricket-analytics/
 - New machine workflow: `git clone` → `make all` → full database in ~2-3 min
 - Docker alternative: `docker compose up` → no Python install needed
 
+## Data Enrichment (planned)
+See `docs/data-enrichment-strategy.md` for full details.
+
+### Key External Sources
+| Source                  | Data                                      | Method                    | Cost |
+|-------------------------|-------------------------------------------|---------------------------|------|
+| python-espncricinfo     | Captain, keeper, player roles, match time | Playwright + __NEXT_DATA__| Free |
+| Open-Meteo              | Historical weather (temp, humidity, wind)  | REST API, no key needed   | Free |
+| OpenStreetMap Nominatim | Venue geocoding (lat/lng)                 | REST API, 1 req/sec       | Free |
+| Manual seed CSVs        | Auction prices, venue coordinates         | Curated data files        | Free |
+
+### Enrichment Phases
+1. Venue coordinates (seed CSV) + weather pipeline (Open-Meteo)
+2. ESPN enrichment: captain, keeper, player roles, match time, day/night
+3. Elo rating system + auction prices + player DOB
+4. Derived analytics: pitch profiles, advanced ball-by-ball metrics
+
+### Not Available (free)
+- Hawk-Eye ball tracking (trajectory, spin, swing) — proprietary, BCCI/Star Sports owned
+- Pitch reports — no structured source; derive from match data instead
+- Live streaming ball-by-ball — future phase, needs running service during matches
+
 ## Use Cases (flexible, not exhaustive)
 - Player stat pages (career stats, per-season breakdown, innings list)
 - Team analytics (head-to-head, home/away, toss impact)
 - Trend analysis (boundaries/innings over years, scoring rate evolution)
 - Comparative analysis ("Is AB de Villiers really that good?")
+- Weather impact analysis (dew factor, humidity effect on scoring)
+- Captain/keeper performance analysis
+- Auction value-for-money analysis (runs per crore)
+- Custom Elo ratings (team + player, historical time series)
 - Future: ML predictions (match outcome simulation, player performance forecasting)
 - Future: NL query interface
-- Future: additional data sources (ICC ratings, etc.) can be integrated
+- Future: live match data pipeline
 
 ## Workflow Commands
 ```bash

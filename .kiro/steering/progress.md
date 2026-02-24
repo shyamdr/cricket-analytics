@@ -12,9 +12,13 @@
 - [x] README with architecture, quick start, commands
 - [x] Steering files for cross-session context
 - [x] Pushed to GitHub: https://github.com/shyamdr/cricket-analytics
+- [x] Dagster orchestration (wire ingestion + dbt as assets)
+- [x] FastAPI endpoints (5 routers: players, teams, matches, batting, bowling)
+- [x] Streamlit UI (home, player stats, team analytics, match explorer, trends)
+- [x] Fix: season normalization bug — '2020/21' was merging with '2021' (120 matches → correctly split into 60+60)
 
-## Verified Data (gold layer)
-- dim_matches: 1,169 rows
+## Verified Data (gold layer, post-season-fix)
+- dim_matches: 1,169 rows (18 seasons: 2008–2025, including 2020 COVID UAE bubble)
 - dim_players: 927 rows
 - dim_teams: 19 rows
 - dim_venues: 63 rows
@@ -23,12 +27,20 @@
 - fact_bowling_innings: 13,846 rows
 - fact_match_summary: 2,333 rows
 
-## Pending
-- [x] Dagster orchestration (wire ingestion + dbt as assets)
-- [x] FastAPI endpoints (query gold layer)
-- [x] Streamlit UI (player pages, team analytics, trend viz)
+## In Progress
+- [ ] Data enrichment strategy — brainstormed and documented (see docs/data-enrichment-strategy.md)
+- [ ] Streamlit UI improvements — functional but needs polish
+
+## Pending — Next Up
 - [ ] pytest unit/integration tests
-- [ ] ML module (future)
+- [ ] Data enrichment Phase 1: venue coordinates + weather (Open-Meteo)
+- [ ] Data enrichment Phase 2: ESPN enrichment (captain, keeper, player roles, match time)
+- [ ] Data enrichment Phase 3: Elo ratings + auction prices + player DOB
+- [ ] Data enrichment Phase 4: derived analytics (pitch profiles, advanced metrics)
+
+## Pending — Future
+- [ ] ML module (match outcome prediction, player performance forecasting)
+- [ ] Live data pipeline (CricAPI/Cricbuzz polling during matches)
 - [ ] Delete old data/ folder from parent Projects directory .git issue
 
 ## Technical Notes
@@ -37,7 +49,10 @@
 - DuckDB schemas: bronze.*, main_silver.*, main_gold.* (dbt prefixes with "main_")
 - dbt profiles.yml uses relative path ../../data/cricket.duckdb
 - Commit convention: conventional commits (feat:, fix:, docs:, refactor:, etc.) with detailed descriptions
+- Season normalization: '2007/08'→'2008', '2009/10'→'2010', '2020/21'→'2020' (special case — COVID)
+- Black version pinned to >=25.1.0,<27 to match CI (currently 26.1.0)
 
 ## Git Standards
 - Clear commit titles with conventional commit prefixes
 - Detailed multi-line descriptions explaining what and why
+- Do NOT mention .kiro, steering files, or Kiro in commit messages
