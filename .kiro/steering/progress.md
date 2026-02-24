@@ -31,8 +31,14 @@
 - [ ] Data enrichment strategy — brainstormed and documented (see docs/data-enrichment-strategy.md)
 - [ ] Streamlit UI improvements — functional but needs polish
 
+## Recently Completed
+- [x] pytest test suite: 79 tests (27 unit, 38 integration, 14 smoke) — all passing
+  - Unit: ingestion JSON parsing (match info + deliveries), config validation
+  - Integration: gold layer data quality (row counts, constraints, referential integrity, season regression), all API endpoints
+  - Smoke: DB connectivity, schema existence, API startup, imports
+  - Regression test for 2020/2021 season merge bug
+
 ## Pending — Next Up
-- [ ] pytest unit/integration tests
 - [ ] Data enrichment Phase 1: venue coordinates + weather (Open-Meteo)
 - [ ] Data enrichment Phase 2: ESPN enrichment (captain, keeper, player roles, match time)
 - [ ] Data enrichment Phase 3: Elo ratings + auction prices + player DOB

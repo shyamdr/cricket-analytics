@@ -1,1 +1,1 @@
-# tests package
+"""Cricket Analytics test suite."""

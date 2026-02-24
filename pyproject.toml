@@ -91,3 +91,8 @@ warn_unused_configs = true
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-v --tb=short"
+markers = [
+    "unit: pure logic tests, no DB needed",
+    "integration: tests that hit the real DuckDB",
+    "smoke: quick sanity checks",
+]
