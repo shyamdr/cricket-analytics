@@ -1,4 +1,8 @@
-"""Download raw data from Cricsheet."""
+"""Download raw data from Cricsheet.
+
+Supports multiple datasets (IPL, T20I, ODI, Tests, BBL, PSL, etc.)
+and delta downloads via Cricsheet's 'recently_added' zips.
+"""
 
 import zipfile
 from pathlib import Path
@@ -6,7 +10,7 @@ from pathlib import Path
 import httpx
 import structlog
 
-from src.config import settings
+from src.config import CRICSHEET_DATASETS, settings
 
 logger = structlog.get_logger(__name__)
 
@@ -22,16 +26,31 @@ def download_file(url: str, dest: Path) -> Path:
             for chunk in response.iter_bytes(chunk_size=8192):
                 f.write(chunk)
 
-    logger.info("download_complete", dest=str(dest), size_mb=round(dest.stat().st_size / 1e6, 2))
+    size_mb = round(dest.stat().st_size / 1e6, 2)
+    logger.info("download_complete", dest=str(dest), size_mb=size_mb)
     return dest
 
 
-def download_matches() -> Path:
-    """Download IPL match JSON zip and extract to raw directory."""
-    zip_path = settings.raw_dir / "ipl_json.zip"
-    extract_dir = settings.raw_dir / "matches"
+def download_dataset(dataset_key: str) -> Path:
+    """Download a Cricsheet dataset and extract JSON files.
 
-    download_file(settings.cricsheet_matches_url, zip_path)
+    Args:
+        dataset_key: Key from CRICSHEET_DATASETS (e.g. 'ipl', 't20i', 'bbl').
+
+    Returns:
+        Path to the directory containing extracted JSON files.
+    """
+    if dataset_key not in CRICSHEET_DATASETS:
+        available = ", ".join(sorted(CRICSHEET_DATASETS.keys()))
+        raise ValueError(f"Unknown dataset '{dataset_key}'. Available: {available}")
+
+    ds = CRICSHEET_DATASETS[dataset_key]
+    url = ds["url"]
+
+    zip_path = settings.raw_dir / f"{dataset_key}_json.zip"
+    extract_dir = settings.raw_dir / dataset_key
+
+    download_file(url, zip_path)
 
     logger.info("extracting", zip_path=str(zip_path), extract_dir=str(extract_dir))
     extract_dir.mkdir(parents=True, exist_ok=True)
@@ -39,5 +58,10 @@ def download_matches() -> Path:
         zf.extractall(extract_dir)
 
     json_count = len(list(extract_dir.glob("*.json")))
-    logger.info("extraction_complete", json_files=json_count)
+    logger.info("extraction_complete", dataset=dataset_key, json_files=json_count)
     return extract_dir
+
+
+def download_matches() -> Path:
+    """Download IPL matches (backward compatible with existing pipeline)."""
+    return download_dataset("ipl")
