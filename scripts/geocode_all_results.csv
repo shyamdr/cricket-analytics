@@ -1,0 +1,64 @@
+venue,city,query_used,attempt,latitude,longitude,photon_name,photon_city,photon_country,photon_state,osm_value
+Arun Jaitley Stadium,Delhi,Arun Jaitley Stadium,1,28.6377017,77.2431069,Arun Jaitley Stadium,Delhi,India,,stadium
+"Arun Jaitley Stadium, Delhi",Delhi,"Arun Jaitley Stadium, Delhi",1,28.6377017,77.2431069,Arun Jaitley Stadium,Delhi,India,,stadium
+Barabati Stadium,Cuttack,Barabati Stadium,1,20.4807044,85.8685254,Barabati Stadium,Cuttack,India,Odisha,stadium
+"Barsapara Cricket Stadium, Guwahati",Guwahati,Barsapara Cricket Stadium,3,-26.3154224,27.8309438,Lenasia Cricket Stadium,Lenasia,South Africa,Gauteng,stadium
+"Bharat Ratna Shri Atal Bihari Vajpayee Ekana Cricket Stadium, Lucknow",Lucknow,"Bharat Ratna Shri Atal Bihari Vajpayee Ekana Cricket Stadium, Lucknow",1,26.8112572,81.0167842,Bharat Ratna Shri Atal Bihari Vajpayee Ekana Cricket Stadium,,India,Uttar Pradesh,stadium
+Brabourne Stadium,Mumbai,Brabourne Stadium,1,18.9319276,72.8249626,Brabourne Stadium,,India,Maharashtra,stadium
+"Brabourne Stadium, Mumbai",Mumbai,"Brabourne Stadium, Mumbai",1,18.9319276,72.8249626,Brabourne Stadium,,India,Maharashtra,stadium
+Buffalo Park,East London,Buffalo Park,1,59.3830528,-112.7292281,Wood Buffalo National Park,,Canada,,national_park
+De Beers Diamond Oval,Kimberley,De Beers Diamond Oval,1,-28.742642,24.7967746,De Beers Diamond Oval,Kimberley,South Africa,Northern Cape,sports_centre
+Dr DY Patil Sports Academy,Mumbai,Dr DY Patil Sports Academy,1,19.0420503,73.0267308,Dr. DY Patil Sports Stadium,Navi Mumbai,India,Maharashtra,stadium
+"Dr DY Patil Sports Academy, Mumbai",Navi Mumbai,"Dr DY Patil Sports Academy, Mumbai",1,19.0420503,73.0267308,Dr. DY Patil Sports Stadium,Navi Mumbai,India,Maharashtra,stadium
+"Dr DY Patil Sports Academy, Mumbai",Mumbai,"Dr DY Patil Sports Academy, Mumbai",1,19.0420503,73.0267308,Dr. DY Patil Sports Stadium,Navi Mumbai,India,Maharashtra,stadium
+Dr. Y.S. Rajasekhara Reddy ACA-VDCA Cricket Stadium,Visakhapatnam,Dr. Y.S. Rajasekhara Reddy ACA-VDCA Cricket Stadium,1,17.7974965,83.3522341,Dr. YS Rajasekhara Reddy ACA-VDCA Cricket Stadium,Endada,India,Andhra Pradesh,stadium
+"Dr. Y.S. Rajasekhara Reddy ACA-VDCA Cricket Stadium, Visakhapatnam",Visakhapatnam,"Dr. Y.S. Rajasekhara Reddy ACA-VDCA Cricket Stadium, Visakhapatnam",1,17.7974965,83.3522341,Dr. YS Rajasekhara Reddy ACA-VDCA Cricket Stadium,Endada,India,Andhra Pradesh,stadium
+Dubai International Cricket Stadium,Dubai,Dubai International Cricket Stadium,1,25.0467384,55.219007,Dubai International Cricket Stadium,مدينة دبي الرياضية,United Arab Emirates,Dubai,stadium
+Dubai International Cricket Stadium,,Dubai International Cricket Stadium,1,25.0467384,55.219007,Dubai International Cricket Stadium,مدينة دبي الرياضية,United Arab Emirates,Dubai,stadium
+Eden Gardens,Kolkata,Eden Gardens,1,22.5646093,88.3423371,Eden Gardens,Kolkata,India,West Bengal,stadium
+"Eden Gardens, Kolkata",Kolkata,"Eden Gardens, Kolkata",1,22.5646093,88.3423371,Eden Gardens,Kolkata,India,West Bengal,stadium
+Feroz Shah Kotla,Delhi,Feroz Shah Kotla,1,24.8773699,67.0457901,Feroz Shah Kotla Road,Jamshed Town,Pakistan,Sindh,residential
+Green Park,Kanpur,Green Park,1,51.5066244,-0.1429437,Green Park,London,United Kingdom,England,station
+Himachal Pradesh Cricket Association Stadium,Dharamsala,Himachal Pradesh Cricket Association Stadium,1,32.1975918,76.3250337,Himachal Pradesh Cricket Association Stadium,Dharamshala,India,Himachal Pradesh,stadium
+"Himachal Pradesh Cricket Association Stadium, Dharamsala",Dharamsala,"Himachal Pradesh Cricket Association Stadium, Dharamsala",1,32.1975918,76.3250337,Himachal Pradesh Cricket Association Stadium,Dharamshala,India,Himachal Pradesh,stadium
+Holkar Cricket Stadium,Indore,Holkar Cricket Stadium,1,22.7242512,75.8796703,Holkar Cricket Stadium,Indore,India,Madhya Pradesh,park
+JSCA International Stadium Complex,Ranchi,JSCA International Stadium Complex,1,23.3104522,85.2748774,JSCA International Cricket Stadium,,India,Jharkhand,sports_centre
+Kingsmead,Durban,Kingsmead,1,51.4051256,-0.2819645,Kingsmeadow,London,United Kingdom,England,stadium
+M Chinnaswamy Stadium,Bangalore,M Chinnaswamy Stadium,1,12.9788127,77.5995775,M Chinnaswamy Stadium,Bengaluru,India,Karnataka,stadium
+"M Chinnaswamy Stadium, Bengaluru",Bengaluru,"M Chinnaswamy Stadium, Bengaluru",1,12.9788127,77.5995775,M Chinnaswamy Stadium,Bengaluru,India,Karnataka,stadium
+M.Chinnaswamy Stadium,Bengaluru,M.Chinnaswamy Stadium,1,12.9788127,77.5995775,M Chinnaswamy Stadium,Bengaluru,India,Karnataka,stadium
+MA Chidambaram Stadium,Chennai,MA Chidambaram Stadium,1,13.0627521,80.2784304,MA Chidambaram Stadium,Chennai,India,Tamil Nadu,stadium
+"MA Chidambaram Stadium, Chepauk",Chennai,"MA Chidambaram Stadium, Chepauk",1,13.0627521,80.2784304,MA Chidambaram Stadium,Chennai,India,Tamil Nadu,stadium
+"MA Chidambaram Stadium, Chepauk, Chennai",Chennai,"MA Chidambaram Stadium, Chepauk, Chennai",1,13.0627521,80.2784304,MA Chidambaram Stadium,Chennai,India,Tamil Nadu,stadium
+"Maharaja Yadavindra Singh International Cricket Stadium, Mullanpur",Mohali,,FAILED,,,,,,,
+"Maharaja Yadavindra Singh International Cricket Stadium, Mullanpur",New Chandigarh,,FAILED,,,,,,,
+"Maharaja Yadavindra Singh International Cricket Stadium, New Chandigarh",New Chandigarh,,FAILED,,,,,,,
+Maharashtra Cricket Association Stadium,Pune,Maharashtra Cricket Association Stadium,1,18.6737116,73.706379,Maharashtra Cricket Association Stadium,Gahunje,India,Maharashtra,stadium
+"Maharashtra Cricket Association Stadium, Pune",Pune,"Maharashtra Cricket Association Stadium, Pune",1,18.6737116,73.706379,Maharashtra Cricket Association Stadium,Gahunje,India,Maharashtra,stadium
+"Narendra Modi Stadium, Ahmedabad",Ahmedabad,"Narendra Modi Stadium, Ahmedabad",1,23.0917717,72.5973345,Narendra Modi Stadium,Ahmedabad,India,Gujarat,stadium
+Nehru Stadium,Kochi,Nehru Stadium,1,28.5833771,77.2335404,Jawaharlal Nehru Stadium,Delhi,India,,stadium
+New Wanderers Stadium,Johannesburg,New Wanderers Stadium,1,-26.1313769,28.0570755,DP World Wanderers Stadium,Rosebank,South Africa,Gauteng,stadium
+Newlands,Cape Town,Newlands,1,-33.9742832,18.4572951,Newlands,Cape Town,South Africa,Western Cape,suburb
+OUTsurance Oval,Bloemfontein,,FAILED,,,,,,,
+Punjab Cricket Association IS Bindra Stadium,Chandigarh,,FAILED,,,,,,,
+"Punjab Cricket Association IS Bindra Stadium, Mohali",Chandigarh,"Punjab Cricket Association IS Bindra Stadium, Mohali",1,32.5008383,74.5539018,Jinnah Cricket Stadium,Sialkot,Pakistan,Punjab,stadium
+"Punjab Cricket Association IS Bindra Stadium, Mohali, Chandigarh",Chandigarh,,FAILED,,,,,,,
+"Punjab Cricket Association Stadium, Mohali",Chandigarh,"Punjab Cricket Association Stadium, Mohali",1,32.5008383,74.5539018,Jinnah Cricket Stadium,Sialkot,Pakistan,Punjab,stadium
+Rajiv Gandhi International Stadium,Hyderabad,Rajiv Gandhi International Stadium,1,17.4059481,78.5505638,Rajiv Gandhi International Cricket Stadium,,India,Telangana,stadium
+"Rajiv Gandhi International Stadium, Uppal",Hyderabad,"Rajiv Gandhi International Stadium, Uppal",1,17.4059481,78.5505638,Rajiv Gandhi International Cricket Stadium,,India,Telangana,stadium
+"Rajiv Gandhi International Stadium, Uppal, Hyderabad",Hyderabad,"Rajiv Gandhi International Stadium, Uppal, Hyderabad",1,17.4059481,78.5505638,Rajiv Gandhi International Cricket Stadium,,India,Telangana,stadium
+"Sardar Patel Stadium, Motera",Ahmedabad,"Sardar Patel Stadium, Motera",1,23.0925447,72.5978635,Sardar Patel Sports Complex,,India,Gujarat,sports_centre
+Saurashtra Cricket Association Stadium,Rajkot,Saurashtra Cricket Association Stadium,1,18.6737116,73.706379,Maharashtra Cricket Association Stadium,Gahunje,India,Maharashtra,stadium
+Sawai Mansingh Stadium,Jaipur,Sawai Mansingh Stadium,1,26.8939911,75.8032269,Sawai Mansingh Stadium,Jaipur Municipal Corporation,India,Rajasthan,stadium
+"Sawai Mansingh Stadium, Jaipur",Jaipur,"Sawai Mansingh Stadium, Jaipur",1,26.8939911,75.8032269,Sawai Mansingh Stadium,Jaipur Municipal Corporation,India,Rajasthan,stadium
+Shaheed Veer Narayan Singh International Stadium,Raipur,"Shaheed Veer Narayan Singh International Stadium, Raipur",2,21.242992,81.6443787,Shaheed Veer Narayan Singh Smarak,Raipur,India,Chhattisgarh,monument
+Sharjah Cricket Stadium,Sharjah,Sharjah Cricket Stadium,1,25.3308493,55.4208718,Sharjah Cricket Stadium,Sharjah,United Arab Emirates,Sharjah,stadium
+Sharjah Cricket Stadium,,Sharjah Cricket Stadium,1,25.3308493,55.4208718,Sharjah Cricket Stadium,Sharjah,United Arab Emirates,Sharjah,stadium
+Sheikh Zayed Stadium,Abu Dhabi,Sheikh Zayed Stadium,1,24.3965743,54.5407478,Sheikh Zayed Cricket Stadium,Zayed City,United Arab Emirates,Abu Dhabi,pitch
+St George's Park,Port Elizabeth,St George's Park,1,-33.9665463,25.610165,St George's Park Cricket Ground,Gqeberha,South Africa,Eastern Cape,stadium
+Subrata Roy Sahara Stadium,Pune,Subrata Roy Sahara Stadium,1,19.5680747,5.7685441,Municipal Stadium,In Guezzam,Algeria,In Guezzam,stadium
+SuperSport Park,Centurion,SuperSport Park,1,-25.8596237,28.1956445,Supersport Park,Irene,South Africa,Gauteng,stadium
+"Vidarbha Cricket Association Stadium, Jamtha",Nagpur,"Vidarbha Cricket Association Stadium, Jamtha",1,21.0135768,79.039632,Vidarbha Cricket Association Stadium,Gumgaon,India,Maharashtra,stadium
+Wankhede Stadium,Mumbai,Wankhede Stadium,1,18.9385497,72.8257408,Wankhede Stadium,,India,Maharashtra,stadium
+"Wankhede Stadium, Mumbai",Mumbai,"Wankhede Stadium, Mumbai",1,18.9385497,72.8257408,Wankhede Stadium,,India,Maharashtra,stadium
+"Zayed Cricket Stadium, Abu Dhabi",Abu Dhabi,"Zayed Cricket Stadium, Abu Dhabi",1,24.3965743,54.5407478,Sheikh Zayed Cricket Stadium,Zayed City,United Arab Emirates,Abu Dhabi,pitch
