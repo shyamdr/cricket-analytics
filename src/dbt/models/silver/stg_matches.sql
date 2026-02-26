@@ -35,6 +35,7 @@ select
     event_match_number,
     event_stage,
     match_type,
+    gender,
     overs as max_overs,
     balls_per_over,
     players_team1_json,

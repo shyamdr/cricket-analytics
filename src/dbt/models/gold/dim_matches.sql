@@ -19,5 +19,7 @@ select
     event_name,
     event_match_number,
     event_stage,
+    match_type,
+    gender,
     max_overs
 from {{ ref('stg_matches') }}
