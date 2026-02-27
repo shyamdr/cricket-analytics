@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 
-import duckdb
 import pytest
 
 from src.config import settings
+from src.database import get_read_conn
 
 # ---------------------------------------------------------------------------
 # Markers
@@ -37,7 +37,7 @@ def db_conn(db_available: bool):
     """Session-scoped read-only DuckDB connection."""
     if not db_available:
         pytest.skip("DuckDB not found — run `make all` first")
-    conn = duckdb.connect(str(settings.duckdb_path), read_only=True)
+    conn = get_read_conn()
     yield conn
     conn.close()
 

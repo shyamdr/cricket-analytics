@@ -1,20 +1,23 @@
-"""DuckDB connection manager for the API layer."""
+"""DuckDB connection manager for the API layer.
+
+Wraps the centralized connection factory with a module-level singleton
+for the API's hot path. DuckDB supports concurrent reads, so a single
+long-lived read-only connection is safe and avoids per-request overhead.
+"""
 
 from __future__ import annotations
 
-import duckdb
-
-from src.config import settings
+from src.database import get_read_conn
 
 # Module-level read-only connection (DuckDB supports concurrent reads)
-_conn: duckdb.DuckDBPyConnection | None = None
+_conn = None
 
 
-def get_conn() -> duckdb.DuckDBPyConnection:
+def get_conn():
     """Get a read-only DuckDB connection, creating one if needed."""
     global _conn
     if _conn is None:
-        _conn = duckdb.connect(str(settings.duckdb_path), read_only=True)
+        _conn = get_read_conn()
     return _conn
 
 

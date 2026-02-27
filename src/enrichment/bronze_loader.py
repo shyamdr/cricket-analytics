@@ -9,16 +9,9 @@ import pyarrow as pa
 import structlog
 
 from src.config import settings
+from src.database import get_write_conn
 
 logger = structlog.get_logger(__name__)
-
-
-def get_connection() -> duckdb.DuckDBPyConnection:
-    """Get a DuckDB connection."""
-    settings.data_dir.mkdir(parents=True, exist_ok=True)
-    conn = duckdb.connect(str(settings.duckdb_path))
-    conn.execute(f"CREATE SCHEMA IF NOT EXISTS {settings.bronze_schema}")
-    return conn
 
 
 def _get_existing_match_ids(conn: duckdb.DuckDBPyConnection) -> set[str]:
@@ -45,7 +38,7 @@ def load_espn_to_bronze(records: list[dict[str, Any]]) -> int:
         logger.info("no_espn_records_to_load")
         return 0
 
-    conn = get_connection()
+    conn = get_write_conn()
     existing = _get_existing_match_ids(conn)
 
     # Filter out already-loaded matches

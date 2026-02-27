@@ -1,17 +1,20 @@
-"""Shared data access for the Streamlit UI."""
+"""Shared data access for the Streamlit UI.
+
+Wraps the centralized connection factory with Streamlit's caching
+so the read-only connection is reused across reruns.
+"""
 
 from __future__ import annotations
 
-import duckdb
 import streamlit as st
 
-from src.config import settings
+from src.database import get_read_conn
 
 
 @st.cache_resource
-def get_conn() -> duckdb.DuckDBPyConnection:
+def get_conn():
     """Get a cached read-only DuckDB connection."""
-    return duckdb.connect(str(settings.duckdb_path), read_only=True)
+    return get_read_conn()
 
 
 def query(sql: str, params: list | None = None) -> list[dict]:

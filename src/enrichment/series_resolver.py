@@ -27,6 +27,7 @@ import structlog
 from playwright.async_api import async_playwright
 
 from src.config import settings
+from src.database import get_read_conn, get_write_conn
 
 logger = structlog.get_logger(__name__)
 
@@ -139,7 +140,7 @@ class SeriesResolver:
     def _load_from_db(self) -> None:
         """Load previously discovered series from bronze.espn_series."""
         try:
-            conn = duckdb.connect(str(settings.duckdb_path), read_only=True)
+            conn = get_read_conn()
             rows = conn.execute(
                 f"SELECT series_id, season FROM {settings.bronze_schema}.espn_series"
             ).fetchall()
@@ -303,7 +304,7 @@ class SeriesResolver:
 
         # Persist to DuckDB
         try:
-            conn = duckdb.connect(str(settings.duckdb_path))
+            conn = get_write_conn()
             _ensure_series_table(conn)
 
             # Upsert — don't fail on duplicate series_id

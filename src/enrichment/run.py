@@ -22,6 +22,7 @@ import duckdb
 import structlog
 
 from src.config import settings
+from src.database import get_read_conn
 from src.enrichment.bronze_loader import load_espn_to_bronze
 from src.enrichment.espn_client import scrape_matches
 from src.enrichment.series_resolver import SeriesResolver
@@ -31,7 +32,7 @@ logger = structlog.get_logger(__name__)
 
 def get_matches_for_season(season: str) -> list[dict[str, str]]:
     """Query DuckDB for all matches in a given season with dates."""
-    conn = duckdb.connect(str(settings.duckdb_path), read_only=True)
+    conn = get_read_conn()
     rows = conn.execute(
         """SELECT match_id, match_date, season
            FROM main_gold.dim_matches
@@ -48,7 +49,7 @@ def get_matches_for_season(season: str) -> list[dict[str, str]]:
 
 def get_all_matches() -> list[dict[str, str]]:
     """Query DuckDB for all matches across all seasons."""
-    conn = duckdb.connect(str(settings.duckdb_path), read_only=True)
+    conn = get_read_conn()
     rows = conn.execute(
         """SELECT match_id, match_date, season
            FROM main_gold.dim_matches
@@ -63,7 +64,7 @@ def get_all_matches() -> list[dict[str, str]]:
 
 def get_already_scraped() -> set[str]:
     """Get match IDs already in bronze.espn_matches."""
-    conn = duckdb.connect(str(settings.duckdb_path), read_only=True)
+    conn = get_read_conn()
     try:
         rows = conn.execute(
             f"SELECT cricsheet_match_id FROM {settings.bronze_schema}.espn_matches"

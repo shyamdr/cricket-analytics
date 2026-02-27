@@ -18,16 +18,9 @@ import pyarrow as pa
 import structlog
 
 from src.config import settings
+from src.database import get_write_conn
 
 logger = structlog.get_logger(__name__)
-
-
-def get_connection() -> duckdb.DuckDBPyConnection:
-    """Get a DuckDB connection, creating the database file if needed."""
-    settings.data_dir.mkdir(parents=True, exist_ok=True)
-    conn = duckdb.connect(str(settings.duckdb_path))
-    conn.execute(f"CREATE SCHEMA IF NOT EXISTS {settings.bronze_schema}")
-    return conn
 
 
 def _get_existing_match_ids(conn: duckdb.DuckDBPyConnection) -> set[str]:
@@ -172,7 +165,7 @@ def load_matches_to_bronze(matches_dir: Path, full_refresh: bool = False) -> int
     Returns:
         Number of new matches loaded.
     """
-    conn = get_connection()
+    conn = get_write_conn()
     json_files = sorted(matches_dir.glob("*.json"))
     logger.info("scanning_json_files", file_count=len(json_files))
 
@@ -253,7 +246,7 @@ def load_matches_to_bronze(matches_dir: Path, full_refresh: bool = False) -> int
 
 def load_people_to_bronze(people_csv: Path) -> int:
     """Load people.csv into bronze.people (always full refresh — it's a registry)."""
-    conn = get_connection()
+    conn = get_write_conn()
     logger.info("loading_people_to_bronze", path=str(people_csv))
 
     conn.execute(f"DROP TABLE IF EXISTS {settings.bronze_schema}.people")
