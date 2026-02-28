@@ -10,6 +10,7 @@ authors = [{ name = "shyamdr" }]
 dependencies = [
     "duckdb>=1.1.0",
     "httpx>=0.27.0",
+    "pyarrow>=14.0.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "structlog>=24.0.0",
@@ -44,8 +45,7 @@ dev = [
 ]
 enrichment = [
     "playwright>=1.40.0",
-    "python-espncricinfo @ git+https://github.com/outside-edge/python-espncricinfo.git@main",
-    "pyarrow>=14.0.0",
+    "python-espncricinfo @ git+https://github.com/outside-edge/python-espncricinfo.git@master",
 ]
 all = [
     "cricket-analytics[dbt,orchestration,api,ui,dev,enrichment]",
