@@ -139,11 +139,7 @@ SAMPLE_NEXT_DATA_NO_PLAYERS: dict = {
                             "slug": "ipl-2008-313494",
                         },
                     },
-                    "content": {
-                        "matchPlayers": {
-                            "teamPlayers": []
-                        }
-                    },
+                    "content": {"matchPlayers": {"teamPlayers": []}},
                 }
             }
         }
@@ -223,7 +219,9 @@ class TestExtractMatchData:
         """CWK role means the player is both captain and keeper."""
         # Modify fixture: make one player CWK (replaces both C and WK)
         data = json.loads(json.dumps(sample_next_data))
-        team2 = data["props"]["appPageProps"]["data"]["data"]["content"]["matchPlayers"]["teamPlayers"][1]
+        team2 = data["props"]["appPageProps"]["data"]["data"]["content"]["matchPlayers"][
+            "teamPlayers"
+        ][1]
         # Remove separate C and WK, add single CWK player
         team2["players"] = [
             team2["players"][0],  # T Head (P)

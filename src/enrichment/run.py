@@ -41,10 +41,7 @@ def get_matches_for_season(season: str) -> list[dict[str, str]]:
         [season],
     ).fetchall()
     conn.close()
-    return [
-        {"match_id": r[0], "match_date": str(r[1]), "season": r[2]}
-        for r in rows
-    ]
+    return [{"match_id": r[0], "match_date": str(r[1]), "season": r[2]} for r in rows]
 
 
 def get_all_matches() -> list[dict[str, str]]:
@@ -56,10 +53,7 @@ def get_all_matches() -> list[dict[str, str]]:
            ORDER BY match_date""",
     ).fetchall()
     conn.close()
-    return [
-        {"match_id": r[0], "match_date": str(r[1]), "season": r[2]}
-        for r in rows
-    ]
+    return [{"match_id": r[0], "match_date": str(r[1]), "season": r[2]} for r in rows]
 
 
 def get_already_scraped() -> set[str]:

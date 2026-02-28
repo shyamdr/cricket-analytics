@@ -61,9 +61,7 @@ def load_espn_to_bronze(records: list[dict[str, Any]]) -> int:
 
     if table_exists:
         conn.register("_tmp_espn", table)
-        conn.execute(
-            f"INSERT INTO {settings.bronze_schema}.espn_matches SELECT * FROM _tmp_espn"
-        )
+        conn.execute(f"INSERT INTO {settings.bronze_schema}.espn_matches SELECT * FROM _tmp_espn")
         conn.unregister("_tmp_espn")
     else:
         conn.register("_tmp_espn", table)
@@ -72,9 +70,9 @@ def load_espn_to_bronze(records: list[dict[str, Any]]) -> int:
         )
         conn.unregister("_tmp_espn")
 
-    total = conn.execute(
-        f"SELECT COUNT(*) FROM {settings.bronze_schema}.espn_matches"
-    ).fetchone()[0]
+    total = conn.execute(f"SELECT COUNT(*) FROM {settings.bronze_schema}.espn_matches").fetchone()[
+        0
+    ]
 
     logger.info(
         "espn_bronze_load_complete",

@@ -75,21 +75,25 @@ def _extract_match_data(next_data: dict[str, Any]) -> dict[str, Any]:
         for p in tp.get("players", []):
             player = p.get("player", {})
             role_code = p.get("playerRoleType", "P")
-            players.append({
-                "espn_player_id": player.get("objectId"),
-                "player_name": player.get("name"),
-                "player_long_name": player.get("longName"),
-                "role_code": role_code,
-                "role": ROLE_MAP.get(role_code, "player"),
-                "is_captain": role_code in ("C", "CWK"),
-                "is_keeper": role_code in ("WK", "CWK"),
-            })
-        teams_enrichment.append({
-            "team_name": team.get("name"),
-            "team_long_name": team.get("longName"),
-            "espn_team_id": team.get("objectId"),
-            "players": players,
-        })
+            players.append(
+                {
+                    "espn_player_id": player.get("objectId"),
+                    "player_name": player.get("name"),
+                    "player_long_name": player.get("longName"),
+                    "role_code": role_code,
+                    "role": ROLE_MAP.get(role_code, "player"),
+                    "is_captain": role_code in ("C", "CWK"),
+                    "is_keeper": role_code in ("WK", "CWK"),
+                }
+            )
+        teams_enrichment.append(
+            {
+                "team_name": team.get("name"),
+                "team_long_name": team.get("longName"),
+                "espn_team_id": team.get("objectId"),
+                "players": players,
+            }
+        )
 
     # Find captains and keepers per team
     team1_captain = None
@@ -177,8 +181,7 @@ async def scrape_matches_async(
                 continue
 
             url = (
-                f"https://www.espncricinfo.com/series/"
-                f"x-{series_id}/x-{match_id}/full-scorecard"
+                f"https://www.espncricinfo.com/series/" f"x-{series_id}/x-{match_id}/full-scorecard"
             )
             try:
                 logger.info(

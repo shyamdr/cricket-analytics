@@ -26,9 +26,7 @@ logger = structlog.get_logger(__name__)
 def _get_existing_match_ids(conn: duckdb.DuckDBPyConnection) -> set[str]:
     """Get match_ids already in bronze.matches."""
     try:
-        rows = conn.execute(
-            f"SELECT match_id FROM {settings.bronze_schema}.matches"
-        ).fetchall()
+        rows = conn.execute(f"SELECT match_id FROM {settings.bronze_schema}.matches").fetchall()
         return {str(r[0]) for r in rows}
     except duckdb.CatalogException:
         return set()
@@ -119,19 +117,17 @@ def _parse_deliveries(match_id: str, data: dict[str, Any]) -> list[dict[str, Any
                     "is_wicket": len(wickets) > 0,
                     "wicket_player_out": wicket.get("player_out"),
                     "wicket_kind": wicket.get("kind"),
-                    "wicket_fielder1": (
-                        fielders[0].get("name") if len(fielders) > 0 else None
-                    ),
-                    "wicket_fielder2": (
-                        fielders[1].get("name") if len(fielders) > 1 else None
-                    ),
+                    "wicket_fielder1": (fielders[0].get("name") if len(fielders) > 0 else None),
+                    "wicket_fielder2": (fielders[1].get("name") if len(fielders) > 1 else None),
                 }
                 rows.append(row)
 
     return rows
 
 
-def _ensure_tables(conn: duckdb.DuckDBPyConnection, matches_table: pa.Table, deliveries_table: pa.Table) -> bool:
+def _ensure_tables(
+    conn: duckdb.DuckDBPyConnection, matches_table: pa.Table, deliveries_table: pa.Table
+) -> bool:
     """Ensure bronze.matches and bronze.deliveries exist. Returns True if they already existed."""
     try:
         conn.execute(f"SELECT 1 FROM {settings.bronze_schema}.matches LIMIT 1")
@@ -215,9 +211,7 @@ def load_matches_to_bronze(matches_dir: Path, full_refresh: bool = False) -> int
 
     # Append new data
     conn.register("_tmp_matches", matches_table)
-    conn.execute(
-        f"INSERT INTO {settings.bronze_schema}.matches SELECT * FROM _tmp_matches"
-    )
+    conn.execute(f"INSERT INTO {settings.bronze_schema}.matches SELECT * FROM _tmp_matches")
     conn.unregister("_tmp_matches")
 
     if deliveries_table is not None:
@@ -255,9 +249,7 @@ def load_people_to_bronze(people_csv: Path) -> int:
         SELECT * FROM read_csv_auto('{people_csv}', header=true)
         """)
 
-    count = conn.execute(
-        f"SELECT COUNT(*) FROM {settings.bronze_schema}.people"
-    ).fetchone()[0]
+    count = conn.execute(f"SELECT COUNT(*) FROM {settings.bronze_schema}.people").fetchone()[0]
 
     logger.info("people_load_complete", count=count)
     conn.close()
