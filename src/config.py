@@ -4,7 +4,6 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings
 
-
 # Cricsheet dataset registry — maps dataset keys to download URLs.
 # All follow the pattern: https://cricsheet.org/downloads/{slug}_json.zip
 CRICSHEET_DATASETS: dict[str, dict[str, str]] = {

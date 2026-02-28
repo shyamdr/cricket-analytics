@@ -22,7 +22,6 @@ import re
 from typing import Any
 
 import duckdb
-import pyarrow as pa
 import structlog
 from playwright.async_api import async_playwright
 
