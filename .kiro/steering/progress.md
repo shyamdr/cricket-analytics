@@ -47,9 +47,9 @@
 Priority order from senior architecture review. Tackle one at a time.
 
 ### High Priority (structural / portfolio impact)
-- [ ] Add Pydantic response models to FastAPI — endpoints return raw list[dict], no OpenAPI response schema, no contract
-- [ ] Surrogate keys on dimensions + FK references in facts — fact tables join on string names (batter, bowler, batting_team), not integer keys; no referential integrity, no proper star schema
-- [ ] Unit tests for enrichment module — series resolver, ESPN client, enrichment bronze loader have zero tests; most complex/fragile code in the project
+- [~] Add Pydantic response models to FastAPI — DEFERRED until gold schema stabilizes post-enrichment; schema will change as enrichment phases add columns, no point maintaining models through churn
+- [x] Surrogate keys on dimensions + FK references in facts — WON'T DO. DuckDB is columnar and dictionary-encodes strings internally (effectively auto-surrogate keys at storage level). No FK constraint enforcement in DuckDB anyway. At 278K deliveries / 927 players, string vs integer join performance is negligible. Human-readable columns (batter='V Kohli' vs batter_id=437) are critical for an analytics platform where users explore data directly via Streamlit/SQL. Referential integrity will be enforced via dbt `relationships` tests instead (see dbt backlog items). Natural keys (match_id, player_id, player_name, team_name) are already stable and unique.
+- [x] Unit tests for enrichment module — 19 tests covering ESPN __NEXT_DATA__ extraction (match metadata, captain/keeper/roles, CWK dual-role, empty teamPlayers edge case), ROLE_MAP validation, SeriesResolver cache logic (season/match lookups, cache size), and series info JSON path extraction (including missing season/series edge cases). All pure unit tests with mocked DB — no browser or network needed.
 - [ ] Consolidate two bronze_loader.py files — src/ingestion/ and src/enrichment/ both implement identical "idempotent PyArrow→DuckDB append" pattern; extract shared utility
 
 ### Medium Priority (correctness / maintainability)
