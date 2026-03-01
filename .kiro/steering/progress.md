@@ -75,7 +75,7 @@ Priority order from senior architecture review. Tackle one at a time.
 Deep review of ingestion, dbt, Dagster, and DuckDB pipeline. Core DE showcase area.
 
 ### Ingestion Layer (Python → Bronze)
-- [ ] Add transaction boundaries (BEGIN/COMMIT) around bronze writes — matches + deliveries insert is not atomic; crash between them = orphaned rows
+- [x] Add transaction boundaries (BEGIN/COMMIT) around bronze writes — both load_matches_to_bronze (matches + deliveries atomic) and load_people_to_bronze (drop + create atomic) now wrapped in BEGIN/COMMIT with ROLLBACK on failure
 - [ ] Batch processing for large datasets — all JSON files parsed into memory before write; will OOM on Tests/ODI datasets with millions of deliveries
 - [x] Define explicit DDL for bronze tables — explicit CREATE TABLE DDL for matches (36 cols) and deliveries (30 cols). Also expanded parser to capture ALL Cricsheet fields: meta (created, revision), team_type, match_type_number, officials (JSON), supersubs (JSON), missing (JSON), event_group, toss_uncontested, non_boundary, review (6 fields), replacements (JSON). 9 new unit tests, 107 total passing.
 - [ ] Safe people.csv loading — DROP+CREATE is not crash-safe; load into staging table, validate, then swap

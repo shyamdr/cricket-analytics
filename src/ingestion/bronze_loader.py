@@ -272,11 +272,19 @@ def load_matches_to_bronze(matches_dir: Path, full_refresh: bool = False) -> int
     matches_pa = pa.Table.from_pylist(all_matches)
     deliveries_pa = pa.Table.from_pylist(all_deliveries) if all_deliveries else None
 
-    # Dedup + append via shared utility
-    new_matches = append_to_bronze(conn, matches_table_name, matches_pa, "match_id")
+    # Atomic write: both matches + deliveries succeed or neither does
+    conn.execute("BEGIN TRANSACTION")
+    try:
+        new_matches = append_to_bronze(conn, matches_table_name, matches_pa, "match_id")
 
-    if deliveries_pa is not None and new_matches > 0:
-        append_to_bronze(conn, deliveries_table_name, deliveries_pa, "match_id")
+        if deliveries_pa is not None and new_matches > 0:
+            append_to_bronze(conn, deliveries_table_name, deliveries_pa, "match_id")
+
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        conn.close()
+        raise
 
     total_matches = conn.execute(f"SELECT COUNT(*) FROM {matches_table_name}").fetchone()[0]
     total_deliveries = conn.execute(f"SELECT COUNT(*) FROM {deliveries_table_name}").fetchone()[0]
@@ -296,11 +304,19 @@ def load_people_to_bronze(people_csv: Path) -> int:
     conn = get_write_conn()
     logger.info("loading_people_to_bronze", path=str(people_csv))
 
-    conn.execute(f"DROP TABLE IF EXISTS {settings.bronze_schema}.people")
-    conn.execute(f"""
-        CREATE TABLE {settings.bronze_schema}.people AS
-        SELECT * FROM read_csv_auto('{people_csv}', header=true)
-        """)
+    # Atomic swap: drop + recreate in a single transaction
+    conn.execute("BEGIN TRANSACTION")
+    try:
+        conn.execute(f"DROP TABLE IF EXISTS {settings.bronze_schema}.people")
+        conn.execute(f"""
+            CREATE TABLE {settings.bronze_schema}.people AS
+            SELECT * FROM read_csv_auto('{people_csv}', header=true)
+            """)
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        conn.close()
+        raise
 
     count = conn.execute(f"SELECT COUNT(*) FROM {settings.bronze_schema}.people").fetchone()[0]
 
