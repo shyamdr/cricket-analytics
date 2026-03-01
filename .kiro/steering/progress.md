@@ -91,11 +91,11 @@ Deep review of ingestion, dbt, Dagster, and DuckDB pipeline. Core DE showcase ar
 - [x] Add dbt tests on fact tables — 25 new tests: unique composite key on each fact table (match_id+innings+batter/bowler/batting_team), not_null on all grain and measure columns, plus 3 singular SQL tests for range checks (no negative stats, wickets ≤ 10). Total dbt tests: 46.
 - [x] Add business rule dbt tests (singular) — 3 new singular SQL tests: every completed match has ≥1 delivery, every completed match has exactly 2 batting teams in summary, total_runs = batter_runs + extras_runs on every delivery. All format-agnostic. Total dbt tests: 49.
 - [x] Add column-level documentation in schema.yml — comprehensive descriptions on every column across all 11 models (3 silver, 8 gold). Descriptions sourced from Cricsheet data format spec. `dbt docs generate` now produces a complete data dictionary.
-- [ ] Consider silver models as views instead of tables — they're just transforms, no need to store twice in DuckDB
+- [x] Consider silver models as views instead of tables — WON'T DO at current scale. Benchmarked: stg_deliveries transform takes ~300ms at 278K rows. At full Cricsheet scale (~5M deliveries across all leagues/formats), it would take ~5.3s per reference × 4 gold models = ~21s overhead per dbt run. Tables keep gold builds fast with negligible storage cost (DuckDB compresses well). May revisit if storage becomes a concern.
 
 ### Dagster Orchestration
 Items below are from the ETL deep review. See "Dagster Orchestration — Full Redesign" section for the comprehensive job/asset graph analysis.
-- [ ] Remove dead CricketAnalyticsConfig resource — defined in resources.py but never registered or used; assets import from src.config directly
+- [x] Remove dead CricketAnalyticsConfig resource — class was defined in resources.py but never registered or imported anywhere; assets use src.config.settings directly. Removed the class, kept the module file.
 - [ ] Add Dagster sensors — blind daily cron is less production-grade than event-driven triggers (watch for new files or poll Cricsheet RSS)
 
 ### Cross-Cutting ETL
