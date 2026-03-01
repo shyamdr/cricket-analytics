@@ -55,7 +55,7 @@ Priority order from senior architecture review. Tackle one at a time.
 ### Medium Priority (correctness / maintainability)
 - [x] Fix schema name mismatch in config — updated config defaults to `gold_schema="main_gold"`, `silver_schema="main_silver"` to match actual DuckDB schemas. Replaced all hardcoded `main_gold` across 16 files (API routers, UI pages, enrichment, tests) with `settings.gold_schema`.
 - [x] Move team name mappings to dbt seed CSV — franchise rename CASE statement in dim_teams.sql replaced with LEFT JOIN against `team_name_mappings` seed CSV. New renames only require adding a CSV row, no SQL changes. Makefile and CI updated to run `dbt seed` before `dbt run`.
-- [ ] Add retry/backoff on HTTP calls — downloader.py and ESPN scraper have no retry logic; single network blip fails entire pipeline
+- [x] Add retry/backoff on HTTP calls — created `src/utils.py` with `retry()` (sync) and `async_retry()` (async) decorators implementing exponential backoff. Applied to `download_file()` in downloader.py, `_fetch_next_data()` in espn_client.py, and `_discover_series_from_match()` in series_resolver.py. Configurable max_attempts, base_delay, backoff_factor, and exception types.
 - [ ] Add FastAPI dependency injection — routers import query() directly; no Depends(), no service layer, no way to unit test API logic without real DB
 - [ ] Handle SCD properly for dim_teams — franchise renames (RCB→RCBengaluru) need valid_from/valid_to, not a hardcoded CASE
 

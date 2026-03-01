@@ -11,10 +11,12 @@ import httpx
 import structlog
 
 from src.config import CRICSHEET_DATASETS, settings
+from src.utils import retry
 
 logger = structlog.get_logger(__name__)
 
 
+@retry(max_attempts=3, base_delay=5.0, exceptions=(httpx.HTTPError, OSError))
 def download_file(url: str, dest: Path) -> Path:
     """Download a file from a URL to a local path."""
     dest.parent.mkdir(parents=True, exist_ok=True)

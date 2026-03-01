@@ -15,6 +15,7 @@ import structlog
 from playwright.async_api import async_playwright
 
 from src.enrichment.series_resolver import SeriesResolver
+from src.utils import async_retry
 
 logger = structlog.get_logger(__name__)
 
@@ -27,6 +28,7 @@ ROLE_MAP: dict[str, str] = {
 }
 
 
+@async_retry(max_attempts=3, base_delay=5.0, exceptions=(Exception,))
 async def _fetch_next_data(url: str, browser: Any) -> dict[str, Any]:
     """Fetch a page and extract __NEXT_DATA__ JSON using an existing browser instance."""
     context = await browser.new_context(

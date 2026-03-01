@@ -27,6 +27,7 @@ from playwright.async_api import async_playwright
 
 from src.config import settings
 from src.database import get_read_conn, get_write_conn
+from src.utils import async_retry
 
 logger = structlog.get_logger(__name__)
 
@@ -46,6 +47,7 @@ def _ensure_series_table(conn: duckdb.DuckDBPyConnection) -> None:
     """)
 
 
+@async_retry(max_attempts=3, base_delay=5.0, exceptions=(Exception,))
 async def _discover_series_from_match(match_id: str, browser: Any) -> dict[str, Any] | None:
     """Probe a single ESPN match page to discover its series metadata.
 
