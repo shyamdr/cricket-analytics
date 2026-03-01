@@ -82,6 +82,32 @@ class TestParseMatchInfo:
         assert registry["RG Sharma"] == "abc12345"
         assert registry["MS Dhoni"] == "ghi11111"
 
+    def test_meta_fields(self, sample_match_json: dict) -> None:
+        result = _parse_match_info("1234567", sample_match_json)
+        assert result["meta_created"] == "2025-01-01"
+        assert result["meta_revision"] == 1
+
+    def test_team_type(self, sample_match_json: dict) -> None:
+        result = _parse_match_info("1234567", sample_match_json)
+        assert result["team_type"] == "club"
+
+    def test_officials_json(self, sample_match_json: dict) -> None:
+        import json
+
+        result = _parse_match_info("1234567", sample_match_json)
+        officials = json.loads(result["officials_json"])
+        assert "AY Dandekar" in officials["umpires"]
+        assert "J Srinath" in officials["match_referees"]
+
+    def test_optional_fields_absent(self, sample_match_json: dict) -> None:
+        """Fields not present in the source JSON should be None."""
+        result = _parse_match_info("1234567", sample_match_json)
+        assert result["match_type_number"] is None
+        assert result["toss_uncontested"] is None
+        assert result["event_group"] is None
+        assert result["supersubs_json"] is None
+        assert result["missing_json"] is None
+
     def test_no_result_empty_innings(self, sample_no_result_json: dict) -> None:
         """No-result match should still parse match info correctly."""
         result = _parse_match_info("9999999", sample_no_result_json)
@@ -135,6 +161,47 @@ class TestParseDeliveries:
         assert wicket["wicket_player_out"] == "RG Sharma"
         assert wicket["wicket_kind"] == "bowled"
         assert wicket["wicket_fielder1"] is None  # bowled has no fielder
+
+    def test_non_boundary_flag(self, sample_match_json: dict) -> None:
+        """First delivery has non_boundary=True in the fixture."""
+        rows = _parse_deliveries("1234567", sample_match_json)
+        assert rows[0]["non_boundary"] is True
+        # Second delivery has no non_boundary key → None
+        assert rows[1]["non_boundary"] is None
+
+    def test_review_fields(self, sample_match_json: dict) -> None:
+        """Second delivery (wide) has a review in the fixture."""
+        rows = _parse_deliveries("1234567", sample_match_json)
+        review_row = rows[1]
+        assert review_row["review_by"] == "Chennai Super Kings"
+        assert review_row["review_umpire"] == "AY Dandekar"
+        assert review_row["review_batter"] == "RG Sharma"
+        assert review_row["review_decision"] == "struck down"
+        assert review_row["review_type"] == "wicket"
+        assert review_row["review_umpires_call"] is None
+
+    def test_review_absent(self, sample_match_json: dict) -> None:
+        """First delivery has no review — all review fields should be None."""
+        rows = _parse_deliveries("1234567", sample_match_json)
+        first = rows[0]
+        assert first["review_by"] is None
+        assert first["review_umpire"] is None
+        assert first["review_decision"] is None
+
+    def test_replacements_json(self, sample_match_json: dict) -> None:
+        """Third delivery (wicket) has an impact_player replacement."""
+        import json
+
+        rows = _parse_deliveries("1234567", sample_match_json)
+        wicket_row = rows[2]
+        repl = json.loads(wicket_row["replacements_json"])
+        assert repl["match"][0]["in"] == "JC Buttler"
+        assert repl["match"][0]["reason"] == "impact_player"
+
+    def test_replacements_absent(self, sample_match_json: dict) -> None:
+        """First delivery has no replacements — should be None."""
+        rows = _parse_deliveries("1234567", sample_match_json)
+        assert rows[0]["replacements_json"] is None
 
     def test_no_result_no_deliveries(self, sample_no_result_json: dict) -> None:
         rows = _parse_deliveries("9999999", sample_no_result_json)

@@ -75,11 +75,17 @@ SAMPLE_MATCH_JSON: dict = {
         "match_type": "T20",
         "overs": 20,
         "season": "2024",
+        "team_type": "club",
         "teams": ["Mumbai Indians", "Chennai Super Kings"],
         "toss": {"decision": "field", "winner": "Chennai Super Kings"},
         "venue": "Wankhede Stadium",
         "outcome": {"winner": "Mumbai Indians", "by": {"runs": 12}},
         "player_of_match": ["RG Sharma"],
+        "officials": {
+            "match_referees": ["J Srinath"],
+            "tv_umpires": ["A Deshmukh"],
+            "umpires": ["AY Dandekar", "NJ Llong"],
+        },
         "players": {
             "Mumbai Indians": ["RG Sharma", "SA Yadav"],
             "Chennai Super Kings": ["MS Dhoni", "RA Jadeja"],
@@ -104,7 +110,12 @@ SAMPLE_MATCH_JSON: dict = {
                             "batter": "RG Sharma",
                             "bowler": "RA Jadeja",
                             "non_striker": "SA Yadav",
-                            "runs": {"batter": 4, "extras": 0, "total": 4},
+                            "runs": {
+                                "batter": 4,
+                                "extras": 0,
+                                "total": 4,
+                                "non_boundary": True,
+                            },
                         },
                         {
                             "batter": "RG Sharma",
@@ -112,6 +123,13 @@ SAMPLE_MATCH_JSON: dict = {
                             "non_striker": "SA Yadav",
                             "runs": {"batter": 0, "extras": 1, "total": 1},
                             "extras": {"wides": 1},
+                            "review": {
+                                "by": "Chennai Super Kings",
+                                "umpire": "AY Dandekar",
+                                "batter": "RG Sharma",
+                                "decision": "struck down",
+                                "type": "wicket",
+                            },
                         },
                         {
                             "batter": "RG Sharma",
@@ -124,6 +142,16 @@ SAMPLE_MATCH_JSON: dict = {
                                     "kind": "bowled",
                                 }
                             ],
+                            "replacements": {
+                                "match": [
+                                    {
+                                        "in": "JC Buttler",
+                                        "out": "SA Yadav",
+                                        "team": "Mumbai Indians",
+                                        "reason": "impact_player",
+                                    }
+                                ]
+                            },
                         },
                     ],
                 }
@@ -151,6 +179,7 @@ SAMPLE_NO_RESULT_JSON: dict = {
         "match_type": "T20",
         "overs": 20,
         "season": "2024",
+        "team_type": "club",
         "teams": ["Royal Challengers Bangalore", "Delhi Capitals"],
         "toss": {"decision": "bat", "winner": "Royal Challengers Bangalore"},
         "venue": "M Chinnaswamy Stadium",
