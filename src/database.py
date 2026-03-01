@@ -8,7 +8,7 @@ Usage:
     from src.database import get_read_conn, get_write_conn, query
 
     # Quick read query
-    rows = query("SELECT * FROM main_gold.dim_matches LIMIT 10")
+    rows = query("SELECT * FROM main_gold.dim_matches LIMIT 10")  # schema from settings
 
     # Write connection (creates schemas, ensures data dir)
     conn = get_write_conn()

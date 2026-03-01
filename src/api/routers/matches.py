@@ -5,8 +5,11 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from src.api.database import query
+from src.config import settings
 
 router = APIRouter(prefix="/api/matches", tags=["matches"])
+
+_gold = settings.gold_schema
 
 
 @router.get("")
@@ -35,7 +38,7 @@ def list_matches(
 
     return query(
         f"""
-        SELECT * FROM main_gold.dim_matches
+        SELECT * FROM {_gold}.dim_matches
         {where}
         ORDER BY match_date DESC
         LIMIT ${idx} OFFSET ${idx + 1}
@@ -47,9 +50,9 @@ def list_matches(
 @router.get("/seasons")
 def list_seasons():
     """List all available seasons with match counts."""
-    return query("""
+    return query(f"""
         SELECT season, COUNT(*) as matches
-        FROM main_gold.dim_matches
+        FROM {_gold}.dim_matches
         GROUP BY season
         ORDER BY season
         """)
@@ -58,14 +61,14 @@ def list_seasons():
 @router.get("/venues")
 def list_venues():
     """List all venues."""
-    return query("SELECT * FROM main_gold.dim_venues ORDER BY venue")
+    return query(f"SELECT * FROM {_gold}.dim_venues ORDER BY venue")
 
 
 @router.get("/{match_id}")
 def get_match(match_id: str):
     """Get details for a specific match."""
     rows = query(
-        "SELECT * FROM main_gold.dim_matches WHERE match_id = $1",
+        f"SELECT * FROM {_gold}.dim_matches WHERE match_id = $1",
         [match_id],
     )
     if not rows:
@@ -77,8 +80,8 @@ def get_match(match_id: str):
 def get_match_summary(match_id: str):
     """Get team-level summary for a match (both innings)."""
     return query(
-        """
-        SELECT * FROM main_gold.fact_match_summary
+        f"""
+        SELECT * FROM {_gold}.fact_match_summary
         WHERE match_id = $1
         ORDER BY innings
         """,
@@ -90,8 +93,8 @@ def get_match_summary(match_id: str):
 def get_match_batting(match_id: str):
     """Get all batting innings for a match."""
     return query(
-        """
-        SELECT * FROM main_gold.fact_batting_innings
+        f"""
+        SELECT * FROM {_gold}.fact_batting_innings
         WHERE match_id = $1
         ORDER BY innings, runs_scored DESC
         """,
@@ -103,8 +106,8 @@ def get_match_batting(match_id: str):
 def get_match_bowling(match_id: str):
     """Get all bowling innings for a match."""
     return query(
-        """
-        SELECT * FROM main_gold.fact_bowling_innings
+        f"""
+        SELECT * FROM {_gold}.fact_bowling_innings
         WHERE match_id = $1
         ORDER BY innings, wickets DESC
         """,

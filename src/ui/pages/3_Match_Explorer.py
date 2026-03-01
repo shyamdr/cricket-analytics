@@ -2,15 +2,18 @@
 
 import streamlit as st
 
+from src.config import settings
 from src.ui.data import query
 
 st.set_page_config(page_title="Match Explorer", page_icon="🏏", layout="wide")
 st.title("📋 Match Explorer")
 
+_gold = settings.gold_schema
+
 # Filters
 col1, col2 = st.columns(2)
 with col1:
-    seasons = query("SELECT DISTINCT season FROM main_gold.dim_matches ORDER BY season")
+    seasons = query(f"SELECT DISTINCT season FROM {_gold}.dim_matches ORDER BY season")
     season_list = ["All"] + [s["season"] for s in seasons]
     selected_season = st.selectbox("Season", season_list)
 
@@ -40,7 +43,7 @@ matches = query(
     SELECT match_id, season, match_date, venue, city,
            team1, team2, outcome_winner,
            outcome_by_runs, outcome_by_wickets, player_of_match
-    FROM main_gold.dim_matches
+    FROM {_gold}.dim_matches
     {where}
     ORDER BY match_date DESC
     LIMIT ${idx}
@@ -61,7 +64,7 @@ selected_match = st.selectbox(
 
 if selected_match:
     # Match info
-    info = query("SELECT * FROM main_gold.dim_matches WHERE match_id = $1", [selected_match])
+    info = query(f"SELECT * FROM {_gold}.dim_matches WHERE match_id = $1", [selected_match])
     if info:
         m = info[0]
         st.markdown(
@@ -81,12 +84,12 @@ if selected_match:
     # Batting scorecard
     st.subheader("Batting")
     batting = query(
-        """
+        f"""
         SELECT innings as Inn, batter as Batter, batting_team as Team,
                runs_scored as Runs, balls_faced as Balls,
                fours as "4s", sixes as "6s",
                ROUND(strike_rate, 2) as SR, dismissal_kind as Dismissal
-        FROM main_gold.fact_batting_innings
+        FROM {_gold}.fact_batting_innings
         WHERE match_id = $1
         ORDER BY innings, runs_scored DESC
         """,
@@ -97,12 +100,12 @@ if selected_match:
     # Bowling scorecard
     st.subheader("Bowling")
     bowling = query(
-        """
+        f"""
         SELECT innings as Inn, bowler as Bowler,
                overs_bowled as Overs, runs_conceded as Runs,
                wickets as Wkts, ROUND(economy_rate, 2) as Econ,
                dot_balls as Dots
-        FROM main_gold.fact_bowling_innings
+        FROM {_gold}.fact_bowling_innings
         WHERE match_id = $1
         ORDER BY innings, wickets DESC
         """,

@@ -34,8 +34,8 @@ def get_matches_for_season(season: str) -> list[dict[str, str]]:
     """Query DuckDB for all matches in a given season with dates."""
     conn = get_read_conn()
     rows = conn.execute(
-        """SELECT match_id, match_date, season
-           FROM main_gold.dim_matches
+        f"""SELECT match_id, match_date, season
+           FROM {settings.gold_schema}.dim_matches
            WHERE season = ?
            ORDER BY match_date""",
         [season],
@@ -48,8 +48,8 @@ def get_all_matches() -> list[dict[str, str]]:
     """Query DuckDB for all matches across all seasons."""
     conn = get_read_conn()
     rows = conn.execute(
-        """SELECT match_id, match_date, season
-           FROM main_gold.dim_matches
+        f"""SELECT match_id, match_date, season
+           FROM {settings.gold_schema}.dim_matches
            ORDER BY match_date""",
     ).fetchall()
     conn.close()

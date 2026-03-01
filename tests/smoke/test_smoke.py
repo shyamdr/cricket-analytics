@@ -20,8 +20,8 @@ class TestConfig:
 
     def test_schemas_defined(self) -> None:
         assert settings.bronze_schema == "bronze"
-        assert settings.silver_schema == "silver"
-        assert settings.gold_schema == "gold"
+        assert settings.silver_schema == "main_silver"
+        assert settings.gold_schema == "main_gold"
 
     def test_cricsheet_urls(self) -> None:
         assert "cricsheet.org" in settings.cricsheet_matches_url
@@ -62,7 +62,7 @@ class TestDatabase:
                 "SELECT schema_name FROM information_schema.schemata"
             ).fetchall()
         ]
-        assert "main_silver" in schemas
+        assert settings.silver_schema in schemas
 
     def test_gold_schema_exists(self, db_conn) -> None:
         schemas = [
@@ -71,7 +71,7 @@ class TestDatabase:
                 "SELECT schema_name FROM information_schema.schemata"
             ).fetchall()
         ]
-        assert "main_gold" in schemas
+        assert settings.gold_schema in schemas
 
     def test_bronze_tables_exist(self, db_conn) -> None:
         tables = [
@@ -89,7 +89,7 @@ class TestDatabase:
             r[0]
             for r in db_conn.execute(
                 "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = 'main_gold'"
+                f"WHERE table_schema = '{settings.gold_schema}'"
             ).fetchall()
         ]
         for expected in [

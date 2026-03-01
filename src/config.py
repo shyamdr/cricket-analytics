@@ -79,9 +79,11 @@ class Settings(BaseSettings):
     cricsheet_people_url: str = "https://cricsheet.org/register/people.csv"
 
     # DuckDB schemas (medallion layers)
+    # Bronze is created by Python ingestion; silver/gold are created by dbt
+    # which prefixes with the DuckDB database name ("main_").
     bronze_schema: str = "bronze"
-    silver_schema: str = "silver"
-    gold_schema: str = "gold"
+    silver_schema: str = "main_silver"
+    gold_schema: str = "main_gold"
 
     # API
     api_host: str = "0.0.0.0"
