@@ -69,7 +69,7 @@ Priority order from senior architecture review. Tackle one at a time.
 - [x] No `make enrich` command — added `make enrich` target (supports optional `SEASON=2024` arg)
 - [x] Remove dead code download_matches() in downloader.py — removed, nothing referenced it
 - [ ] pyproject.toml says requires-python >=3.11 but dev is on 3.13 — consider CI matrix for both
-- [ ] Integration tests have hardcoded value expectations — "Kohli > 5000 runs" is brittle; test shape/constraints instead
+- [x] Integration tests have hardcoded value expectations — replaced with shape/constraint assertions (positive values, sorted order, non-empty results)
 
 ## Pending — ETL Deep Review Backlog
 Deep review of ingestion, dbt, Dagster, and DuckDB pipeline. Core DE showcase area.
