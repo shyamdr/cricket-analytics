@@ -1,6 +1,13 @@
 -- Batting innings: per-batter-per-match aggregates
+-- Reads from silver (stg_deliveries) with explicit super_over filter
 with deliveries as (
-    select * from {{ ref('fact_deliveries') }}
+    select
+        d.*,
+        m.season,
+        m.match_date
+    from {{ ref('stg_deliveries') }} d
+    join {{ ref('stg_matches') }} m on d.match_id = m.match_id
+    where d.is_super_over = false
 )
 
 select

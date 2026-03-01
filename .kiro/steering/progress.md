@@ -85,7 +85,7 @@ Deep review of ingestion, dbt, Dagster, and DuckDB pipeline. Core DE showcase ar
 ### dbt Transformation Layer (Bronze → Silver → Gold)
 - [x] Strengthen silver layer — added `_loaded_at` audit timestamp to all 3 silver models, plus `_is_valid_extras` (extras components sum check) and `_is_valid_total` (total_runs = batter_runs + extras_runs) validation flags on stg_deliveries. All format-agnostic, no IPL-specific assumptions.
 - [x] Add referential integrity test: stg_deliveries.match_id → stg_matches.match_id — dbt relationships test, 21 total dbt tests passing
-- [ ] Gold facts should read from silver, not other gold — fact_batting/bowling/summary read from fact_deliveries; creates fragile cascade, super_over filter silently inherited
+- [x] Gold facts should read from silver, not other gold — fact_batting_innings, fact_bowling_innings, and fact_match_summary now read from stg_deliveries + stg_matches (silver) instead of fact_deliveries (gold). Each has its own explicit `WHERE is_super_over = false` filter. Eliminates fragile cascade dependency and silent filter inheritance.
 - [ ] dim_matches adds no value over stg_matches — identical SELECT; add surrogate keys, derived columns, or enrichment joins to justify the layer
 - [ ] Add incremental materialization to fact_deliveries — demonstrates the most important dbt production pattern; append new matches only
 - [ ] Add dbt tests on fact tables — zero tests on fact_batting_innings, fact_bowling_innings, fact_match_summary; need not_null on grain, unique composite key, range checks
