@@ -90,7 +90,7 @@ Deep review of ingestion, dbt, Dagster, and DuckDB pipeline. Core DE showcase ar
 - [x] Add incremental materialization to fact_deliveries — uses `materialized='incremental'` with composite unique_key and `match_id NOT IN` filter. Full refresh builds complete table; subsequent runs only append deliveries from new matches. Verified: full refresh 0.32s, incremental no-op 0.07s, row count stable at 278,034.
 - [x] Add dbt tests on fact tables — 25 new tests: unique composite key on each fact table (match_id+innings+batter/bowler/batting_team), not_null on all grain and measure columns, plus 3 singular SQL tests for range checks (no negative stats, wickets ≤ 10). Total dbt tests: 46.
 - [x] Add business rule dbt tests (singular) — 3 new singular SQL tests: every completed match has ≥1 delivery, every completed match has exactly 2 batting teams in summary, total_runs = batter_runs + extras_runs on every delivery. All format-agnostic. Total dbt tests: 49.
-- [ ] Add column-level documentation in schema.yml — most columns lack descriptions; dbt docs generate produces empty data dictionary
+- [x] Add column-level documentation in schema.yml — comprehensive descriptions on every column across all 11 models (3 silver, 8 gold). Descriptions sourced from Cricsheet data format spec. `dbt docs generate` now produces a complete data dictionary.
 - [ ] Consider silver models as views instead of tables — they're just transforms, no need to store twice in DuckDB
 
 ### Dagster Orchestration

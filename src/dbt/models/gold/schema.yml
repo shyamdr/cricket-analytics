@@ -1,127 +1,330 @@
 version: 2
 
 models:
-  - name: dim_players
-    description: "Player dimension — one row per player who appeared in IPL"
+  - name: dim_matches
+    description: "Match dimension — one row per match with derived analytical columns (match_result_type, winning_margin)."
     columns:
-      - name: player_id
-        description: "8-char hex Cricsheet identifier"
-        tests:
-          - not_null
-      - name: player_name
-        tests:
-          - not_null
-
-  - name: dim_teams
-    description: "Team dimension with historical name mappings"
-    columns:
-      - name: team_name
+      - name: match_id
+        description: "Unique Cricsheet match identifier"
         tests:
           - unique
           - not_null
+      - name: season
+        description: "Normalized season string (calendar year)"
+      - name: match_date
+        description: "Date the match was played"
+      - name: city
+        description: "City where the match took place"
+      - name: venue
+        description: "Venue name"
+      - name: team1
+        description: "First team listed"
+      - name: team2
+        description: "Second team listed"
+      - name: toss_winner
+        description: "Team that won the toss"
+      - name: toss_decision
+        description: "Toss decision: 'bat' or 'field'"
+      - name: outcome_winner
+        description: "Winning team name (NULL if no winner)"
+      - name: outcome_by_runs
+        description: "Victory margin in runs (NULL if won by wickets)"
+      - name: outcome_by_wickets
+        description: "Victory margin in wickets (NULL if won by runs)"
+      - name: outcome_method
+        description: "Special method used (e.g. 'D/L' for Duckworth-Lewis)"
+      - name: outcome_result
+        description: "Non-win result: 'draw', 'tie', or 'no result'"
+      - name: outcome_eliminator
+        description: "Super over winner in a tied match"
+      - name: player_of_match
+        description: "Player of the match"
+      - name: event_name
+        description: "Tournament or series name"
+      - name: event_match_number
+        description: "Match number within the event"
+      - name: event_stage
+        description: "Event stage (e.g. 'Final', 'Qualifier 1')"
+      - name: match_type
+        description: "Match format: T20, ODI, Test, IT20, ODM, MDM"
+      - name: gender
+        description: "Player gender: 'male' or 'female'"
+      - name: max_overs
+        description: "Maximum overs per innings for this format"
+      - name: match_result_type
+        description: "Derived enum classifying the outcome: normal_win, dls_win, tie_super_over, no_result, or unknown"
+      - name: winning_margin
+        description: "Derived human-readable margin (e.g. '5 runs', '3 wickets', 'Team won via super over')"
+      - name: is_home_team
+        description: "Placeholder (NULL) — will be populated by venue-team enrichment"
+
+  - name: dim_players
+    description: "Player dimension — one row per player who appeared in match data, joined with people.csv registry."
+    columns:
+      - name: player_id
+        description: "8-char hex Cricsheet identifier — stable unique ID across all matches"
+        tests:
+          - not_null
+      - name: player_name
+        description: "Short display name as used in match data (e.g. 'V Kohli')"
+        tests:
+          - not_null
+      - name: unique_name
+        description: "Disambiguated full name from people.csv"
+      - name: key_cricinfo
+        description: "ESPNcricinfo player ID"
+      - name: key_cricbuzz
+        description: "Cricbuzz player ID"
+      - name: key_bcci
+        description: "BCCI player ID"
+
+  - name: dim_teams
+    description: "Team dimension — one row per team name with franchise mapping and match date range."
+    columns:
+      - name: team_name
+        description: "Team name as it appeared in match data (historical names preserved)"
+        tests:
+          - unique
+          - not_null
+      - name: current_franchise_name
+        description: "Current franchise name from seed CSV (NULL if defunct, same as team_name if never renamed)"
+      - name: first_match_date
+        description: "Date of the team's first match in the dataset"
+      - name: last_match_date
+        description: "Date of the team's most recent match in the dataset"
+      - name: total_matches
+        description: "Total number of matches played by this team"
 
   - name: dim_venues
-    description: "Venue dimension with match counts"
+    description: "Venue dimension — one row per unique venue+city combination with match counts."
     tests:
       - unique:
           column_name: "venue || '|' || coalesce(city, '')"
     columns:
       - name: venue
+        description: "Venue name (e.g. 'M Chinnaswamy Stadium')"
         tests:
           - not_null
-
-  - name: dim_matches
-    description: "Match dimension — one row per IPL match"
-    columns:
-      - name: match_id
-        tests:
-          - unique
-          - not_null
+      - name: city
+        description: "City where the venue is located"
+      - name: total_matches
+        description: "Number of matches played at this venue"
+      - name: first_match_date
+        description: "Date of the first match at this venue"
+      - name: last_match_date
+        description: "Date of the most recent match at this venue"
 
   - name: fact_deliveries
-    description: "Core fact table — one row per ball bowled (excluding super overs)"
+    description: "Core fact table — one row per ball bowled (excluding super overs). Incremental materialization appends new matches only."
     columns:
       - name: match_id
+        description: "Foreign key to dim_matches"
         tests:
           - not_null
+      - name: season
+        description: "Normalized season from the match"
+      - name: match_date
+        description: "Date of the match"
+      - name: innings
+        description: "Innings number (1 or 2 for regular play)"
+      - name: batting_team
+        description: "Name of the batting team"
+      - name: is_super_over
+        description: "Always false in this table (super overs filtered out)"
+      - name: over_num
+        description: "0-indexed over number"
+      - name: ball_num
+        description: "0-indexed ball number within the over"
       - name: batter
+        description: "Name of the batter facing the delivery"
         tests:
           - not_null
+      - name: bowler
+        description: "Name of the bowler"
+      - name: non_striker
+        description: "Name of the non-striker"
+      - name: batter_runs
+        description: "Runs scored by the batter"
+      - name: extras_runs
+        description: "Total extras on this delivery"
+      - name: total_runs
+        description: "Total runs (batter + extras)"
+      - name: extras_wides
+        description: "Wide runs (0 if not a wide)"
+      - name: extras_noballs
+        description: "No-ball runs (0 if not a no-ball)"
+      - name: extras_byes
+        description: "Bye runs (0 if no byes)"
+      - name: extras_legbyes
+        description: "Leg-bye runs (0 if no leg-byes)"
+      - name: extras_penalty
+        description: "Penalty runs (0 if no penalty)"
+      - name: is_legal_delivery
+        description: "True if not a wide or no-ball"
+      - name: is_wicket
+        description: "True if a wicket fell"
+      - name: wicket_player_out
+        description: "Dismissed player name (NULL if no wicket)"
+      - name: wicket_kind
+        description: "Dismissal type (bowled, caught, lbw, run out, etc.)"
+      - name: wicket_fielder1
+        description: "Primary fielder in dismissal"
+      - name: wicket_fielder2
+        description: "Secondary fielder in dismissal"
+      - name: is_four
+        description: "True if batter scored 4"
+      - name: is_six
+        description: "True if batter scored 6"
+      - name: is_dot_ball
+        description: "True if legal delivery with 0 total runs"
+      - name: phase
+        description: "Derived match phase: 'powerplay' (overs 0-5), 'middle' (6-14), 'death' (15-19). NULL for overs outside this range."
 
   - name: fact_batting_innings
-    description: "Batting aggregates per batter per match innings"
+    description: "Batting aggregates — one row per batter per match innings (excluding super overs)."
     tests:
       - unique:
           column_name: "match_id || '|' || innings || '|' || batter"
     columns:
       - name: match_id
+        description: "Foreign key to dim_matches"
         tests:
           - not_null
-      - name: batter
-        tests:
-          - not_null
+      - name: season
+        description: "Normalized season"
+      - name: match_date
+        description: "Date of the match"
       - name: innings
+        description: "Innings number"
+        tests:
+          - not_null
+      - name: batting_team
+        description: "Name of the batting team"
+      - name: batter
+        description: "Name of the batter"
         tests:
           - not_null
       - name: balls_faced
+        description: "Number of legal deliveries faced (excludes wides and no-balls)"
         tests:
           - not_null
       - name: runs_scored
+        description: "Total runs scored by the batter"
         tests:
           - not_null
+      - name: fours
+        description: "Number of 4s hit"
+      - name: sixes
+        description: "Number of 6s hit"
+      - name: dot_balls
+        description: "Number of dot balls faced (legal delivery, 0 total runs)"
       - name: strike_rate
+        description: "Batting strike rate: (runs / balls_faced) * 100, rounded to 2 decimal places. 0 if no balls faced."
         tests:
           - not_null
+      - name: is_out
+        description: "True if the batter was dismissed in this innings"
+      - name: dismissal_kind
+        description: "How the batter was dismissed (bowled, caught, lbw, etc.). NULL if not out."
+      - name: dismissed_by
+        description: "Name of the bowler who took the wicket. NULL if not out or run out."
 
   - name: fact_bowling_innings
-    description: "Bowling aggregates per bowler per match innings"
+    description: "Bowling aggregates — one row per bowler per match innings (excluding super overs)."
     tests:
       - unique:
           column_name: "match_id || '|' || innings || '|' || bowler"
     columns:
       - name: match_id
+        description: "Foreign key to dim_matches"
         tests:
           - not_null
-      - name: bowler
-        tests:
-          - not_null
+      - name: season
+        description: "Normalized season"
+      - name: match_date
+        description: "Date of the match"
       - name: innings
+        description: "Innings number"
+        tests:
+          - not_null
+      - name: batting_team
+        description: "Name of the team the bowler was bowling against"
+      - name: bowler
+        description: "Name of the bowler"
         tests:
           - not_null
       - name: legal_balls
+        description: "Number of legal deliveries bowled (excludes wides and no-balls)"
         tests:
           - not_null
+      - name: overs_bowled
+        description: "Overs bowled in cricket notation (e.g. 4.0, 3.2 = 3 overs and 2 balls)"
       - name: runs_conceded
+        description: "Total runs conceded including extras"
         tests:
           - not_null
       - name: wickets
+        description: "Wickets taken (excludes run outs, retired hurt/out, obstructing the field)"
         tests:
           - not_null
+      - name: dot_balls
+        description: "Number of dot balls bowled"
+      - name: wides
+        description: "Total wide runs conceded"
+      - name: noballs
+        description: "Total no-ball runs conceded"
+      - name: fours_conceded
+        description: "Number of 4s hit off this bowler"
+      - name: sixes_conceded
+        description: "Number of 6s hit off this bowler"
       - name: economy_rate
+        description: "Economy rate: runs conceded per over (runs * 6 / legal_balls), rounded to 2 decimal places. 0 if no balls bowled."
         tests:
           - not_null
 
   - name: fact_match_summary
-    description: "Team-level match innings aggregates"
+    description: "Team-level match innings aggregates — one row per team per innings (excluding super overs)."
     tests:
       - unique:
           column_name: "match_id || '|' || innings || '|' || batting_team"
     columns:
       - name: match_id
+        description: "Foreign key to dim_matches"
+        tests:
+          - not_null
+      - name: season
+        description: "Normalized season"
+      - name: match_date
+        description: "Date of the match"
+      - name: innings
+        description: "Innings number"
         tests:
           - not_null
       - name: batting_team
-        tests:
-          - not_null
-      - name: innings
+        description: "Name of the batting team"
         tests:
           - not_null
       - name: total_runs
+        description: "Total runs scored in the innings"
         tests:
           - not_null
       - name: total_wickets
+        description: "Total wickets fallen in the innings"
         tests:
           - not_null
+      - name: legal_balls
+        description: "Total legal deliveries bowled in the innings"
+      - name: total_extras
+        description: "Total extras conceded in the innings"
+      - name: total_fours
+        description: "Total 4s hit in the innings"
+      - name: total_sixes
+        description: "Total 6s hit in the innings"
+      - name: total_dot_balls
+        description: "Total dot balls in the innings"
       - name: run_rate
+        description: "Run rate: runs per over (runs * 6 / legal_balls), rounded to 2 decimal places"
         tests:
           - not_null
+      - name: overs_played
+        description: "Number of overs completed (max over_num + 1)"

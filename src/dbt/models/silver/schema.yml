@@ -2,45 +2,163 @@ version: 2
 
 models:
   - name: stg_matches
-    description: "Staged match metadata with cleaned types and normalized seasons"
+    description: "Staged match metadata from Cricsheet JSON files. Cleaned types, normalized season format, one row per match."
     columns:
       - name: match_id
-        description: "Unique Cricsheet match identifier"
+        description: "Unique Cricsheet match identifier (numeric, from JSON filename)"
         tests:
           - unique
           - not_null
+      - name: data_version
+        description: "Cricsheet data format version (e.g. '1.0.0', '1.1.0')"
       - name: season
+        description: "Normalized season string. Split-year seasons converted to calendar year (e.g. '2007/08' → '2008'). Special case: '2020/21' → '2020' (COVID UAE bubble)."
         tests:
           - not_null
       - name: match_date
+        description: "Date the match was played (first day for multi-day matches), cast from Cricsheet dates array"
         tests:
           - not_null
+      - name: city
+        description: "City where the match took place (optional in Cricsheet data)"
+      - name: venue
+        description: "Venue name where the match was played (e.g. 'M Chinnaswamy Stadium')"
+      - name: team1
+        description: "Name of the first team listed in the Cricsheet teams array"
+      - name: team2
+        description: "Name of the second team listed in the Cricsheet teams array"
+      - name: toss_winner
+        description: "Name of the team that won the toss"
+      - name: toss_decision
+        description: "Toss winner's decision: 'bat' or 'field'"
+      - name: outcome_winner
+        description: "Name of the winning team, NULL if draw/tie/no result"
+      - name: outcome_by_runs
+        description: "Margin of victory in runs (NULL if won by wickets or no winner)"
+      - name: outcome_by_wickets
+        description: "Margin of victory in wickets (NULL if won by runs or no winner)"
+      - name: outcome_method
+        description: "Method used to determine winner if curtailed (e.g. 'D/L' for Duckworth-Lewis)"
+      - name: outcome_result
+        description: "Result when no team won: 'draw', 'tie', or 'no result'"
+      - name: outcome_eliminator
+        description: "Team that won the super over in a tied match"
+      - name: player_of_match
+        description: "Name of the player adjudged player of the match"
+      - name: event_name
+        description: "Name of the tournament or series (e.g. 'Indian Premier League')"
+      - name: event_match_number
+        description: "Match number within the event/series"
+      - name: event_stage
+        description: "Stage of the event (e.g. 'Final', 'Qualifier 1', 'Super 10')"
+      - name: match_type
+        description: "Type of match: T20, ODI, Test, IT20, ODM, or MDM"
+      - name: gender
+        description: "Gender of the players: 'male' or 'female'"
+      - name: max_overs
+        description: "Maximum overs per innings for this match type (e.g. 20 for T20, 50 for ODI)"
+      - name: balls_per_over
+        description: "Number of balls per over, generally 6"
+      - name: players_team1_json
+        description: "JSON array of player names in team1's playing XI"
+      - name: players_team2_json
+        description: "JSON array of player names in team2's playing XI"
+      - name: registry_json
+        description: "JSON object mapping player names to their unique Cricsheet identifiers (8-char hex)"
+      - name: _loaded_at
+        description: "Timestamp when this row was loaded into the silver layer"
 
   - name: stg_deliveries
-    description: "Staged ball-by-ball data with computed flags"
+    description: "Staged ball-by-ball data from Cricsheet JSON files. One row per delivery with computed flags and validation columns."
     columns:
       - name: match_id
+        description: "Foreign key to stg_matches — identifies which match this delivery belongs to"
         tests:
           - not_null
           - relationships:
               arguments:
                 to: ref('stg_matches')
                 field: match_id
+      - name: innings
+        description: "Innings number (1, 2, or higher for super overs)"
+      - name: batting_team
+        description: "Name of the team batting in this innings"
+      - name: is_super_over
+        description: "True if this delivery is part of a super over"
+      - name: over_num
+        description: "0-indexed over number within the innings (0 = first over)"
+      - name: ball_num
+        description: "0-indexed ball number within the over"
       - name: batter
+        description: "Name of the batter who faced this delivery"
         tests:
           - not_null
       - name: bowler
+        description: "Name of the bowler who bowled this delivery"
         tests:
           - not_null
+      - name: non_striker
+        description: "Name of the non-striker during this delivery"
+      - name: batter_runs
+        description: "Runs scored by the batter off this ball (0 if none)"
+      - name: extras_runs
+        description: "Total extra runs conceded on this delivery (wides + noballs + byes + legbyes + penalty)"
+      - name: total_runs
+        description: "Total runs from this delivery (batter_runs + extras_runs)"
+      - name: extras_wides
+        description: "Wide runs on this delivery (0 if not a wide)"
+      - name: extras_noballs
+        description: "No-ball runs on this delivery (0 if not a no-ball)"
+      - name: extras_byes
+        description: "Bye runs on this delivery (0 if no byes)"
+      - name: extras_legbyes
+        description: "Leg-bye runs on this delivery (0 if no leg-byes)"
+      - name: extras_penalty
+        description: "Penalty runs on this delivery (0 if no penalty)"
+      - name: is_legal_delivery
+        description: "True if the delivery is legal (not a wide or no-ball). Used for balls-faced and economy calculations."
+      - name: is_wicket
+        description: "True if a wicket fell on this delivery"
+      - name: wicket_player_out
+        description: "Name of the dismissed player (NULL if no wicket)"
+      - name: wicket_kind
+        description: "Dismissal type: bowled, caught, lbw, run out, stumped, caught and bowled, hit wicket, retired hurt, retired out, obstructing the field"
+      - name: wicket_fielder1
+        description: "Name of the primary fielder involved in the dismissal (NULL if not applicable)"
+      - name: wicket_fielder2
+        description: "Name of the secondary fielder involved (e.g. second fielder in a run out relay)"
+      - name: is_four
+        description: "True if the batter scored exactly 4 runs off this ball"
+      - name: is_six
+        description: "True if the batter scored exactly 6 runs off this ball"
+      - name: is_dot_ball
+        description: "True if this is a legal delivery with 0 total runs scored"
+      - name: _is_valid_extras
+        description: "Validation flag: true if extras component columns sum to extras_runs"
+      - name: _is_valid_total
+        description: "Validation flag: true if total_runs = batter_runs + extras_runs"
+      - name: _loaded_at
+        description: "Timestamp when this row was loaded into the silver layer"
 
   - name: stg_people
-    description: "Staged player/official registry"
+    description: "Staged player/official registry from Cricsheet people.csv. One row per person with cross-reference IDs."
     columns:
       - name: player_id
-        description: "8-char hex identifier"
+        description: "8-char hex Cricsheet identifier — stable across all matches regardless of name variations"
         tests:
           - unique
           - not_null
       - name: player_name
+        description: "Short display name (e.g. 'V Kohli')"
         tests:
           - not_null
+      - name: unique_name
+        description: "Disambiguated full name for players who share short names"
+      - name: key_cricinfo
+        description: "ESPNcricinfo player ID for cross-referencing"
+      - name: key_cricbuzz
+        description: "Cricbuzz player ID for cross-referencing"
+      - name: key_bcci
+        description: "BCCI player ID for cross-referencing"
+      - name: _loaded_at
+        description: "Timestamp when this row was loaded into the silver layer"
