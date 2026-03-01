@@ -11,6 +11,7 @@ testing, scalability, documentation. Everything free/open-source.
 - Flexibility — the data platform supports any analytics, viz, or ML use case on top
 - Professional quality — coding standards, type hints, tests, docs, CI, ADRs, the works
 - Idempotent pipelines — raw data downloaded from source, never stored in git
+- Format-agnostic — all code, validations, and schema design must work across cricket formats (T20, ODI, Test, The Hundred, etc.) and leagues (IPL, BBL, PSL, CPL, etc.). Never hardcode IPL-specific assumptions like "20 overs", "season is 4 digits", "dates start from 2008", or "max batter_runs = 6". The project is cricket-analytics, not IPL-analytics.
 
 ## Tech Stack
 | Layer            | Tool                        | Why                                              |

@@ -9,5 +9,6 @@ select
     unique_name,
     key_cricinfo,
     key_cricbuzz,
-    key_bcci
+    key_bcci,
+    current_timestamp as _loaded_at
 from source

@@ -83,7 +83,7 @@ Deep review of ingestion, dbt, Dagster, and DuckDB pipeline. Core DE showcase ar
 - [x] Skip unchanged downloads — HTTP HEAD + Last-Modified check before downloading. If remote file hasn't changed since local zip was saved, download is skipped entirely. Falls through to download if server doesn't provide Last-Modified or local file doesn't exist.
 
 ### dbt Transformation Layer (Bronze → Silver → Gold)
-- [ ] Strengthen silver layer — currently just type casting + computed flags; add data range validation, anomaly flagging, audit columns (_loaded_at, _source_file)
+- [x] Strengthen silver layer — added `_loaded_at` audit timestamp to all 3 silver models, plus `_is_valid_extras` (extras components sum check) and `_is_valid_total` (total_runs = batter_runs + extras_runs) validation flags on stg_deliveries. All format-agnostic, no IPL-specific assumptions.
 - [ ] Add referential integrity test: stg_deliveries.match_id → stg_matches.match_id (relationships test)
 - [ ] Gold facts should read from silver, not other gold — fact_batting/bowling/summary read from fact_deliveries; creates fragile cascade, super_over filter silently inherited
 - [ ] dim_matches adds no value over stg_matches — identical SELECT; add surrogate keys, derived columns, or enrichment joins to justify the layer

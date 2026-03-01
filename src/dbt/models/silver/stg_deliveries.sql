@@ -1,4 +1,4 @@
--- Staged deliveries: proper types, computed flags
+-- Staged deliveries: proper types, computed flags, validation
 with source as (
     select * from {{ source('bronze', 'deliveries') }}
 )
@@ -42,5 +42,22 @@ select
             and total_runs = 0
             then true
         else false
-    end as is_dot_ball
+    end as is_dot_ball,
+    -- Validation: extras components should sum to extras_runs
+    case
+        when extras_runs = coalesce(extras_wides, 0)
+            + coalesce(extras_noballs, 0)
+            + coalesce(extras_byes, 0)
+            + coalesce(extras_legbyes, 0)
+            + coalesce(extras_penalty, 0)
+            then true
+        else false
+    end as _is_valid_extras,
+    -- Validation: total_runs should equal batter_runs + extras_runs
+    case
+        when total_runs = batter_runs + extras_runs
+            then true
+        else false
+    end as _is_valid_total,
+    current_timestamp as _loaded_at
 from source

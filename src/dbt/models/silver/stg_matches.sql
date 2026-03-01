@@ -40,5 +40,6 @@ select
     balls_per_over,
     players_team1_json,
     players_team2_json,
-    registry_json
+    registry_json,
+    current_timestamp as _loaded_at
 from source
