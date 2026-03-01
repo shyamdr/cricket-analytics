@@ -65,7 +65,7 @@ Priority order from senior architecture review. Tackle one at a time.
 - [x] _ensure_tables in bronze_loader infers schema from first batch — replaced with explicit `_MATCHES_DDL` (36 columns) and `_DELIVERIES_DDL` (30 columns) CREATE TABLE IF NOT EXISTS statements. Tables are created before any data is parsed, so NULL-heavy first batches no longer cause wrong types.
 - [x] Docker compose builds image 3x — pipeline now builds + tags `cricket-analytics:latest`, api and ui reuse via `image:`. Also added missing `dbt seed` to pipeline command.
 - [x] Pre-commit has both ruff-format and black — removed black entirely; ruff handles both linting and formatting
-- [ ] CI doesn't cache pip dependencies — pip install from scratch every run; add actions/cache
+- [x] CI doesn't cache pip dependencies — added `cache: 'pip'` to all 3 setup-python steps; keyed on pyproject.toml hash
 - [ ] No `make enrich` command — inconsistent with otherwise clean Makefile interface
 - [ ] Remove dead code download_matches() in downloader.py — backward-compat wrapper, nothing references it
 - [ ] pyproject.toml says requires-python >=3.11 but dev is on 3.13 — consider CI matrix for both

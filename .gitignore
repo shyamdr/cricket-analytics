@@ -46,3 +46,4 @@ htmlcov/
 # Misc
 *.log
 .env
+cricsheet-website-data-format.txt
