@@ -27,7 +27,7 @@ from playwright.async_api import async_playwright
 
 from src.config import settings
 from src.database import get_read_conn, get_write_conn
-from src.utils import async_retry
+from src.utils import async_retry, run_async
 
 logger = structlog.get_logger(__name__)
 
@@ -180,7 +180,7 @@ class SeriesResolver:
                 return season_cached
 
         # Dynamic discovery
-        series_info = asyncio.run(self._discover_single(match_id))
+        series_info = run_async(self._discover_single(match_id))
         if series_info is not None:
             self._store_series(series_info)
             sid = series_info["series_id"]

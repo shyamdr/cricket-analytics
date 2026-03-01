@@ -15,7 +15,7 @@ import structlog
 from playwright.async_api import async_playwright
 
 from src.enrichment.series_resolver import SeriesResolver
-from src.utils import async_retry
+from src.utils import async_retry, run_async
 
 logger = structlog.get_logger(__name__)
 
@@ -221,6 +221,4 @@ def scrape_matches(
     delay_seconds: float = 4.0,
 ) -> list[dict[str, Any]]:
     """Synchronous wrapper around scrape_matches_async."""
-    return asyncio.run(
-        scrape_matches_async(matches, resolver=resolver, delay_seconds=delay_seconds)
-    )
+    return run_async(scrape_matches_async(matches, resolver=resolver, delay_seconds=delay_seconds))

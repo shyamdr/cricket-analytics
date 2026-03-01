@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import functools
 import time
 from collections.abc import Callable  # noqa: TC003 — used at runtime in decorators
@@ -106,3 +107,27 @@ def async_retry(
         return wrapper
 
     return decorator
+
+
+def run_async(coro: Any) -> Any:
+    """Run an async coroutine from any context — sync, async, Jupyter, Dagster.
+
+    - If no event loop is running: uses ``asyncio.run()`` (standard path).
+    - If an event loop IS already running (Jupyter, Dagster async, uvicorn):
+      runs the coroutine in a background thread to avoid the
+      ``RuntimeError: asyncio.run() cannot be called from a running event loop``
+      crash.
+
+    Usage::
+
+        result = run_async(some_async_function(arg1, arg2))
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        # No loop running — safe to use asyncio.run()
+        return asyncio.run(coro)
+
+    # Loop already running — offload to a new thread with its own loop
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, coro).result()
