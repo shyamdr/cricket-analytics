@@ -80,7 +80,7 @@ Deep review of ingestion, dbt, Dagster, and DuckDB pipeline. Core DE showcase ar
 - [x] Define explicit DDL for bronze tables — explicit CREATE TABLE DDL for matches (36 cols) and deliveries (30 cols). Also expanded parser to capture ALL Cricsheet fields: meta (created, revision), team_type, match_type_number, officials (JSON), supersubs (JSON), missing (JSON), event_group, toss_uncontested, non_boundary, review (6 fields), replacements (JSON). 9 new unit tests, 107 total passing.
 - [x] Safe people.csv loading — load into _people_staging table, validate (row count > 0, identifier column exists), then atomic swap (drop old + rename). Malformed CSV no longer destroys existing people table.
 - [x] Per-file error handling in ingestion — malformed JSON files are caught, logged via structlog, and collected into a failed_files summary. Rest of the batch still loads.
-- [ ] Skip unchanged downloads — downloader always re-downloads full zip; use HTTP ETag/If-Modified-Since or local file existence check
+- [x] Skip unchanged downloads — HTTP HEAD + Last-Modified check before downloading. If remote file hasn't changed since local zip was saved, download is skipped entirely. Falls through to download if server doesn't provide Last-Modified or local file doesn't exist.
 
 ### dbt Transformation Layer (Bronze → Silver → Gold)
 - [ ] Strengthen silver layer — currently just type casting + computed flags; add data range validation, anomaly flagging, audit columns (_loaded_at, _source_file)
