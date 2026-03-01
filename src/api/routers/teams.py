@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from src.api.database import query
+from src.api.database import DbQuery  # noqa: TC001 — runtime dep for FastAPI DI
 from src.config import settings
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
@@ -13,15 +13,15 @@ _gold = settings.gold_schema
 
 
 @router.get("")
-def list_teams():
+def list_teams(db: DbQuery):
     """List all IPL teams."""
-    return query(f"SELECT * FROM {_gold}.dim_teams ORDER BY team_name")
+    return db(f"SELECT * FROM {_gold}.dim_teams ORDER BY team_name")
 
 
 @router.get("/{team_name}")
-def get_team(team_name: str):
+def get_team(team_name: str, db: DbQuery):
     """Get a specific team's details."""
-    rows = query(
+    rows = db(
         f"SELECT * FROM {_gold}.dim_teams WHERE team_name = $1",
         [team_name],
     )
@@ -31,10 +31,10 @@ def get_team(team_name: str):
 
 
 @router.get("/{team_name}/matches")
-def get_team_matches(team_name: str, season: str | None = None):
+def get_team_matches(team_name: str, db: DbQuery, season: str | None = None):
     """Get all matches for a team, optionally filtered by season."""
     if season:
-        return query(
+        return db(
             f"""
             SELECT * FROM {_gold}.dim_matches
             WHERE (team1 = $1 OR team2 = $1) AND season = $2
@@ -42,7 +42,7 @@ def get_team_matches(team_name: str, season: str | None = None):
             """,
             [team_name, season],
         )
-    return query(
+    return db(
         f"""
         SELECT * FROM {_gold}.dim_matches
         WHERE team1 = $1 OR team2 = $1

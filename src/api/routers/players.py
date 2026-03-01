@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from src.api.database import query
+from src.api.database import DbQuery  # noqa: TC001 — runtime dep for FastAPI DI
 from src.config import settings
 
 router = APIRouter(prefix="/api/players", tags=["players"])
@@ -14,13 +14,14 @@ _gold = settings.gold_schema
 
 @router.get("")
 def list_players(
+    db: DbQuery,
     search: str | None = Query(None, description="Search player name (case-insensitive)"),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ):
     """List players with optional name search."""
     if search:
-        return query(
+        return db(
             f"""
             SELECT * FROM {_gold}.dim_players
             WHERE player_name ILIKE '%' || $1 || '%'
@@ -29,16 +30,16 @@ def list_players(
             """,
             [search, limit, offset],
         )
-    return query(
+    return db(
         f"SELECT * FROM {_gold}.dim_players ORDER BY player_name LIMIT $1 OFFSET $2",
         [limit, offset],
     )
 
 
 @router.get("/{player_name}")
-def get_player(player_name: str):
+def get_player(player_name: str, db: DbQuery):
     """Get a specific player's profile."""
-    rows = query(
+    rows = db(
         f"SELECT * FROM {_gold}.dim_players WHERE player_name = $1",
         [player_name],
     )
@@ -50,11 +51,12 @@ def get_player(player_name: str):
 @router.get("/{player_name}/batting")
 def get_player_batting(
     player_name: str,
+    db: DbQuery,
     season: str | None = Query(None, description="Filter by season"),
 ):
     """Get a player's batting innings history."""
     if season:
-        return query(
+        return db(
             f"""
             SELECT * FROM {_gold}.fact_batting_innings
             WHERE batter = $1 AND season = $2
@@ -62,7 +64,7 @@ def get_player_batting(
             """,
             [player_name, season],
         )
-    return query(
+    return db(
         f"""
         SELECT * FROM {_gold}.fact_batting_innings
         WHERE batter = $1
@@ -75,11 +77,12 @@ def get_player_batting(
 @router.get("/{player_name}/bowling")
 def get_player_bowling(
     player_name: str,
+    db: DbQuery,
     season: str | None = Query(None, description="Filter by season"),
 ):
     """Get a player's bowling innings history."""
     if season:
-        return query(
+        return db(
             f"""
             SELECT * FROM {_gold}.fact_bowling_innings
             WHERE bowler = $1 AND season = $2
@@ -87,7 +90,7 @@ def get_player_bowling(
             """,
             [player_name, season],
         )
-    return query(
+    return db(
         f"""
         SELECT * FROM {_gold}.fact_bowling_innings
         WHERE bowler = $1

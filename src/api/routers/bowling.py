@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query
 
-from src.api.database import query
+from src.api.database import DbQuery  # noqa: TC001 — runtime dep for FastAPI DI
 from src.config import settings
 
 router = APIRouter(prefix="/api/bowling", tags=["bowling"])
@@ -14,12 +14,13 @@ _gold = settings.gold_schema
 
 @router.get("/top")
 def top_wicket_takers(
+    db: DbQuery,
     season: str | None = Query(None, description="Filter by season"),
     limit: int = Query(10, ge=1, le=100),
 ):
     """Get top wicket takers, optionally filtered by season."""
     if season:
-        return query(
+        return db(
             f"""
             SELECT bowler, COUNT(*) as innings,
                    SUM(wickets) as total_wickets,
@@ -31,7 +32,7 @@ def top_wicket_takers(
             """,
             [season, limit],
         )
-    return query(
+    return db(
         f"""
         SELECT bowler, COUNT(*) as innings,
                SUM(wickets) as total_wickets,
@@ -45,9 +46,9 @@ def top_wicket_takers(
 
 
 @router.get("/stats/{player_name}")
-def player_bowling_stats(player_name: str):
+def player_bowling_stats(player_name: str, db: DbQuery):
     """Get aggregated bowling stats for a player across all seasons."""
-    return query(
+    return db(
         f"""
         SELECT bowler,
                COUNT(*) as innings,
@@ -68,9 +69,9 @@ def player_bowling_stats(player_name: str):
 
 
 @router.get("/season-breakdown/{player_name}")
-def player_bowling_season_breakdown(player_name: str):
+def player_bowling_season_breakdown(player_name: str, db: DbQuery):
     """Get per-season bowling breakdown for a player."""
-    return query(
+    return db(
         f"""
         SELECT season, COUNT(*) as innings,
                SUM(wickets) as total_wickets,
