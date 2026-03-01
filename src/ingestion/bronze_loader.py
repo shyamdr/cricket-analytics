@@ -323,26 +323,55 @@ def load_matches_to_bronze(matches_dir: Path, full_refresh: bool = False) -> int
 
 
 def load_people_to_bronze(people_csv: Path) -> int:
-    """Load people.csv into bronze.people (always full refresh — it's a registry)."""
+    """Load people.csv into bronze.people via staging table with validation.
+
+    Pattern: load into _people_staging → validate → drop old → rename.
+    If the CSV is malformed or empty, the existing people table survives.
+    """
     conn = get_write_conn()
+    schema = settings.bronze_schema
+    staging = f"{schema}._people_staging"
+    target = f"{schema}.people"
+
     logger.info("loading_people_to_bronze", path=str(people_csv))
 
-    # Atomic swap: drop + recreate in a single transaction
+    # Load into staging table (outside transaction — DuckDB CREATE AS
+    # with read_csv_auto needs to read the file)
+    conn.execute(f"DROP TABLE IF EXISTS {staging}")
+    conn.execute(f"""
+        CREATE TABLE {staging} AS
+        SELECT * FROM read_csv_auto('{people_csv}', header=true)
+    """)
+
+    # Validate staging data before swapping
+    (staging_count,) = conn.execute(f"SELECT COUNT(*) FROM {staging}").fetchone()
+    if staging_count == 0:
+        conn.execute(f"DROP TABLE IF EXISTS {staging}")
+        conn.close()
+        raise ValueError(f"people.csv loaded 0 rows from {people_csv} — refusing to swap")
+
+    (has_identifier,) = conn.execute(f"""
+        SELECT COUNT(*) FROM information_schema.columns
+        WHERE table_schema = '{schema}' AND table_name = '_people_staging'
+        AND column_name = 'identifier'
+    """).fetchone()
+    if has_identifier == 0:
+        conn.execute(f"DROP TABLE IF EXISTS {staging}")
+        conn.close()
+        raise ValueError("people.csv missing 'identifier' column — refusing to swap")
+
+    # Atomic swap: drop old + rename staging
     conn.execute("BEGIN TRANSACTION")
     try:
-        conn.execute(f"DROP TABLE IF EXISTS {settings.bronze_schema}.people")
-        conn.execute(f"""
-            CREATE TABLE {settings.bronze_schema}.people AS
-            SELECT * FROM read_csv_auto('{people_csv}', header=true)
-            """)
+        conn.execute(f"DROP TABLE IF EXISTS {target}")
+        conn.execute(f"ALTER TABLE {staging} RENAME TO people")
         conn.execute("COMMIT")
     except Exception:
         conn.execute("ROLLBACK")
+        conn.execute(f"DROP TABLE IF EXISTS {staging}")
         conn.close()
         raise
 
-    count = conn.execute(f"SELECT COUNT(*) FROM {settings.bronze_schema}.people").fetchone()[0]
-
-    logger.info("people_load_complete", count=count)
+    logger.info("people_load_complete", count=staging_count)
     conn.close()
-    return count
+    return staging_count
