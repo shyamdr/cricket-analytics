@@ -53,8 +53,8 @@ Priority order from senior architecture review. Tackle one at a time.
 - [x] Consolidate two bronze_loader.py files — extracted shared `append_to_bronze()` into `src/database.py`. Both `src/ingestion/bronze_loader.py` and `src/enrichment/bronze_loader.py` now delegate to this utility for idempotent PyArrow→DuckDB append with dedup.
 
 ### Medium Priority (correctness / maintainability)
-- [ ] Fix schema name mismatch in config — settings says gold_schema="gold" but actual DuckDB schema is "main_gold"; API/UI hardcode "main_gold" everywhere instead of using config
-- [ ] Move team name mappings to dbt seed CSV — dim_teams.sql has hardcoded CASE statement for franchise renames; every rename requires code change + rebuild
+- [x] Fix schema name mismatch in config — updated config defaults to `gold_schema="main_gold"`, `silver_schema="main_silver"` to match actual DuckDB schemas. Replaced all hardcoded `main_gold` across 16 files (API routers, UI pages, enrichment, tests) with `settings.gold_schema`.
+- [x] Move team name mappings to dbt seed CSV — franchise rename CASE statement in dim_teams.sql replaced with LEFT JOIN against `team_name_mappings` seed CSV. New renames only require adding a CSV row, no SQL changes. Makefile and CI updated to run `dbt seed` before `dbt run`.
 - [ ] Add retry/backoff on HTTP calls — downloader.py and ESPN scraper have no retry logic; single network blip fails entire pipeline
 - [ ] Add FastAPI dependency injection — routers import query() directly; no Depends(), no service layer, no way to unit test API logic without real DB
 - [ ] Handle SCD properly for dim_teams — franchise renames (RCB→RCBengaluru) need valid_from/valid_to, not a hardcoded CASE

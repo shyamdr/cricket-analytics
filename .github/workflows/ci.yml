@@ -47,6 +47,6 @@ jobs:
       - name: Build database (ingest + dbt)
         run: |
           python -m src.ingestion.run
-          cd src/dbt && dbt run --profiles-dir . && dbt test --profiles-dir .
+          cd src/dbt && dbt seed --profiles-dir . && dbt run --profiles-dir . && dbt test --profiles-dir .
       - name: Run integration and smoke tests
         run: python -m pytest tests/ -v -m "integration or smoke"

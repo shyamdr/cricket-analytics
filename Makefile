@@ -15,8 +15,8 @@ setup: ## Install all dependencies
 ingest: ## Download data from Cricsheet and load into DuckDB bronze layer
 	$(PYTHON) -m src.ingestion.run
 
-transform: ## Run dbt transformations (bronze → silver → gold)
-	cd $(DBT_DIR) && dbt run --profiles-dir .
+transform: ## Run dbt transformations (seed + bronze → silver → gold)
+	cd $(DBT_DIR) && dbt seed --profiles-dir . && dbt run --profiles-dir .
 
 dbt-test: ## Run dbt tests
 	cd $(DBT_DIR) && dbt test --profiles-dir .

@@ -1,5 +1,5 @@
 -- Team dimension: all team names that have appeared in IPL
--- Includes historical name mappings
+-- Franchise rename mappings loaded from seed CSV (team_name_mappings)
 with all_teams as (
     select team1 as team_name from {{ ref('stg_matches') }}
     union
@@ -19,21 +19,15 @@ team_stats as (
 )
 
 select
-    team_name,
-    -- Map historical names to current franchise
-    case team_name
-        when 'Delhi Daredevils' then 'Delhi Capitals'
-        when 'Deccan Chargers' then 'Sunrisers Hyderabad'
-        when 'Kings XI Punjab' then 'Punjab Kings'
-        when 'Royal Challengers Bangalore' then 'Royal Challengers Bengaluru'
-        when 'Rising Pune Supergiant' then null
-        when 'Rising Pune Supergiants' then null
-        when 'Gujarat Lions' then null
-        when 'Kochi Tuskers Kerala' then null
-        when 'Pune Warriors' then null
-        else team_name
+    ts.team_name,
+    case
+        when tnm.team_name is null then ts.team_name  -- not in mappings = active, never renamed
+        when tnm.current_franchise_name = '' then null  -- in mappings with empty value = defunct
+        else tnm.current_franchise_name  -- renamed franchise
     end as current_franchise_name,
-    first_match_date,
-    last_match_date,
-    total_matches
-from team_stats
+    ts.first_match_date,
+    ts.last_match_date,
+    ts.total_matches
+from team_stats ts
+left join {{ ref('team_name_mappings') }} tnm
+    on ts.team_name = tnm.team_name
