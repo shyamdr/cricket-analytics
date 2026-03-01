@@ -22,6 +22,10 @@ models:
       - name: match_id
         tests:
           - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_matches')
+                field: match_id
       - name: batter
         tests:
           - not_null
