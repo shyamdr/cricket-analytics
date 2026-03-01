@@ -264,6 +264,7 @@ def load_matches_to_bronze(matches_dir: Path, full_refresh: bool = False) -> int
         return 0
 
     total_new = 0
+    failed_files: list[str] = []
     num_batches = (len(json_files) + _BATCH_SIZE - 1) // _BATCH_SIZE
 
     for batch_idx in range(num_batches):
@@ -275,10 +276,14 @@ def load_matches_to_bronze(matches_dir: Path, full_refresh: bool = False) -> int
 
         for json_file in batch_files:
             match_id = json_file.stem
-            with open(json_file) as f:
-                data = json.load(f)
-            batch_matches.append(_parse_match_info(match_id, data))
-            batch_deliveries.extend(_parse_deliveries(match_id, data))
+            try:
+                with open(json_file) as f:
+                    data = json.load(f)
+                batch_matches.append(_parse_match_info(match_id, data))
+                batch_deliveries.extend(_parse_deliveries(match_id, data))
+            except Exception as exc:
+                failed_files.append(json_file.name)
+                logger.warning("parse_failed", file=json_file.name, error=str(exc))
 
         if not batch_matches:
             continue
@@ -317,7 +322,11 @@ def load_matches_to_bronze(matches_dir: Path, full_refresh: bool = False) -> int
         new_matches=total_new,
         total_matches=total_matches,
         total_deliveries=total_deliveries,
+        failed_files=len(failed_files),
     )
+    if failed_files:
+        logger.warning("failed_files_summary", files=failed_files)
+
     conn.close()
     return total_new
 
