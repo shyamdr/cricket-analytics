@@ -23,8 +23,13 @@ Usage:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import duckdb
 import structlog
+
+if TYPE_CHECKING:
+    import pyarrow as pa
 
 from src.config import settings
 
@@ -66,3 +71,65 @@ def query(sql: str, params: list | None = None) -> list[dict]:
         return [dict(zip(columns, row, strict=False)) for row in result.fetchall()]
     finally:
         conn.close()
+
+
+def append_to_bronze(
+    conn: duckdb.DuckDBPyConnection,
+    table_name: str,
+    data: pa.Table,
+    id_column: str,
+) -> int:
+    """Idempotent append of a PyArrow table into a bronze DuckDB table.
+
+    Checks for existing rows by ``id_column``, filters duplicates, then
+    creates the table (first run) or appends new rows.
+
+    Args:
+        conn: An open read-write DuckDB connection.
+        table_name: Fully-qualified table name (e.g. ``bronze.matches``).
+        data: PyArrow Table to load.
+        id_column: Column used for dedup (e.g. ``match_id``).
+
+    Returns:
+        Number of new rows inserted.
+    """
+    import pyarrow as pa
+
+    if data.num_rows == 0:
+        return 0
+
+    # Check which IDs already exist
+    existing_ids: set[str] = set()
+    table_exists = False
+    try:
+        rows = conn.execute(f"SELECT {id_column} FROM {table_name}").fetchall()
+        existing_ids = {str(r[0]) for r in rows}
+        table_exists = True
+    except duckdb.CatalogException:
+        pass
+
+    # Filter out duplicates using PyArrow compute
+    if existing_ids:
+        import pyarrow.compute as pc
+
+        id_array = data.column(id_column)
+        mask = pc.invert(pc.is_in(id_array, value_set=pa.array(list(existing_ids))))
+        data = data.filter(mask)
+
+    if data.num_rows == 0:
+        logger.info("no_new_rows", table=table_name, existing=len(existing_ids))
+        return 0
+
+    # Register temp view, create or append, unregister
+    tmp_name = "_tmp_bronze_load"
+    conn.register(tmp_name, data)
+    try:
+        if table_exists:
+            conn.execute(f"INSERT INTO {table_name} SELECT * FROM {tmp_name}")
+        else:
+            conn.execute(f"CREATE TABLE {table_name} AS SELECT * FROM {tmp_name}")
+    finally:
+        conn.unregister(tmp_name)
+
+    logger.info("bronze_append", table=table_name, new_rows=data.num_rows)
+    return data.num_rows
