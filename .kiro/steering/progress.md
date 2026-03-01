@@ -96,7 +96,7 @@ Deep review of ingestion, dbt, Dagster, and DuckDB pipeline. Core DE showcase ar
 ### Dagster Orchestration
 Items below are from the ETL deep review. See "Dagster Orchestration — Full Redesign" section for the comprehensive job/asset graph analysis.
 - [x] Remove dead CricketAnalyticsConfig resource — class was defined in resources.py but never registered or imported anywhere; assets use src.config.settings directly. Removed the class, kept the module file.
-- [ ] Add Dagster sensors — blind daily cron is less production-grade than event-driven triggers (watch for new files or poll Cricsheet RSS)
+- [ ] Add Dagster sensors — deferred until deployment strategy is decided. Requires Dagster running continuously (server/VM). See Step 5 in Dagster Orchestration Full Redesign section.
 
 ### Cross-Cutting ETL
 - [ ] Add audit columns to bronze tables — _loaded_at, _source_file, _run_id for lineage and debugging
@@ -150,9 +150,10 @@ bronze_people ───→ stg_people ──→ dim_players
 - [x] Updated `__init__.py` to register new jobs/schedule
 
 ### Step 5: Dagster best practices to add
-- [ ] Use Dagster's `FreshnessPolicy` on gold assets — e.g., dim_matches should be no more than 24 hours stale; Dagster UI shows freshness status
-- [ ] Use `AssetObservation` to record row counts as observable metadata — currently logged via structlog but not visible in Dagster UI
-- [ ] Consider `AutoMaterializePolicy` — Dagster can automatically materialize downstream assets when upstream changes, eliminating the need for most jobs entirely
+- [x] FreshnessPolicy on gold assets — 1-week warn, 30-day fail window applied to all 8 gold layer assets via `map_asset_specs` in `__init__.py`. Dagster UI shows freshness health status.
+- [x] AssetObservation for row counts — already implemented. Python assets (ingestion, enrichment) emit `MaterializeResult(metadata={...})` with row counts. dagster-dbt automatically captures dbt output metrics. All visible in Dagster UI asset detail pages.
+- [x] AutoMaterializePolicy — WON'T DO. Adds implicit complexity without benefit given we already have clean explicit jobs. Makes debugging harder.
+- [ ] Add Dagster sensor to replace blind daily cron — poll Cricsheet (HTTP HEAD / Last-Modified) and only trigger daily_refresh when new data is available. Requires Dagster to be running continuously (local laptop or server). Deferred until deployment strategy is decided.
 
 ## Pending — Next Up
 - [ ] Data enrichment Phase 1: venue coordinates + weather (Open-Meteo)

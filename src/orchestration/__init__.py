@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from dagster import Definitions
+from datetime import timedelta
+
+from dagster import Definitions, FreshnessPolicy, apply_freshness_policy
 from dagster_dbt import DbtCliResource
 
 from src.orchestration.assets.dbt import DBT_PROJECT_DIR, dbt_analytics_assets
@@ -13,6 +15,13 @@ from src.orchestration.jobs import (
     daily_refresh_schedule,
     enrichment_backfill_job,
     full_pipeline_job,
+)
+
+# Freshness policy: gold assets should be no more than 24 hours stale,
+# warn after 12 hours. Visible in Dagster UI asset health dashboard.
+gold_freshness_policy = FreshnessPolicy.time_window(
+    fail_window=timedelta(days=30),
+    warn_window=timedelta(weeks=1),
 )
 
 defs = Definitions(
@@ -29,4 +38,15 @@ defs = Definitions(
             profiles_dir=DBT_PROJECT_DIR,
         ),
     },
+)
+
+# Apply freshness policy to gold layer assets only
+_GOLD_ASSET_PREFIXES = ("gold/",)
+
+defs = defs.map_asset_specs(
+    func=lambda spec: (
+        apply_freshness_policy(spec, gold_freshness_policy)
+        if any(spec.key.to_user_string().startswith(p) for p in _GOLD_ASSET_PREFIXES)
+        else spec
+    ),
 )
