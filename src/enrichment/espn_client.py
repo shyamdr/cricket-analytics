@@ -182,9 +182,7 @@ async def scrape_matches_async(
                 logger.warning("skipping_no_series_id", match_id=match_id)
                 continue
 
-            url = (
-                f"https://www.espncricinfo.com/series/" f"x-{series_id}/x-{match_id}/full-scorecard"
-            )
+            url = f"https://www.espncricinfo.com/series/x-{series_id}/x-{match_id}/full-scorecard"
             try:
                 logger.info(
                     "scraping_match",

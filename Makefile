@@ -27,13 +27,13 @@ dbt-docs: ## Generate and serve dbt docs
 test: ## Run pytest
 	$(PYTHON) -m pytest tests/ -v
 
-lint: ## Run linting (ruff + black check)
+lint: ## Run linting (ruff check + ruff format check)
 	ruff check src/ tests/
-	black --check src/ tests/
+	ruff format --check src/ tests/
 
 format: ## Auto-format code
 	ruff check --fix src/ tests/
-	black src/ tests/
+	ruff format src/ tests/
 
 all: setup ingest transform ## Full pipeline: setup + ingest + transform
 

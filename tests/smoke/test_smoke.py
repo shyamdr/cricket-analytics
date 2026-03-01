@@ -77,7 +77,7 @@ class TestDatabase:
         tables = [
             r[0]
             for r in db_conn.execute(
-                "SELECT table_name FROM information_schema.tables " "WHERE table_schema = 'bronze'"
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'bronze'"
             ).fetchall()
         ]
         assert "matches" in tables

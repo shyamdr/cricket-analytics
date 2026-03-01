@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 st.title("🏏 IPL Cricket Analytics")
-st.markdown("Explore IPL stats powered by DuckDB. " "Use the sidebar to navigate between pages.")
+st.markdown("Explore IPL stats powered by DuckDB. Use the sidebar to navigate between pages.")
 
 # Summary stats
 from src.config import settings  # noqa: E402

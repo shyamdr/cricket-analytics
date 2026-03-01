@@ -32,7 +32,8 @@
 - [ ] Streamlit UI improvements — functional but needs polish
 
 ## Recently Completed
-- [x] pytest test suite: 79 tests (27 unit, 38 integration, 14 smoke) — all passing, pushed to GitHub
+- [x] Explicit bronze DDL + full Cricsheet field expansion — 36-column matches table, 30-column deliveries table with CREATE TABLE IF NOT EXISTS. Parser now captures: meta.created, meta.revision, team_type, match_type_number, officials (JSON), supersubs (JSON), missing (JSON), event_group, toss_uncontested, non_boundary, review (6 fields: by/umpire/batter/decision/type/umpires_call), replacements (JSON). 9 new unit tests (107 total). Requires full_refresh rebuild of DuckDB.
+- [x] pytest test suite: 107 tests (36 unit, 38 integration, 14 smoke) — all passing, pushed to GitHub
   - Unit: ingestion JSON parsing (match info + deliveries), config validation
   - Integration: gold layer data quality (row counts, constraints, referential integrity, season regression), all API endpoints
   - Smoke: DB connectivity, schema existence, API startup, imports
@@ -61,9 +62,9 @@ Priority order from senior architecture review. Tackle one at a time.
 
 ### Lower Priority (cleanup / DevOps)
 - [x] asyncio.run() inside sync wrappers is fragile — replaced with `run_async()` utility in `src/utils.py` that detects whether an event loop is already running. If no loop: uses `asyncio.run()`. If loop exists (Dagster async, Jupyter, uvicorn): offloads to a background thread. Applied to `scrape_matches()` in espn_client.py and `SeriesResolver.resolve()` in series_resolver.py.
-- [ ] _ensure_tables in bronze_loader infers schema from first batch — NULL columns in first batch → wrong types; define explicit CREATE TABLE schemas
-- [ ] Docker compose builds image 3x — pipeline/api/ui all use build:.; should build once + reference with image:
-- [ ] Pre-commit has both ruff-format and black — redundant, can conflict; drop black, use ruff format only
+- [x] _ensure_tables in bronze_loader infers schema from first batch — replaced with explicit `_MATCHES_DDL` (36 columns) and `_DELIVERIES_DDL` (30 columns) CREATE TABLE IF NOT EXISTS statements. Tables are created before any data is parsed, so NULL-heavy first batches no longer cause wrong types.
+- [x] Docker compose builds image 3x — pipeline now builds + tags `cricket-analytics:latest`, api and ui reuse via `image:`. Also added missing `dbt seed` to pipeline command.
+- [x] Pre-commit has both ruff-format and black — removed black entirely; ruff handles both linting and formatting
 - [ ] CI doesn't cache pip dependencies — pip install from scratch every run; add actions/cache
 - [ ] No `make enrich` command — inconsistent with otherwise clean Makefile interface
 - [ ] Remove dead code download_matches() in downloader.py — backward-compat wrapper, nothing references it
@@ -76,7 +77,7 @@ Deep review of ingestion, dbt, Dagster, and DuckDB pipeline. Core DE showcase ar
 ### Ingestion Layer (Python → Bronze)
 - [ ] Add transaction boundaries (BEGIN/COMMIT) around bronze writes — matches + deliveries insert is not atomic; crash between them = orphaned rows
 - [ ] Batch processing for large datasets — all JSON files parsed into memory before write; will OOM on Tests/ODI datasets with millions of deliveries
-- [ ] Define explicit DDL for bronze tables — _ensure_tables infers schema from first PyArrow batch; NULL columns → wrong types (overlaps with arch review item)
+- [x] Define explicit DDL for bronze tables — explicit CREATE TABLE DDL for matches (36 cols) and deliveries (30 cols). Also expanded parser to capture ALL Cricsheet fields: meta (created, revision), team_type, match_type_number, officials (JSON), supersubs (JSON), missing (JSON), event_group, toss_uncontested, non_boundary, review (6 fields), replacements (JSON). 9 new unit tests, 107 total passing.
 - [ ] Safe people.csv loading — DROP+CREATE is not crash-safe; load into staging table, validate, then swap
 - [ ] Per-file error handling in ingestion — one malformed JSON kills the entire batch; parse with try/except, collect failures into dead-letter log
 - [ ] Skip unchanged downloads — downloader always re-downloads full zip; use HTTP ETag/If-Modified-Since or local file existence check
@@ -206,7 +207,7 @@ After fixing the asset graph, you only need:
 - dbt profiles.yml uses relative path ../../data/cricket.duckdb
 - Commit convention: conventional commits (feat:, fix:, docs:, refactor:, etc.) with detailed descriptions
 - Season normalization: '2007/08'→'2008', '2009/10'→'2010', '2020/21'→'2020' (special case — COVID)
-- Black version pinned to >=25.1.0,<27 to match CI (currently 26.1.0)
+- Formatting: ruff format (black-compatible, single tool for lint + format)
 
 ## Git Standards
 - Clear commit titles with conventional commit prefixes

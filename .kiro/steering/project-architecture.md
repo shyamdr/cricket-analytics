@@ -23,7 +23,7 @@ testing, scalability, documentation. Everything free/open-source.
 | Data Enrichment  | python-espncricinfo, Open-Meteo | ESPN match data via Playwright, free weather API |
 | ML (future)      | scikit-learn, XGBoost, MLflow | All free, MLflow for experiment tracking        |
 | CI/CD            | GitHub Actions              | Free for public repos                            |
-| Linting/Format   | ruff, black                 | Fast, standard                                   |
+| Linting/Format   | ruff                        | Fast, standard — lint + format in one tool        |
 | Testing          | pytest, dbt tests           | Unit + integration + data quality                |
 | Containerization | Docker + docker-compose     | Environment portability (optional workflow)       |
 
@@ -119,7 +119,7 @@ make setup          # install deps, create virtualenv
 make ingest         # download from cricsheet + load into DuckDB bronze
 make transform      # dbt run (bronze → silver → gold)
 make test           # pytest + dbt test
-make lint           # ruff + black check
+make lint           # ruff check + ruff format check
 make all            # setup + ingest + transform
 make api            # start FastAPI server
 make ui             # start Streamlit app

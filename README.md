@@ -48,7 +48,7 @@ make help       # show all available commands
 make ingest     # download from Cricsheet → DuckDB bronze
 make transform  # dbt run (bronze → silver → gold)
 make test       # run pytest
-make lint       # ruff + black
+make lint       # ruff check + ruff format
 make api        # start FastAPI on :8000
 make ui         # start Streamlit on :8501
 ```
