@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 from src.api.database import DbQuery  # noqa: TC001 — runtime dep for FastAPI DI
 from src.config import settings
 
-router = APIRouter(prefix="/api/matches", tags=["matches"])
+router = APIRouter(prefix="/api/v1/matches", tags=["matches"])
 
 _gold = settings.gold_schema
 

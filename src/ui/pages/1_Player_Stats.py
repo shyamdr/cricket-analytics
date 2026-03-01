@@ -1,12 +1,12 @@
-"""Player Stats page — search and explore individual player performance."""
+"""Player Stats page -- search and explore individual player performance."""
 
 import streamlit as st
 
 from src.config import settings
 from src.ui.data import query
 
-st.set_page_config(page_title="Player Stats", page_icon="🏏", layout="wide")
-st.title("👤 Player Stats")
+st.set_page_config(page_title="Player Stats", page_icon=None, layout="wide")
+st.title("Player Stats")
 
 _gold = settings.gold_schema
 

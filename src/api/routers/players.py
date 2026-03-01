@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 from src.api.database import DbQuery  # noqa: TC001 — runtime dep for FastAPI DI
 from src.config import settings
 
-router = APIRouter(prefix="/api/players", tags=["players"])
+router = APIRouter(prefix="/api/v1/players", tags=["players"])
 
 _gold = settings.gold_schema
 
@@ -53,6 +53,8 @@ def get_player_batting(
     player_name: str,
     db: DbQuery,
     season: str | None = Query(None, description="Filter by season"),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
 ):
     """Get a player's batting innings history."""
     if season:
@@ -61,16 +63,18 @@ def get_player_batting(
             SELECT * FROM {_gold}.fact_batting_innings
             WHERE batter = $1 AND season = $2
             ORDER BY match_date
+            LIMIT $3 OFFSET $4
             """,
-            [player_name, season],
+            [player_name, season, limit, offset],
         )
     return db(
         f"""
         SELECT * FROM {_gold}.fact_batting_innings
         WHERE batter = $1
         ORDER BY match_date
+        LIMIT $2 OFFSET $3
         """,
-        [player_name],
+        [player_name, limit, offset],
     )
 
 
@@ -79,6 +83,8 @@ def get_player_bowling(
     player_name: str,
     db: DbQuery,
     season: str | None = Query(None, description="Filter by season"),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
 ):
     """Get a player's bowling innings history."""
     if season:
@@ -87,14 +93,16 @@ def get_player_bowling(
             SELECT * FROM {_gold}.fact_bowling_innings
             WHERE bowler = $1 AND season = $2
             ORDER BY match_date
+            LIMIT $3 OFFSET $4
             """,
-            [player_name, season],
+            [player_name, season, limit, offset],
         )
     return db(
         f"""
         SELECT * FROM {_gold}.fact_bowling_innings
         WHERE bowler = $1
         ORDER BY match_date
+        LIMIT $2 OFFSET $3
         """,
-        [player_name],
+        [player_name, limit, offset],
     )

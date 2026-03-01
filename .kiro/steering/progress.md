@@ -16,6 +16,7 @@
 - [x] FastAPI endpoints (5 routers: players, teams, matches, batting, bowling)
 - [x] Streamlit UI (home, player stats, team analytics, match explorer, trends)
 - [x] Fix: season normalization bug — '2020/21' was merging with '2021' (120 matches → correctly split into 60+60)
+- [x] Format-agnostic season derivation — replaced hardcoded CASE/split_part logic with `EXTRACT(YEAR FROM match_date)`. Eliminates IPL-specific '2020/21' special case. Works correctly for BBL (split-year seasons span Dec-Feb) and all other leagues. Original Cricsheet season preserved as `season_raw` in silver layer.
 
 ## Verified Data (gold layer, post-season-fix)
 - dim_matches: 1,169 rows (18 seasons: 2008–2025, including 2020 COVID UAE bubble)
@@ -172,7 +173,7 @@ bronze_people ───→ stg_people ──→ dim_players
 - DuckDB schemas: bronze.*, main_silver.*, main_gold.* (dbt prefixes with "main_")
 - dbt profiles.yml uses relative path ../../data/cricket.duckdb
 - Commit convention: conventional commits (feat:, fix:, docs:, refactor:, etc.) with detailed descriptions
-- Season normalization: '2007/08'→'2008', '2009/10'→'2010', '2020/21'→'2020' (special case — COVID)
+- Season derivation: `EXTRACT(YEAR FROM match_date)` — format-agnostic, no hardcoded special cases. `season_raw` preserved in silver for reference.
 - Formatting: ruff format (black-compatible, single tool for lint + format)
 
 ## Git Standards

@@ -37,11 +37,31 @@ select
     d.is_four,
     d.is_six,
     d.is_dot_ball,
-    -- Phase classification
+    -- Phase classification: derived from max_overs to support all formats.
+    -- T20: powerplay 0-5, middle 6-14, death 15-19
+    -- ODI: powerplay 0-9, middle 10-39, death 40-49
+    -- Tests/other: NULL (no phase concept)
     case
-        when d.over_num between 0 and 5 then 'powerplay'
-        when d.over_num between 6 and 14 then 'middle'
-        when d.over_num between 15 and 19 then 'death'
+        when m.max_overs = 20 then
+            case
+                when d.over_num between 0 and 5 then 'powerplay'
+                when d.over_num between 6 and 14 then 'middle'
+                when d.over_num between 15 and 19 then 'death'
+            end
+        when m.max_overs = 50 then
+            case
+                when d.over_num between 0 and 9 then 'powerplay'
+                when d.over_num between 10 and 39 then 'middle'
+                when d.over_num between 40 and 49 then 'death'
+            end
+        when m.max_overs = 100 then
+            -- The Hundred uses 100 balls (roughly 16.4 overs)
+            case
+                when d.over_num between 0 and 5 then 'powerplay'
+                when d.over_num between 6 and 11 then 'middle'
+                when d.over_num between 12 and 16 then 'death'
+            end
+        else null  -- Tests and unknown formats: no phase
     end as phase
 from {{ ref('stg_deliveries') }} d
 join {{ ref('stg_matches') }} m on d.match_id = m.match_id

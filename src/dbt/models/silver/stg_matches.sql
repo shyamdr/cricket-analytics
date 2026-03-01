@@ -6,17 +6,16 @@ with source as (
 select
     match_id,
     data_version,
-    -- Normalize season: extract the calendar year matches were actually played in.
-    -- "2007/08" → "2008" (IPL 1, played Apr-Jun 2008)
-    -- "2009/10" → "2010" (IPL 3, played Mar-Apr 2010)
-    -- "2020/21" → "2020" (IPL played Sep-Nov 2020 in UAE due to COVID)
-    case
-        when season = '2020/21'
-            then '2020'
-        when season like '%/%'
-            then '20' || split_part(season, '/', 2)
-        else season
-    end as season,
+    -- Keep the raw Cricsheet season for reference (e.g. '2020/21', '2025')
+    season as season_raw,
+    -- Derive season from the actual match date — format-agnostic.
+    -- Works correctly across all leagues and edge cases:
+    --   IPL 2007/08 (played Apr-Jun 2008) → '2008'
+    --   IPL 2020/21 (COVID, played Sep-Nov 2020) → '2020'
+    --   BBL 2020/21 (played Dec 2020 - Feb 2021) → '2020' or '2021' per match
+    --   IPL 2025 → '2025'
+    -- No hardcoded special cases needed.
+    cast(extract(year from cast(date as date)) as varchar) as season,
     cast(date as date) as match_date,
     city,
     venue,

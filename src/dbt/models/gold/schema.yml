@@ -64,6 +64,7 @@ models:
       - name: player_id
         description: "8-char hex Cricsheet identifier — stable unique ID across all matches"
         tests:
+          - unique
           - not_null
       - name: player_name
         description: "Short display name as used in match data (e.g. 'V Kohli')"
@@ -178,7 +179,7 @@ models:
       - name: is_dot_ball
         description: "True if legal delivery with 0 total runs"
       - name: phase
-        description: "Derived match phase: 'powerplay' (overs 0-5), 'middle' (6-14), 'death' (15-19). NULL for overs outside this range."
+        description: "Derived match phase based on format. T20: powerplay (0-5), middle (6-14), death (15-19). ODI: powerplay (0-9), middle (10-39), death (40-49). NULL for Tests and unknown formats."
 
   - name: fact_batting_innings
     description: "Batting aggregates — one row per batter per match innings (excluding super overs)."
@@ -260,7 +261,7 @@ models:
       - name: overs_bowled
         description: "Overs bowled in cricket notation (e.g. 4.0, 3.2 = 3 overs and 2 balls)"
       - name: runs_conceded
-        description: "Total runs conceded including extras"
+        description: "Runs charged to the bowler: batter_runs + wides + noballs + penalty. Excludes byes and legbyes (not the bowler's fault)."
         tests:
           - not_null
       - name: wickets
@@ -278,7 +279,7 @@ models:
       - name: sixes_conceded
         description: "Number of 6s hit off this bowler"
       - name: economy_rate
-        description: "Economy rate: runs conceded per over (runs * 6 / legal_balls), rounded to 2 decimal places. 0 if no balls bowled."
+        description: "Economy rate: bowler's runs conceded per over (excludes byes/legbyes). Calculated as (batter_runs + wides + noballs + penalty) * 6 / legal_balls, rounded to 2 decimal places. 0 if no balls bowled."
         tests:
           - not_null
 

@@ -40,13 +40,27 @@ defs = Definitions(
     },
 )
 
-# Apply freshness policy to gold layer assets only
-_GOLD_ASSET_PREFIXES = ("gold/",)
+# Apply freshness policy to gold layer assets only.
+# dagster-dbt asset keys use the dbt model path structure, so gold models
+# have keys like "gold/dim_matches", "gold/fact_deliveries", etc.
+# We also match on the model name prefix as a fallback in case the
+# translator flattens the key (e.g. "dim_matches", "fact_").
+_GOLD_MODEL_PREFIXES = ("dim_", "fact_")
+
+
+def _is_gold_asset(spec) -> bool:
+    """Check if an asset spec belongs to the gold layer."""
+    key_str = spec.key.to_user_string()
+    # Match "gold/" prefix (dagster-dbt default path-based keys)
+    if "gold/" in key_str or "/gold/" in key_str:
+        return True
+    # Fallback: match on gold model naming convention
+    last_segment = key_str.rsplit("/", 1)[-1]
+    return any(last_segment.startswith(p) for p in _GOLD_MODEL_PREFIXES)
+
 
 defs = defs.map_asset_specs(
     func=lambda spec: (
-        apply_freshness_policy(spec, gold_freshness_policy)
-        if any(spec.key.to_user_string().startswith(p) for p in _GOLD_ASSET_PREFIXES)
-        else spec
+        apply_freshness_policy(spec, gold_freshness_policy) if _is_gold_asset(spec) else spec
     ),
 )

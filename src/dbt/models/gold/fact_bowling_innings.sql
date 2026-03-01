@@ -1,5 +1,6 @@
 -- Bowling innings: per-bowler-per-match aggregates
 -- Reads from silver (stg_deliveries) with explicit super_over filter
+-- Note: runs_conceded excludes byes and legbyes (not charged to bowler)
 with deliveries as (
     select
         d.*,
@@ -21,7 +22,9 @@ select
     -- Overs bowled (e.g. 4.0, 3.2)
     floor(count(*) filter (where is_legal_delivery) / 6)
         + (count(*) filter (where is_legal_delivery) % 6) * 0.1 as overs_bowled,
-    sum(total_runs) as runs_conceded,
+    -- Runs charged to bowler: batter runs + wides + noballs + penalty
+    -- Byes and legbyes are NOT the bowler's fault
+    sum(batter_runs + extras_wides + extras_noballs + extras_penalty) as runs_conceded,
     count(*) filter (where is_wicket
         and wicket_kind not in ('run out', 'retired hurt', 'retired out', 'obstructing the field')
     ) as wickets,
@@ -30,11 +33,12 @@ select
     sum(extras_noballs) as noballs,
     count(*) filter (where is_four) as fours_conceded,
     count(*) filter (where is_six) as sixes_conceded,
-    -- Economy rate: runs per over
+    -- Economy rate: runs per over (bowler's runs only)
     case
         when count(*) filter (where is_legal_delivery) > 0
             then round(
-                sum(total_runs) * 6.0 / count(*) filter (where is_legal_delivery), 2
+                sum(batter_runs + extras_wides + extras_noballs + extras_penalty) * 6.0
+                / count(*) filter (where is_legal_delivery), 2
             )
         else 0
     end as economy_rate

@@ -30,9 +30,13 @@ from src.enrichment.series_resolver import SeriesResolver
 logger = structlog.get_logger(__name__)
 
 
-def get_matches_for_season(season: str) -> list[dict[str, str]]:
+def get_matches_for_season(
+    season: str, conn: duckdb.DuckDBPyConnection | None = None
+) -> list[dict[str, str]]:
     """Query DuckDB for all matches in a given season with dates."""
-    conn = get_read_conn()
+    close_after = conn is None
+    if conn is None:
+        conn = get_read_conn()
     rows = conn.execute(
         f"""SELECT match_id, match_date, season
            FROM {settings.gold_schema}.dim_matches
@@ -40,25 +44,31 @@ def get_matches_for_season(season: str) -> list[dict[str, str]]:
            ORDER BY match_date""",
         [season],
     ).fetchall()
-    conn.close()
+    if close_after:
+        conn.close()
     return [{"match_id": r[0], "match_date": str(r[1]), "season": r[2]} for r in rows]
 
 
-def get_all_matches() -> list[dict[str, str]]:
+def get_all_matches(conn: duckdb.DuckDBPyConnection | None = None) -> list[dict[str, str]]:
     """Query DuckDB for all matches across all seasons."""
-    conn = get_read_conn()
+    close_after = conn is None
+    if conn is None:
+        conn = get_read_conn()
     rows = conn.execute(
         f"""SELECT match_id, match_date, season
            FROM {settings.gold_schema}.dim_matches
            ORDER BY match_date""",
     ).fetchall()
-    conn.close()
+    if close_after:
+        conn.close()
     return [{"match_id": r[0], "match_date": str(r[1]), "season": r[2]} for r in rows]
 
 
-def get_already_scraped() -> set[str]:
+def get_already_scraped(conn: duckdb.DuckDBPyConnection | None = None) -> set[str]:
     """Get match IDs already in bronze.espn_matches."""
-    conn = get_read_conn()
+    close_after = conn is None
+    if conn is None:
+        conn = get_read_conn()
     try:
         rows = conn.execute(
             f"SELECT cricsheet_match_id FROM {settings.bronze_schema}.espn_matches"
@@ -66,7 +76,8 @@ def get_already_scraped() -> set[str]:
         result = {r[0] for r in rows}
     except duckdb.CatalogException:
         result = set()
-    conn.close()
+    if close_after:
+        conn.close()
     return result
 
 
@@ -78,15 +89,22 @@ def run_enrichment(
     delay: float = 4.0,
 ) -> None:
     """Run the ESPN enrichment pipeline."""
-    # Get matches to process
-    if all_seasons:
-        all_matches = get_all_matches()
-    elif season:
-        all_matches = get_matches_for_season(season)
-    else:
-        return
+    # Single connection for all read queries
+    conn = get_read_conn()
+    try:
+        # Get matches to process
+        if all_seasons:
+            all_matches = get_all_matches(conn)
+        elif season:
+            all_matches = get_matches_for_season(season, conn)
+        else:
+            conn.close()
+            return
 
-    already_scraped = get_already_scraped()
+        already_scraped = get_already_scraped(conn)
+    finally:
+        conn.close()
+
     pending = [m for m in all_matches if m["match_id"] not in already_scraped]
 
     if limit:

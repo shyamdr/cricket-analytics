@@ -1,15 +1,15 @@
-"""Cricket Analytics — Streamlit UI."""
+"""Cricket Analytics -- Streamlit UI."""
 
 import streamlit as st
 
 st.set_page_config(
     page_title="Cricket Analytics",
-    page_icon="🏏",
+    page_icon=None,
     layout="wide",
 )
 
-st.title("🏏 IPL Cricket Analytics")
-st.markdown("Explore IPL stats powered by DuckDB. Use the sidebar to navigate between pages.")
+st.title("Cricket Analytics")
+st.markdown("Explore cricket stats powered by DuckDB. Use the sidebar to navigate between pages.")
 
 # Summary stats
 from src.config import settings  # noqa: E402

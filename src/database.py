@@ -81,8 +81,8 @@ def append_to_bronze(
 ) -> int:
     """Idempotent append of a PyArrow table into a bronze DuckDB table.
 
-    Checks for existing rows by ``id_column``, filters duplicates, then
-    creates the table (first run) or appends new rows.
+    Uses a SQL anti-join for dedup instead of loading all existing IDs
+    into Python memory. Scales to millions of rows without OOM.
 
     Args:
         conn: An open read-write DuckDB connection.
@@ -93,43 +93,45 @@ def append_to_bronze(
     Returns:
         Number of new rows inserted.
     """
-    import pyarrow as pa
-
     if data.num_rows == 0:
         return 0
 
-    # Check which IDs already exist
-    existing_ids: set[str] = set()
-    table_exists = False
-    try:
-        rows = conn.execute(f"SELECT {id_column} FROM {table_name}").fetchall()
-        existing_ids = {str(r[0]) for r in rows}
-        table_exists = True
-    except duckdb.CatalogException:
-        pass
-
-    # Filter out duplicates using PyArrow compute
-    if existing_ids:
-        import pyarrow.compute as pc
-
-        id_array = data.column(id_column)
-        mask = pc.invert(pc.is_in(id_array, value_set=pa.array(list(existing_ids))))
-        data = data.filter(mask)
-
-    if data.num_rows == 0:
-        logger.info("no_new_rows", table=table_name, existing=len(existing_ids))
-        return 0
-
-    # Register temp view, create or append, unregister
     tmp_name = "_tmp_bronze_load"
     conn.register(tmp_name, data)
+
     try:
-        if table_exists:
-            conn.execute(f"INSERT INTO {table_name} SELECT * FROM {tmp_name}")
-        else:
+        # Check if target table exists
+        table_exists = False
+        try:
+            conn.execute(f"SELECT 1 FROM {table_name} LIMIT 0")
+            table_exists = True
+        except duckdb.CatalogException:
+            pass
+
+        if not table_exists:
             conn.execute(f"CREATE TABLE {table_name} AS SELECT * FROM {tmp_name}")
+            new_rows = data.num_rows
+        else:
+            # Count before insert
+            (count_before,) = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+
+            # Anti-join dedup: only insert rows whose id_column is not already present
+            conn.execute(
+                f"""INSERT INTO {table_name}
+                    SELECT t.* FROM {tmp_name} t
+                    WHERE t.{id_column} NOT IN (
+                        SELECT DISTINCT {id_column} FROM {table_name}
+                    )"""
+            )
+
+            (count_after,) = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+            new_rows = count_after - count_before
     finally:
         conn.unregister(tmp_name)
 
-    logger.info("bronze_append", table=table_name, new_rows=data.num_rows)
-    return data.num_rows
+    if new_rows > 0:
+        logger.info("bronze_append", table=table_name, new_rows=new_rows)
+    else:
+        logger.info("no_new_rows", table=table_name)
+
+    return new_rows

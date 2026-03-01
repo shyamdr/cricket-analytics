@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query
 from src.api.database import DbQuery  # noqa: TC001 — runtime dep for FastAPI DI
 from src.config import settings
 
-router = APIRouter(prefix="/api/batting", tags=["batting"])
+router = APIRouter(prefix="/api/v1/batting", tags=["batting"])
 
 _gold = settings.gold_schema
 

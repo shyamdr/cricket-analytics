@@ -11,8 +11,10 @@ models:
           - not_null
       - name: data_version
         description: "Cricsheet data format version (e.g. '1.0.0', '1.1.0')"
+      - name: season_raw
+        description: "Original season string from Cricsheet (e.g. '2007/08', '2020/21', '2025'). Preserved for reference and debugging."
       - name: season
-        description: "Normalized season string. Split-year seasons converted to calendar year (e.g. '2007/08' → '2008'). Special case: '2020/21' → '2020' (COVID UAE bubble)."
+        description: "Derived season: calendar year extracted from match_date. Format-agnostic — works across all leagues without hardcoded special cases."
         tests:
           - not_null
       - name: match_date

@@ -1,4 +1,4 @@
-my services:
+services:
   pipeline:
     build: .
     image: cricket-analytics:latest

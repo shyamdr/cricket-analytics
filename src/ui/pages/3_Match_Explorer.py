@@ -1,12 +1,12 @@
-"""Match Explorer page — browse and drill into individual matches."""
+"""Match Explorer page -- browse and drill into individual matches."""
 
 import streamlit as st
 
 from src.config import settings
 from src.ui.data import query
 
-st.set_page_config(page_title="Match Explorer", page_icon="🏏", layout="wide")
-st.title("📋 Match Explorer")
+st.set_page_config(page_title="Match Explorer", page_icon=None, layout="wide")
+st.title("Match Explorer")
 
 _gold = settings.gold_schema
 
@@ -68,7 +68,7 @@ if selected_match:
     if info:
         m = info[0]
         st.markdown(
-            f"**{m['team1']}** vs **{m['team2']}** — {m['venue']}, {m['city']} ({m['match_date']})"
+            f"**{m['team1']}** vs **{m['team2']}** -- {m['venue']}, {m['city']} ({m['match_date']})"
         )
         if m["outcome_winner"]:
             margin = (

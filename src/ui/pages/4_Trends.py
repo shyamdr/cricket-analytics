@@ -1,4 +1,4 @@
-"""Trends page — scoring trends, boundary analysis, season-over-season."""
+"""Trends page -- scoring trends, boundary analysis, season-over-season."""
 
 import pandas as pd
 import streamlit as st
@@ -6,8 +6,8 @@ import streamlit as st
 from src.config import settings
 from src.ui.data import query
 
-st.set_page_config(page_title="Trends", page_icon="🏏", layout="wide")
-st.title("📈 IPL Trends")
+st.set_page_config(page_title="Trends", page_icon=None, layout="wide")
+st.title("Scoring Trends")
 
 _gold = settings.gold_schema
 

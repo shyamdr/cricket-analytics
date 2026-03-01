@@ -1,7 +1,9 @@
 """Centralized configuration for the cricket-analytics project."""
 
+import re
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 # Cricsheet dataset registry — maps dataset keys to download URLs.
@@ -84,6 +86,19 @@ class Settings(BaseSettings):
     bronze_schema: str = "bronze"
     silver_schema: str = "main_silver"
     gold_schema: str = "main_gold"
+
+    @field_validator("bronze_schema", "silver_schema", "gold_schema")
+    @classmethod
+    def validate_schema_name(cls, v: str) -> str:
+        """Reject schema names that aren't valid SQL identifiers.
+
+        Prevents SQL injection via CRICKET_GOLD_SCHEMA env var etc.
+        Schema names are interpolated into f-strings throughout the
+        codebase, so they must be safe identifiers.
+        """
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", v):
+            raise ValueError(f"Invalid schema name: {v!r}")
+        return v
 
     # API
     api_host: str = "0.0.0.0"
