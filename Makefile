@@ -35,6 +35,13 @@ format: ## Auto-format code
 	ruff check --fix src/ tests/
 	ruff format src/ tests/
 
+enrich: ## Run ESPN enrichment pipeline (optional: SEASON=2024)
+ifdef SEASON
+	$(PYTHON) -m src.enrichment.run --season $(SEASON)
+else
+	$(PYTHON) -m src.enrichment.run
+endif
+
 all: setup ingest transform ## Full pipeline: setup + ingest + transform
 
 dagster: ## Start Dagster webserver (orchestration UI)

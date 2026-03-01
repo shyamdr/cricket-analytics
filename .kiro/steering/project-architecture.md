@@ -120,6 +120,7 @@ make ingest         # download from cricsheet + load into DuckDB bronze
 make transform      # dbt run (bronze → silver → gold)
 make test           # pytest + dbt test
 make lint           # ruff check + ruff format check
+make enrich         # ESPN enrichment (optional: make enrich SEASON=2024)
 make all            # setup + ingest + transform
 make api            # start FastAPI server
 make ui             # start Streamlit app

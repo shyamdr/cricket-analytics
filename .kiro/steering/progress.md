@@ -66,7 +66,7 @@ Priority order from senior architecture review. Tackle one at a time.
 - [x] Docker compose builds image 3x — pipeline now builds + tags `cricket-analytics:latest`, api and ui reuse via `image:`. Also added missing `dbt seed` to pipeline command.
 - [x] Pre-commit has both ruff-format and black — removed black entirely; ruff handles both linting and formatting
 - [x] CI doesn't cache pip dependencies — added `cache: 'pip'` to all 3 setup-python steps; keyed on pyproject.toml hash
-- [ ] No `make enrich` command — inconsistent with otherwise clean Makefile interface
+- [x] No `make enrich` command — added `make enrich` target (supports optional `SEASON=2024` arg)
 - [ ] Remove dead code download_matches() in downloader.py — backward-compat wrapper, nothing references it
 - [ ] pyproject.toml says requires-python >=3.11 but dev is on 3.13 — consider CI matrix for both
 - [ ] Integration tests have hardcoded value expectations — "Kohli > 5000 runs" is brittle; test shape/constraints instead
