@@ -1,14 +1,15 @@
 services:
   pipeline:
     build: .
+    image: cricket-analytics:latest
     volumes:
       - ./data:/app/data
     command: >
       sh -c "python -m src.ingestion.run &&
-             cd src/dbt && dbt run --profiles-dir ."
+             cd src/dbt && dbt seed --profiles-dir . && dbt run --profiles-dir ."
 
   api:
-    build: .
+    image: cricket-analytics:latest
     ports:
       - "8000:8000"
     volumes:
@@ -19,7 +20,7 @@ services:
         condition: service_completed_successfully
 
   ui:
-    build: .
+    image: cricket-analytics:latest
     ports:
       - "8501:8501"
     volumes:
