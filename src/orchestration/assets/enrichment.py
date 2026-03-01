@@ -5,7 +5,7 @@ Discovers series_ids dynamically, scrapes captain/keeper/roles/floodlit/
 start_time, and loads into bronze.espn_matches.
 """
 
-from dagster import AssetExecutionContext, Config, MaterializeResult, MetadataValue, asset
+from dagster import AssetExecutionContext, AssetKey, Config, MaterializeResult, MetadataValue, asset
 
 from src.enrichment.bronze_loader import load_espn_to_bronze
 from src.enrichment.espn_client import scrape_matches
@@ -25,7 +25,7 @@ class EnrichmentConfig(Config):
 @asset(
     group_name="enrichment",
     compute_kind="python",
-    deps=["bronze_matches"],
+    deps=[AssetKey(["gold", "dim_matches"])],
     description=(
         "Scrape ESPN match data (captain, keeper, player roles, floodlit, "
         "start time) and load into bronze.espn_matches. Delta-aware — "

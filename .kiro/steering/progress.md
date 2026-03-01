@@ -135,54 +135,19 @@ bronze_people ───→ stg_people ──→ dim_players
 ```
 
 ### Step 1: Wire dbt source assets to Python bronze assets
-- [ ] Map dbt sources to Dagster asset keys — in @dbt_assets, configure source_asset_key_map or add meta tags in sources.yml so Dagster knows source('bronze', 'matches') = the bronze_matches Python asset. Without this, the DAG is disconnected and dbt can run before ingestion.
-  - Option A: In sources.yml, add `meta: { dagster: { asset_key: ["bronze_matches"] } }` to each source table
-  - Option B: Use `@dbt_assets(source_asset_key_map=...)` parameter
-  - This is the single most important fix — it connects the entire graph
+- [x] Map dbt sources to Dagster asset keys — added `meta: { dagster: { asset_key: ["bronze_matches"] } }` to matches and deliveries sources, `asset_key: ["bronze_people"]` to people source in sources.yml. Enabled `DagsterDbtTranslatorSettings(enable_duplicate_source_asset_keys=True)` in dbt.py since matches+deliveries share the same bronze_matches asset. DAG is now fully connected: bronze → silver → gold → enrichment.
 
 ### Step 2: Fix espn_enrichment dependency
-- [ ] Change espn_enrichment deps from ["bronze_matches"] to the dbt dim_matches asset key — the enrichment asset queries main_gold.dim_matches to get the match list, so it must run AFTER dbt, not after bronze ingestion. Current dep means Dagster thinks enrichment can run right after bronze, but it'll fail because dim_matches doesn't exist yet.
-  - After Step 1, the dbt dim_matches model becomes a proper Dagster asset
-  - Change to: `deps=[AssetKey("dim_matches")]` or however dagster-dbt exposes the model key
-  - Verify in Dagster UI that the lineage shows: bronze → dbt → enrichment
+- [x] Changed espn_enrichment deps from `["bronze_matches"]` to `[AssetKey(["gold", "dim_matches"])]` — enrichment now correctly depends on the dbt gold layer, not bronze. Dagster will refuse to run enrichment without dim_matches being materialized first.
 
-### Step 3: Fix job definitions
-
-#### full_pipeline_job — AssetSelection.all()
-- [ ] Status: KEEP. Works correctly, useful for CLI `make all` equivalent. Redundant with "Materialize All" in UI but harmless.
-
-#### ingestion_job — AssetSelection.groups("bronze")
-- [ ] Status: KEEP. Clean, correct, materializes bronze_matches + bronze_people.
-
-#### transformation_job — complex set arithmetic (BROKEN)
-- [ ] REWRITE. Current selection `AssetSelection.groups("bronze", "enrichment").downstream() - AssetSelection.groups("bronze", "enrichment")` is fragile and hard to reason about. If you add a new asset group (e.g., "ml") downstream of bronze, it gets accidentally included.
-  - Fix: select dbt assets directly. Either `AssetSelection.assets("dbt_analytics_assets")` or tag dbt models with a group and use `AssetSelection.groups("dbt")`.
-  - After Step 1, this becomes trivial because the dbt assets are properly connected.
-
-#### enrichment_job — AssetSelection.groups("enrichment") (BROKEN DEPENDENCY)
-- [ ] Status: works in isolation but will fail if dbt hasn't run. After Step 2, the dependency is correct and Dagster will refuse to run enrichment without dim_matches being materialized. No code change needed on the job itself — the fix is in the asset dependency.
-
-#### delta_pipeline_job (BROKEN — multiple issues)
-- [ ] REWRITE COMPLETELY. Three problems:
-  1. Selection `groups("bronze") | groups("enrichment").upstream()` — since espn_enrichment's upstream is only bronze_matches (wrong dep), this resolves to just `groups("bronze")`. dbt is NOT included. So delta ingests new matches but never transforms them to gold. The new matches are invisible to the API/UI.
-  2. Config uses legacy `"ops"` key — should use `RunConfig` from the current Dagster API:
-     ```python
-     from dagster import RunConfig
-     config=RunConfig(ops={"bronze_matches": IngestionConfig(datasets=["recent_7"], full_refresh=False)})
-     ```
-  3. Baking config into the job definition is inflexible — can't change datasets without creating a new job. Better: use a schedule or sensor that provides config at runtime via `RunRequest`.
-  - After Steps 1+2, the correct selection is just `AssetSelection.assets("bronze_matches")` — Dagster will automatically include dbt and enrichment as downstream dependencies.
-
-#### daily_delta_schedule (BROKEN — schedules the broken job)
-- [ ] REWRITE after fixing delta_pipeline_job. Consider replacing with a sensor that checks Cricsheet for new data before triggering, rather than blind daily cron.
-
-### Step 4: Simplify to 3 jobs (target state)
-After fixing the asset graph, you only need:
-- [ ] `full_pipeline` — `AssetSelection.all()` — rebuild everything from scratch
-- [ ] `daily_refresh` — schedule/sensor that materializes bronze_matches with recent_7 config; Dagster auto-runs dbt + enrichment downstream because the graph is correct
-- [ ] `enrichment_backfill` — `AssetSelection.assets("espn_enrichment")` — for manually scraping historical seasons
-- [ ] Remove `transformation_job` — unnecessary; just click "Materialize" on dbt assets in UI, or they run automatically as part of full_pipeline/daily_refresh
-- [ ] Remove `ingestion_job` — same reasoning; click "Materialize" on bronze assets in UI
+### Step 3+4: Simplify jobs (3 jobs + 1 schedule)
+- [x] Rewrote jobs.py — simplified from 6 jobs + 1 schedule to 3 jobs + 1 schedule:
+  - `full_pipeline` — `AssetSelection.all()` (kept as-is)
+  - `daily_refresh` — `AssetSelection.all()` with `RunConfig(ops={"bronze_matches": IngestionConfig(datasets=["recent_7"], full_refresh=False)})`. Fixed legacy `"ops"` dict config to use proper `RunConfig`.
+  - `enrichment_backfill` — `AssetSelection.groups("enrichment")` for manual historical scraping
+  - `daily_refresh` schedule at 06:00 UTC pointing to daily_refresh_job
+- [x] Removed: `ingestion_job`, `transformation_job`, `enrichment_job`, `delta_pipeline_job`, `daily_delta_schedule`
+- [x] Updated `__init__.py` to register new jobs/schedule
 
 ### Step 5: Dagster best practices to add
 - [ ] Use Dagster's `FreshnessPolicy` on gold assets — e.g., dim_matches should be no more than 24 hours stale; Dagster UI shows freshness status

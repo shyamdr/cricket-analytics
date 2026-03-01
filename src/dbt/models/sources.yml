@@ -6,7 +6,16 @@ sources:
     tables:
       - name: matches
         description: "Raw match metadata from Cricsheet JSON files"
+        meta:
+          dagster:
+            asset_key: ["bronze_matches"]
       - name: deliveries
         description: "Raw ball-by-ball delivery data from Cricsheet JSON files"
+        meta:
+          dagster:
+            asset_key: ["bronze_matches"]
       - name: people
         description: "Player/official registry from Cricsheet people.csv"
+        meta:
+          dagster:
+            asset_key: ["bronze_people"]

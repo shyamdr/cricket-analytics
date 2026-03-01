@@ -2,69 +2,51 @@
 
 from __future__ import annotations
 
-from dagster import AssetSelection, ScheduleDefinition, define_asset_job
+from dagster import AssetSelection, RunConfig, ScheduleDefinition, define_asset_job
+
+from src.orchestration.assets.ingestion import IngestionConfig
 
 # ---------------------------------------------------------------------------
 # Jobs
 # ---------------------------------------------------------------------------
 
-# Full pipeline: ingest bronze → dbt (silver + gold)
+# Full pipeline: ingest bronze → dbt (silver + gold) → enrichment
 full_pipeline_job = define_asset_job(
     name="full_pipeline",
     selection=AssetSelection.all(),
     description="Run the complete pipeline: download from Cricsheet → bronze → silver → gold → enrichment.",
 )
 
-# Ingestion only: just the bronze layer
-ingestion_job = define_asset_job(
-    name="ingestion_only",
-    selection=AssetSelection.groups("bronze"),
-    description="Download from Cricsheet and load into DuckDB bronze layer only.",
-)
-
-# Transformation only: just dbt (silver + gold)
-transformation_job = define_asset_job(
-    name="transformation_only",
-    selection=AssetSelection.groups("bronze", "enrichment").downstream()
-    - AssetSelection.groups("bronze", "enrichment"),
-    description="Run dbt transformations only (bronze → silver → gold).",
-)
-
-# Enrichment only: ESPN scraping
-enrichment_job = define_asset_job(
-    name="enrichment_only",
-    selection=AssetSelection.groups("enrichment"),
-    description="Scrape ESPN match data (captain, keeper, roles, floodlit, start time).",
-)
-
-# Delta ingestion: recent matches + dbt rebuild
-delta_pipeline_job = define_asset_job(
-    name="delta_pipeline",
-    selection=AssetSelection.groups("bronze") | AssetSelection.groups("enrichment").upstream(),
+# Daily refresh: ingest recent matches → dbt auto-runs downstream → enrichment auto-runs downstream
+daily_refresh_job = define_asset_job(
+    name="daily_refresh",
+    selection=AssetSelection.all(),
     description=(
         "Delta pipeline: ingest recent matches from Cricsheet, "
-        "run dbt, then enrich new matches via ESPN."
+        "run dbt (silver + gold), then enrich new matches via ESPN."
     ),
-    config={
-        "ops": {
-            "bronze_matches": {
-                "config": {
-                    "datasets": ["recent_7"],
-                    "full_refresh": False,
-                }
-            }
+    config=RunConfig(
+        ops={
+            "bronze_matches": IngestionConfig(datasets=["recent_7"], full_refresh=False),
         }
-    },
+    ),
+)
+
+# Enrichment backfill: manually scrape historical seasons
+enrichment_backfill_job = define_asset_job(
+    name="enrichment_backfill",
+    selection=AssetSelection.groups("enrichment"),
+    description="Scrape ESPN match data for historical seasons (manual backfill).",
 )
 
 # ---------------------------------------------------------------------------
 # Schedules
 # ---------------------------------------------------------------------------
 
-# Daily delta: pick up new matches from Cricsheet (recent_7) at 6 AM UTC
-daily_delta_schedule = ScheduleDefinition(
-    job=delta_pipeline_job,
+# Daily at 06:00 UTC — pick up new matches from Cricsheet (recent_7)
+daily_refresh_schedule = ScheduleDefinition(
+    job=daily_refresh_job,
     cron_schedule="0 6 * * *",
-    name="daily_delta_ingestion",
+    name="daily_refresh",
     description="Daily at 06:00 UTC — ingest recent Cricsheet matches, transform, enrich.",
 )
