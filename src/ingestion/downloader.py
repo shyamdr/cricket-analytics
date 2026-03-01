@@ -62,8 +62,3 @@ def download_dataset(dataset_key: str) -> Path:
     json_count = len(list(extract_dir.glob("*.json")))
     logger.info("extraction_complete", dataset=dataset_key, json_files=json_count)
     return extract_dir
-
-
-def download_matches() -> Path:
-    """Download IPL matches (backward compatible with existing pipeline)."""
-    return download_dataset("ipl")
