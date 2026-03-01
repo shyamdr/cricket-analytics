@@ -1,5 +1,13 @@
 -- Fact deliveries: core grain table, one row per ball
 -- Enriched with match context
+-- Incremental: only processes new matches on subsequent runs
+{{
+    config(
+        materialized='incremental',
+        unique_key=['match_id', 'innings', 'over_num', 'ball_num', 'batter']
+    )
+}}
+
 select
     d.match_id,
     m.season,
@@ -38,3 +46,7 @@ select
 from {{ ref('stg_deliveries') }} d
 join {{ ref('stg_matches') }} m on d.match_id = m.match_id
 where d.is_super_over = false
+
+{% if is_incremental() %}
+    and d.match_id not in (select distinct match_id from {{ this }})
+{% endif %}
