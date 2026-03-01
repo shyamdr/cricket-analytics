@@ -226,11 +226,16 @@ def _parse_deliveries(match_id: str, data: dict[str, Any]) -> list[dict[str, Any
     return rows
 
 
+_BATCH_SIZE = 1000  # files per batch — keeps memory bounded for large datasets
+
+
 def load_matches_to_bronze(matches_dir: Path, full_refresh: bool = False) -> int:
     """Parse match JSONs and load into bronze.matches and bronze.deliveries.
 
-    Delta-aware: only inserts matches not already in bronze. Use
-    full_refresh=True to drop and rebuild (backward compat).
+    Processes files in batches of ``_BATCH_SIZE`` to bound memory usage.
+    Each batch is written atomically (BEGIN/COMMIT). Delta-aware: only
+    inserts matches not already in bronze. Use full_refresh=True to drop
+    and rebuild.
 
     Args:
         matches_dir: Directory containing Cricsheet JSON files.
@@ -253,50 +258,68 @@ def load_matches_to_bronze(matches_dir: Path, full_refresh: bool = False) -> int
     # Ensure tables exist with correct schema (idempotent)
     _ensure_bronze_tables(conn)
 
-    # Parse all JSON files into lists
-    all_matches: list[dict[str, Any]] = []
-    all_deliveries: list[dict[str, Any]] = []
-
-    for json_file in json_files:
-        match_id = json_file.stem
-        with open(json_file) as f:
-            data = json.load(f)
-        all_matches.append(_parse_match_info(match_id, data))
-        all_deliveries.extend(_parse_deliveries(match_id, data))
-
-    if not all_matches:
+    if not json_files:
         logger.info("no_json_files_found")
         conn.close()
         return 0
 
-    matches_pa = pa.Table.from_pylist(all_matches)
-    deliveries_pa = pa.Table.from_pylist(all_deliveries) if all_deliveries else None
+    total_new = 0
+    num_batches = (len(json_files) + _BATCH_SIZE - 1) // _BATCH_SIZE
 
-    # Atomic write: both matches + deliveries succeed or neither does
-    conn.execute("BEGIN TRANSACTION")
-    try:
-        new_matches = append_to_bronze(conn, matches_table_name, matches_pa, "match_id")
+    for batch_idx in range(num_batches):
+        start = batch_idx * _BATCH_SIZE
+        batch_files = json_files[start : start + _BATCH_SIZE]
 
-        if deliveries_pa is not None and new_matches > 0:
-            append_to_bronze(conn, deliveries_table_name, deliveries_pa, "match_id")
+        batch_matches: list[dict[str, Any]] = []
+        batch_deliveries: list[dict[str, Any]] = []
 
-        conn.execute("COMMIT")
-    except Exception:
-        conn.execute("ROLLBACK")
-        conn.close()
-        raise
+        for json_file in batch_files:
+            match_id = json_file.stem
+            with open(json_file) as f:
+                data = json.load(f)
+            batch_matches.append(_parse_match_info(match_id, data))
+            batch_deliveries.extend(_parse_deliveries(match_id, data))
+
+        if not batch_matches:
+            continue
+
+        matches_pa = pa.Table.from_pylist(batch_matches)
+        deliveries_pa = pa.Table.from_pylist(batch_deliveries) if batch_deliveries else None
+
+        # Atomic write: both matches + deliveries succeed or neither does
+        conn.execute("BEGIN TRANSACTION")
+        try:
+            new_matches = append_to_bronze(conn, matches_table_name, matches_pa, "match_id")
+
+            if deliveries_pa is not None and new_matches > 0:
+                append_to_bronze(conn, deliveries_table_name, deliveries_pa, "match_id")
+
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            conn.close()
+            raise
+
+        total_new += new_matches
+        if num_batches > 1:
+            logger.info(
+                "batch_complete",
+                batch=batch_idx + 1,
+                of=num_batches,
+                new_matches=new_matches,
+            )
 
     total_matches = conn.execute(f"SELECT COUNT(*) FROM {matches_table_name}").fetchone()[0]
     total_deliveries = conn.execute(f"SELECT COUNT(*) FROM {deliveries_table_name}").fetchone()[0]
 
     logger.info(
         "bronze_load_complete",
-        new_matches=new_matches,
+        new_matches=total_new,
         total_matches=total_matches,
         total_deliveries=total_deliveries,
     )
     conn.close()
-    return new_matches
+    return total_new
 
 
 def load_people_to_bronze(people_csv: Path) -> int:
