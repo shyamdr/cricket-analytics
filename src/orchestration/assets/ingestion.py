@@ -60,6 +60,7 @@ def bronze_matches(context: AssetExecutionContext, config: IngestionConfig) -> M
 @asset(
     group_name="bronze",
     compute_kind="python",
+    deps=[bronze_matches],
     description="Download people registry CSV from Cricsheet and load into DuckDB bronze.people.",
 )
 def bronze_people(context: AssetExecutionContext) -> MaterializeResult:
