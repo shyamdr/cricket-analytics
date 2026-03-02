@@ -1,0 +1,246 @@
+# ESPN Ball-by-Ball Spatial Data — Scraping Research
+
+## What This Data Is
+
+ESPN Cricinfo stores proprietary ball-level spatial data that is NOT available in Cricsheet
+or any other free/open source. This includes:
+
+| Field | Description | Available From | Coverage |
+|-------|-------------|----------------|----------|
+| `wagonX` | X coordinate on wagon wheel (0-300 range) | 2008 | 100% of balls |
+| `wagonY` | Y coordinate on wagon wheel (0-300 range) | 2008 | 100% of balls |
+| `wagonZone` | Wagon wheel zone (0-8, 0=dot ball/no shot) | 2008 | 100% of balls |
+| `pitchLine` | Line of delivery | ~2012-2015 | 100% from ~2015 |
+| `pitchLength` | Length of delivery | ~2012-2015 | 100% from ~2015 |
+| `shotType` | Type of shot played | 2008 | ~98%+ of balls |
+| `shotControl` | Shot control rating (1=controlled, 2=uncontrolled) | ~2012-2015 | 100% from ~2015 |
+
+### pitchLine values
+`DOWN_LEG`, `ON_THE_STUMPS`, `OUTSIDE_OFFSTUMP`, `WIDE_DOWN_LEG`, `WIDE_OUTSIDE_OFFSTUMP`
+
+### pitchLength values
+`FULL`, `FULL_TOSS`, `GOOD_LENGTH`, `SHORT`, `SHORT_OF_A_GOOD_LENGTH`, `YORKER`
+
+### shotType values (modern, 2015+)
+`COVER_DRIVE`, `CUT_SHOT`, `DAB`, `DEFENDED`, `FLICK`, `HOOK`, `LEFT_ALONE`,
+`LEG_GLANCE`, `ON_DRIVE`, `PULL`, `PUSH`, `RAMP`, `REVERSE_SWEEP`, `SLOG_SHOT`,
+`SLOG_SWEEP`, `SQUARE_DRIVE`, `STEERED`, `STRAIGHT_DRIVE`, `SWEEP_SHOT`, `UPPER_CUT`
+
+### shotType values (legacy, 2008-era)
+Different naming convention: `CUT_SHOT_ON_BACK_FOOT`, `FORWARD_DEFENCE`,
+`OFF_SIDE_DRIVE_ON_FRONT_FOOT`, `NO_SHOT`, etc. Will need a mapping table
+to normalize old and new names.
+
+### shotControl values
+`1` = controlled, `2` = uncontrolled. Missing on wides (no shot played).
+
+### Other fields available per ball (from the commentary API)
+- `id` — unique ESPN ball ID
+- `inningNumber` — 1 or 2
+- `overNumber` — 1-indexed over number
+- `ballNumber` — ball within the over
+- `oversActual` — e.g. 17.6 (over.ball format)
+- `oversUnique` — e.g. 17.06
+- `batsmanPlayerId` — ESPN player ID for batter
+- `bowlerPlayerId` — ESPN player ID for bowler
+- `nonStrikerPlayerId` — ESPN player ID for non-striker
+- `batsmanRuns` — runs scored by batter
+- `totalRuns` — total runs off the ball
+- `totalInningRuns` — cumulative innings total
+- `totalInningWickets` — cumulative wickets
+- `isFour`, `isSix`, `isWicket` — boolean flags
+- `wides`, `noballs`, `byes`, `legbyes`, `penalties` — extras
+- `dismissalType` — e.g. "caught", "bowled" (null if not out)
+- `dismissalText` — human-readable dismissal description
+- `outPlayerId` — ESPN player ID of dismissed batter
+- `timestamp` — ISO timestamp of the ball
+- `title` — human-readable ball description (e.g. "Bumrah to Kohli, FOUR")
+- `commentTextItems` — array of commentary text objects
+- `smartStats` — array of contextual stats shown during commentary
+- `predictions` — win probability predictions (if available)
+
+## Where The Data Lives
+
+The data is served by ESPN's commentary API:
+```
+https://hs-consumer-api.espncricinfo.com/v1/pages/match/comments
+  ?lang=en
+  &seriesId={espn_series_id}
+  &matchId={espn_match_id}
+  &inningNumber={1|2}
+  &commentType=ALL
+  &sortDirection=DESC
+  &fromInningOver={over_number}
+```
+
+The API returns paginated responses:
+- ~12 balls per page (roughly 2 overs)
+- `nextInningOver` field for pagination (null when no more data)
+- Sorted descending (latest over first)
+- A T20 innings (~120 balls) requires ~10 API pages
+
+The initial page load (`__NEXT_DATA__`) also contains the last ~12 balls.
+
+## What Works
+
+### Working approach: Playwright route interception via scroll-triggered requests
+
+The ONLY reliable way to get this data is:
+
+1. Load the ESPN commentary page in Playwright (WebKit, headless)
+2. Set up `page.route("**/hs-consumer-api**/comments**", handler)` to intercept API calls
+3. In the handler, use `route.fetch()` to let the request through and capture the response
+4. Scroll the page to trigger the page's own JavaScript to make API calls
+5. The page uses an IntersectionObserver — when the user scrolls near the bottom,
+   it fetches the next page of commentary
+
+**Critical detail**: `route.fetch()` only succeeds (200) when intercepting a request
+that the PAGE'S OWN JavaScript initiated. If you trigger a fetch from `page.evaluate()`,
+the route still intercepts it, but `route.fetch()` gets 403 from ESPN's WAF.
+
+### Scroll technique that works reliably
+
+"Bounce scroll" — scroll to bottom, up a bit, then back down:
+```python
+height = await page.evaluate("document.body.scrollHeight")
+await page.evaluate(f"window.scrollTo(0, {height})")        # bottom
+await asyncio.sleep(0.4)
+await page.evaluate(f"window.scrollTo(0, {height - 500})")  # up
+await asyncio.sleep(0.2)
+await page.evaluate(f"window.scrollTo(0, {height + 1000})") # back down
+await asyncio.sleep(1.2)
+```
+
+This reliably triggers the IntersectionObserver. With this approach, a full T20 innings
+(~10 API pages) loads in about 20 seconds.
+
+### Verified: complete innings capture
+
+Tested on IPL 2025 Final (PBKS vs RCB, match 1473511):
+- Inning 2: 123 balls captured (12 from __NEXT_DATA__ + 111 from 9 API pages)
+- `nextInningOver` reached `None` — confirmed complete
+- All spatial fields present on every ball
+
+### Initial page data
+
+The `__NEXT_DATA__` on the commentary page always contains:
+- `content.comments` — last ~12 balls of the most recent innings (inning 2)
+- `content.currentInningNumber` — always 2 (page defaults to most recent)
+- `content.nextInningOver` — pagination cursor for the API
+- `content.innings` — list of innings with team names and inning numbers
+
+## What Does NOT Work
+
+### 1. Direct API calls (any method) — 403
+
+ESPN has a WAF (Web Application Firewall) that blocks all programmatic API calls:
+
+- `page.evaluate("fetch(url)")` — 403
+- `page.evaluate("new XMLHttpRequest()")` — 403
+- `context.request.get(url)` (Playwright API context) — 403
+- `page.goto(api_url)` (navigate directly to API) — 403
+- `page.evaluate` with injected `window.__originalFetch` — 403
+- iframe navigation to API URL — blocked (cross-origin)
+- `fetch()` with `credentials: 'include'`, custom headers, `x-requested-with` — all 403
+
+The WAF distinguishes between:
+- Requests initiated by the page's own bundled JavaScript (allowed)
+- Requests initiated by injected/evaluated JavaScript (blocked)
+
+This is likely based on:
+- Request origin/initiator chain tracking
+- Anti-bot tokens embedded in the page's JS bundle
+- TLS fingerprinting differences between Playwright's fetch and the browser's native fetch
+
+### 2. Next.js `_next/data` endpoint — 403
+
+ESPN is a Next.js app. Normally `_next/data/{buildId}/...json` returns the same data
+as `__NEXT_DATA__` but as a JSON API. ESPN's WAF blocks this too.
+
+### 3. URL query parameters for pagination — ignored
+
+The commentary page URL ignores query parameters:
+- `?innings=1`, `?inningNumber=1`, `?fromInningOver=5` — all ignored
+- `__NEXT_DATA__` always returns the same data regardless of URL params
+- The page is a single-page app; pagination is purely client-side via API
+
+### 4. Innings switching via tab click — unreliable
+
+The page has innings tabs (team abbreviations like "RCB", "PBKS"). Clicking them:
+- Sometimes works (triggers API call for the other innings)
+- Sometimes clicks the wrong element (empty text, wrong button)
+- After clicking, the scroll-based loading becomes unreliable
+- The `__NEXT_DATA__` doesn't change (it's server-rendered, tabs are client-side)
+
+## Recommended Implementation Strategy
+
+### For each match, open TWO separate page instances
+
+Since innings switching is unreliable, the safest approach is:
+
+1. Open page for inning 2 (default) → scroll to capture all balls → close page
+2. Open a NEW page for inning 2 again → click inning 1 tab → scroll → close page
+
+OR (simpler, more reliable):
+
+1. Open page → capture inning 2 via scroll (this works 100%)
+2. For inning 1: we need to find a reliable tab-click selector
+
+The tab click issue needs more investigation. Options:
+- Use `page.locator` with more specific selectors
+- Use `page.click()` with coordinates
+- Find the React component that controls innings and trigger it programmatically
+
+### Alternative: Accept inning 2 only initially
+
+If innings switching proves too fragile, we could:
+- Capture inning 2 for all matches first (this is proven reliable)
+- Investigate inning 1 switching separately
+- Still get ~50% of all ball data, which is already unique and valuable
+
+### Performance estimate
+
+Per match:
+- Page load: ~3-5 seconds
+- Scroll to capture full innings: ~20 seconds (10 pages x 2s each)
+- Rate limiting between matches: 4 seconds
+
+For 1 innings per match: ~30 seconds/match x 1169 matches = ~10 hours
+For 2 innings per match: ~60 seconds/match x 1169 matches = ~20 hours
+
+This should use batch persistence (like the existing ESPN enrichment) to avoid
+losing progress on failure.
+
+### Storage
+
+New bronze table: `bronze.espn_ball_data`
+
+Key columns to extract per ball:
+- `cricsheet_match_id` (our FK)
+- `espn_match_id`, `espn_ball_id` (ESPN's IDs)
+- `inning_number`, `over_number`, `ball_number`
+- `batsman_player_id`, `bowler_player_id` (ESPN player IDs)
+- `batsman_runs`, `total_runs`, `is_four`, `is_six`, `is_wicket`
+- `wagon_x`, `wagon_y`, `wagon_zone`
+- `pitch_line`, `pitch_length`
+- `shot_type`, `shot_control`
+- `dismissal_type`, `out_player_id`
+- `wides`, `noballs`, `byes`, `legbyes`
+- `timestamp`
+
+Estimated size: ~240 balls/match x 1169 matches = ~280K rows
+
+### Browser requirements
+
+- WebKit only (Chromium not installed, and WebKit works fine)
+- Headless mode works
+- User agent should mimic Safari on macOS
+- Viewport height of 2000px helps (more content visible = fewer scroll iterations)
+
+## Files Referenced
+
+- `src/enrichment/espn_client.py` — existing ESPN scraper (match-level)
+- `src/enrichment/bronze_loader.py` — existing ESPN data loader
+- `src/enrichment/series_resolver.py` — resolves ESPN series IDs
+- `src/config.py` — centralized settings
+- `data/espn_ball_sample.json` — sample captured data (123 balls, 1 innings)
