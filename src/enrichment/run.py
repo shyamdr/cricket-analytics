@@ -145,13 +145,26 @@ def run_enrichment(
     resolver = SeriesResolver()
     logger.info("series_resolver_ready", cache_size=resolver.cache_size)
 
-    # Scrape
-    results = scrape_matches(pending, resolver=resolver, delay_seconds=delay)
-    loaded = load_espn_to_bronze(results)
+    # Scrape with batch persistence — writes to DuckDB every 25 matches
+    # so progress isn't lost if the job fails midway
+    total_loaded = 0
+
+    def persist_batch(batch: list[dict]) -> None:
+        nonlocal total_loaded
+        loaded = load_espn_to_bronze(batch)
+        total_loaded += loaded
+        logger.info("batch_persisted", loaded=loaded, total_loaded=total_loaded)
+
+    results = scrape_matches(
+        pending,
+        resolver=resolver,
+        delay_seconds=delay,
+        on_batch=persist_batch,
+    )
     logger.info(
         "enrichment_complete",
         scraped=len(results),
-        loaded=loaded,
+        loaded=total_loaded,
     )
 
 

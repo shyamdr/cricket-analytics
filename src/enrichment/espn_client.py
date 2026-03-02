@@ -14,6 +14,7 @@ from typing import Any
 import structlog
 from playwright.async_api import async_playwright
 
+from src.config import settings
 from src.enrichment.series_resolver import SeriesResolver
 from src.utils import async_retry, run_async
 
@@ -142,6 +143,8 @@ async def scrape_matches_async(
     matches: list[dict[str, str]],
     resolver: SeriesResolver | None = None,
     delay_seconds: float = 4.0,
+    on_batch: callable | None = None,
+    batch_size: int | None = None,
 ) -> list[dict[str, Any]]:
     """Scrape ESPN data for a list of matches.
 
@@ -155,6 +158,11 @@ async def scrape_matches_async(
         matches: List of dicts with 'match_id', 'match_date', and 'season' keys.
         resolver: SeriesResolver instance (created if not provided).
         delay_seconds: Seconds to wait between requests (default 4).
+        on_batch: Optional callback called with a list of results every batch_size
+                  matches. Used to persist intermediate results so progress isn't
+                  lost on failure.
+        batch_size: Number of matches per batch for on_batch callback.
+                  Defaults to settings.enrichment_batch_size.
 
     Returns:
         List of enrichment dicts, one per successfully scraped match.
@@ -162,7 +170,11 @@ async def scrape_matches_async(
     if resolver is None:
         resolver = SeriesResolver()
 
+    if batch_size is None:
+        batch_size = settings.enrichment_batch_size
+
     results: list[dict[str, Any]] = []
+    batch_buffer: list[dict[str, Any]] = []
 
     async with async_playwright() as pw:
         browser = await pw.webkit.launch(headless=True)
@@ -194,6 +206,7 @@ async def scrape_matches_async(
                 enrichment = _extract_match_data(next_data)
                 enrichment["cricsheet_match_id"] = match_id
                 results.append(enrichment)
+                batch_buffer.append(enrichment)
                 scrape_count += 1
                 logger.info(
                     "match_scraped",
@@ -204,9 +217,18 @@ async def scrape_matches_async(
             except Exception:
                 logger.exception("scrape_failed", match_id=match_id, url=url)
 
+            # Persist batch to avoid losing progress on failure
+            if on_batch and len(batch_buffer) >= batch_size:
+                on_batch(batch_buffer)
+                batch_buffer = []
+
             # Rate limit — be respectful to ESPN
             if i < len(matches) - 1:
                 await asyncio.sleep(delay_seconds)
+
+        # Flush remaining
+        if on_batch and batch_buffer:
+            on_batch(batch_buffer)
 
         await browser.close()
 
@@ -217,6 +239,16 @@ def scrape_matches(
     matches: list[dict[str, str]],
     resolver: SeriesResolver | None = None,
     delay_seconds: float = 4.0,
+    on_batch: callable | None = None,
+    batch_size: int | None = None,
 ) -> list[dict[str, Any]]:
     """Synchronous wrapper around scrape_matches_async."""
-    return run_async(scrape_matches_async(matches, resolver=resolver, delay_seconds=delay_seconds))
+    return run_async(
+        scrape_matches_async(
+            matches,
+            resolver=resolver,
+            delay_seconds=delay_seconds,
+            on_batch=on_batch,
+            batch_size=batch_size,
+        )
+    )

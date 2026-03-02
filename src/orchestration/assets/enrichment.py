@@ -63,19 +63,32 @@ def espn_enrichment(context: AssetExecutionContext, config: EnrichmentConfig) ->
             }
         )
 
-    # Scrape
+    # Scrape with batch persistence — writes to DuckDB every 25 matches
+    # so progress isn't lost if the job fails midway
     resolver = SeriesResolver()
     context.log.info(f"Series resolver ready, {resolver.cache_size} seasons cached")
 
-    results = scrape_matches(pending, resolver=resolver, delay_seconds=config.delay)
-    loaded = load_espn_to_bronze(results)
+    total_loaded = 0
 
-    context.log.info(f"Enrichment complete: {len(results)} scraped, {loaded} loaded")
+    def persist_batch(batch: list[dict]) -> None:
+        nonlocal total_loaded
+        loaded = load_espn_to_bronze(batch)
+        total_loaded += loaded
+        context.log.info(f"Batch persisted: {loaded} matches saved (total: {total_loaded})")
+
+    results = scrape_matches(
+        pending,
+        resolver=resolver,
+        delay_seconds=config.delay,
+        on_batch=persist_batch,
+    )
+
+    context.log.info(f"Enrichment complete: {len(results)} scraped, {total_loaded} loaded")
 
     return MaterializeResult(
         metadata={
             "scraped": MetadataValue.int(len(results)),
-            "loaded": MetadataValue.int(loaded),
+            "loaded": MetadataValue.int(total_loaded),
             "already_scraped": MetadataValue.int(len(already_scraped)),
             "total_matches": MetadataValue.int(len(all_matches)),
         }
