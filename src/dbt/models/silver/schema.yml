@@ -164,3 +164,81 @@ models:
         description: "BCCI player ID for cross-referencing"
       - name: _loaded_at
         description: "Timestamp when this row was loaded into the silver layer"
+
+  - name: stg_espn_matches
+    description: "Staged ESPN match enrichment data. One row per match with venue, timing, captains, home team, and classification fields."
+    columns:
+      - name: match_id
+        description: "Cricsheet match ID — join key to stg_matches"
+        tests:
+          - unique
+          - not_null
+      - name: espn_match_id
+        description: "ESPN's unique match object ID"
+      - name: start_time
+        description: "Actual match start time (first ball) as UTC timestamp"
+      - name: end_time
+        description: "Actual match end time (last ball / result) as UTC timestamp"
+      - name: venue_timezone
+        description: "IANA timezone of the venue (e.g. 'Asia/Kolkata')"
+      - name: team1_is_home
+        description: "Whether team1 is the home team at this venue"
+      - name: team2_is_home
+        description: "Whether team2 is the home team at this venue"
+
+  - name: stg_espn_players
+    description: "Staged ESPN player biographical data. One row per player per match appearance."
+    columns:
+      - name: espn_player_id
+        description: "ESPN's unique player object ID"
+        tests:
+          - not_null
+      - name: date_of_birth
+        description: "Player date of birth (derived from year/month/day components)"
+      - name: is_overseas
+        description: "Whether the player is an overseas (non-domestic) player in this match"
+      - name: playing_roles
+        description: "JSON array of playing roles (e.g. 'batter', 'bowler', 'allrounder')"
+
+  - name: stg_espn_ball_data
+    description: "Staged ESPN per-ball spatial and prediction data. One row per ball bowled."
+    columns:
+      - name: espn_ball_id
+        description: "ESPN's unique ball ID"
+        tests:
+          - unique
+          - not_null
+      - name: wagon_x
+        description: "Wagon wheel X coordinate (0-300, 150=center)"
+      - name: wagon_y
+        description: "Wagon wheel Y coordinate (0-300, 0=bowler's end)"
+      - name: wagon_zone
+        description: "Wagon wheel zone (0-8, 0=dot ball/no shot)"
+      - name: pitch_line
+        description: "Delivery line: DOWN_LEG, ON_THE_STUMPS, OUTSIDE_OFFSTUMP, WIDE_DOWN_LEG, WIDE_OUTSIDE_OFFSTUMP"
+      - name: pitch_length
+        description: "Delivery length: FULL, FULL_TOSS, GOOD_LENGTH, SHORT, SHORT_OF_A_GOOD_LENGTH, YORKER"
+      - name: shot_type
+        description: "Type of shot played (COVER_DRIVE, CUT_SHOT, DAB, DEFENDED, FLICK, etc.)"
+      - name: shot_control
+        description: "Shot control rating: 1=controlled, 2=uncontrolled"
+      - name: win_probability
+        description: "Win probability for batting team after this ball (0-100)"
+
+  - name: stg_espn_innings
+    description: "Staged ESPN innings-level enrichment data. One row per innings per match."
+    columns:
+      - name: espn_match_id
+        description: "ESPN match ID — join key to stg_espn_matches"
+        tests:
+          - not_null
+      - name: inning_number
+        description: "Innings number (1 or 2)"
+        tests:
+          - not_null
+      - name: runs_saved
+        description: "Runs saved by fielding in this innings (may be null)"
+      - name: catches_dropped
+        description: "Dropped catches in this innings (may be null)"
+      - name: partnerships_json
+        description: "JSON array of partnership details (player runs/balls, total, out player)"

@@ -43,6 +43,9 @@ src/dbt/logs/
 htmlcov/
 .pytest_cache/
 
+# Debug/investigation scripts
+scripts/
+
 # Misc
 *.log
 .env

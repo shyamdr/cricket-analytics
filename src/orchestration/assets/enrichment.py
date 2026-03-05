@@ -2,7 +2,9 @@
 
 Runs after bronze ingestion + dbt transformation (needs dim_matches).
 Discovers series_ids dynamically, scrapes captain/keeper/roles/floodlit/
-start_time, and loads into bronze.espn_matches.
+start_time/venue/player bios/per-ball spatial data, and loads into
+bronze.espn_matches, bronze.espn_players, bronze.espn_innings,
+and bronze.espn_ball_data.
 """
 
 from dagster import AssetExecutionContext, AssetKey, Config, MaterializeResult, MetadataValue, asset
@@ -28,8 +30,8 @@ class EnrichmentConfig(Config):
     deps=[AssetKey(["gold", "dim_matches"])],
     description=(
         "Scrape ESPN match data (captain, keeper, player roles, floodlit, "
-        "start time) and load into bronze.espn_matches. Delta-aware — "
-        "skips already-scraped matches."
+        "start time, venue details, player bios, per-ball spatial data) "
+        "and load into bronze ESPN tables. Delta-aware — skips already-scraped matches."
     ),
 )
 def espn_enrichment(context: AssetExecutionContext, config: EnrichmentConfig) -> MaterializeResult:
@@ -58,7 +60,7 @@ def espn_enrichment(context: AssetExecutionContext, config: EnrichmentConfig) ->
         return MaterializeResult(
             metadata={
                 "scraped": MetadataValue.int(0),
-                "loaded": MetadataValue.int(0),
+                "loaded_matches": MetadataValue.int(0),
                 "already_scraped": MetadataValue.int(len(already_scraped)),
             }
         )
@@ -68,13 +70,17 @@ def espn_enrichment(context: AssetExecutionContext, config: EnrichmentConfig) ->
     resolver = SeriesResolver()
     context.log.info(f"Series resolver ready, {resolver.cache_size} seasons cached")
 
-    total_loaded = 0
+    total_counts: dict[str, int] = {"matches": 0, "players": 0, "innings": 0, "balls": 0}
 
     def persist_batch(batch: list[dict]) -> None:
-        nonlocal total_loaded
-        loaded = load_espn_to_bronze(batch)
-        total_loaded += loaded
-        context.log.info(f"Batch persisted: {loaded} matches saved (total: {total_loaded})")
+        counts = load_espn_to_bronze(batch)
+        for k, v in counts.items():
+            total_counts[k] = total_counts.get(k, 0) + v
+        context.log.info(
+            f"Batch persisted: {counts['matches']} matches, "
+            f"{counts['players']} players, {counts['balls']} balls "
+            f"(totals: {total_counts})"
+        )
 
     results = scrape_matches(
         pending,
@@ -83,12 +89,19 @@ def espn_enrichment(context: AssetExecutionContext, config: EnrichmentConfig) ->
         on_batch=persist_batch,
     )
 
-    context.log.info(f"Enrichment complete: {len(results)} scraped, {total_loaded} loaded")
+    context.log.info(
+        f"Enrichment complete: {len(results)} scraped, "
+        f"{total_counts['matches']} matches, {total_counts['players']} players, "
+        f"{total_counts['balls']} balls loaded"
+    )
 
     return MaterializeResult(
         metadata={
             "scraped": MetadataValue.int(len(results)),
-            "loaded": MetadataValue.int(total_loaded),
+            "loaded_matches": MetadataValue.int(total_counts["matches"]),
+            "loaded_players": MetadataValue.int(total_counts["players"]),
+            "loaded_innings": MetadataValue.int(total_counts["innings"]),
+            "loaded_balls": MetadataValue.int(total_counts["balls"]),
             "already_scraped": MetadataValue.int(len(already_scraped)),
             "total_matches": MetadataValue.int(len(all_matches)),
         }

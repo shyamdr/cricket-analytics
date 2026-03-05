@@ -164,52 +164,50 @@ The commentary page URL ignores query parameters:
 - `__NEXT_DATA__` always returns the same data regardless of URL params
 - The page is a single-page app; pagination is purely client-side via API
 
-### 4. Innings switching via tab click — unreliable
+### 4. Innings switching via tab click — SOLVED (see below)
 
-The page has innings tabs (team abbreviations like "RCB", "PBKS"). Clicking them:
-- Sometimes works (triggers API call for the other innings)
-- Sometimes clicks the wrong element (empty text, wrong button)
-- After clicking, the scroll-based loading becomes unreliable
-- The `__NEXT_DATA__` doesn't change (it's server-rendered, tabs are client-side)
+Initial attempts using tab clicks were unreliable. The correct approach uses the
+dropdown button, not the tab. See "Working approach: Innings switching via dropdown".
 
 ## Recommended Implementation Strategy
 
-### For each match, open TWO separate page instances
+### Working approach: Innings switching via dropdown (SOLVED)
 
-Since innings switching is unreliable, the safest approach is:
+The commentary page has a dropdown button showing the current team abbreviation
+(e.g. "RCB"). Clicking it reveals a dropdown with both teams. Selecting the other
+team triggers an API call for that innings' data, then scrolling loads the rest.
 
-1. Open page for inning 2 (default) → scroll to capture all balls → close page
-2. Open a NEW page for inning 2 again → click inning 1 tab → scroll → close page
+Steps:
+1. Click `button:has-text("{current_team_abbr}")` to open the dropdown
+2. Click `div.ds-cursor-pointer:has-text("{target_team_abbr}")` to switch
+3. Wait ~2s for the API response, then scroll to load remaining balls
 
-OR (simpler, more reliable):
+This approach is reliable and captures both innings in a single page session.
 
-1. Open page → capture inning 2 via scroll (this works 100%)
-2. For inning 1: we need to find a reliable tab-click selector
+### Single-page, single-match flow
 
-The tab click issue needs more investigation. Options:
-- Use `page.locator` with more specific selectors
-- Use `page.click()` with coordinates
-- Find the React component that controls innings and trigger it programmatically
+For each match, open ONE page instance:
+1. Load commentary page -> get __NEXT_DATA__ (inning 2, last ~12 balls)
+2. Set up route interception for commentary API
+3. Scroll to load all remaining inning 2 balls
+4. Open dropdown, click inning 1 team to switch innings
+5. Scroll to load all inning 1 balls
+6. Deduplicate and return all balls for both innings
 
-### Alternative: Accept inning 2 only initially
-
-If innings switching proves too fragile, we could:
-- Capture inning 2 for all matches first (this is proven reliable)
-- Investigate inning 1 switching separately
-- Still get ~50% of all ball data, which is already unique and valuable
+Verified on RCB vs LSG (match 1422133): 248 balls total (126 inn1 + 122 inn2),
+100% spatial data coverage, all 20 overs per innings, zero duplicates.
+Runs in ~30 seconds per match.
 
 ### Performance estimate
 
-Per match:
+Per match (~30 seconds):
 - Page load: ~3-5 seconds
-- Scroll to capture full innings: ~20 seconds (10 pages x 2s each)
+- Scroll inning 2: ~10 seconds
+- Innings switch + scroll inning 1: ~15 seconds
 - Rate limiting between matches: 4 seconds
 
-For 1 innings per match: ~30 seconds/match x 1169 matches = ~10 hours
-For 2 innings per match: ~60 seconds/match x 1169 matches = ~20 hours
-
-This should use batch persistence (like the existing ESPN enrichment) to avoid
-losing progress on failure.
+For all 1169 matches: ~30s/match x 1169 = ~10 hours
+Uses batch persistence (like existing ESPN enrichment) to avoid losing progress.
 
 ### Storage
 
@@ -239,8 +237,10 @@ Estimated size: ~240 balls/match x 1169 matches = ~280K rows
 
 ## Files Referenced
 
+- `src/enrichment/ball_data_scraper.py` — production ball-by-ball scraper module
+- `src/enrichment/run_ball_scraper.py` — CLI entry point for ball data scraping
+- `src/enrichment/bronze_loader.py` — ESPN data loader (espn_matches + espn_ball_data)
 - `src/enrichment/espn_client.py` — existing ESPN scraper (match-level)
-- `src/enrichment/bronze_loader.py` — existing ESPN data loader
 - `src/enrichment/series_resolver.py` — resolves ESPN series IDs
 - `src/config.py` — centralized settings
-- `data/espn_ball_sample.json` — sample captured data (123 balls, 1 innings)
+- `scripts/test_ball_scraper.py` — standalone test script (used during development)

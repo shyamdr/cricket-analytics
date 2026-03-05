@@ -195,28 +195,31 @@ class TestExtractMatchData:
 
     def test_match_metadata(self, sample_next_data: dict) -> None:
         result = _extract_match_data(sample_next_data)
-        assert result["espn_match_id"] == 1410537
-        assert result["espn_series_id"] == 1410320
-        assert result["title"] == "KKR vs SRH, Final"
-        assert result["season"] == "2024"
-        assert result["floodlit"] == 2
-        assert result["start_date"] == "2024-05-26T00:00:00.000Z"
-        assert result["start_time"] == "2024-05-26T14:00:00.000Z"
-        assert result["status_text"] == "Kolkata Knight Riders won by 8 wickets"
+        m = result["match"]
+        assert m["espn_match_id"] == 1410537
+        assert m["espn_series_id"] == 1410320
+        assert m["title"] == "KKR vs SRH, Final"
+        assert m["season"] == "2024"
+        assert m["floodlit"] == 2
+        assert m["start_date"] == "2024-05-26T00:00:00.000Z"
+        assert m["start_time"] == "2024-05-26T14:00:00.000Z"
+        assert m["status_text"] == "Kolkata Knight Riders won by 8 wickets"
 
     def test_team1_captain_and_keeper(self, sample_next_data: dict) -> None:
         result = _extract_match_data(sample_next_data)
-        assert result["team1_name"] == "Kolkata Knight Riders"
-        assert result["team1_espn_id"] == 4341
-        assert result["team1_captain"] == "SA Yadav"
-        assert result["team1_keeper"] == "PD Salt"
+        m = result["match"]
+        assert m["team1_name"] == "Kolkata Knight Riders"
+        assert m["team1_espn_id"] == 4341
+        assert m["team1_captain"] == "SA Yadav"
+        assert m["team1_keeper"] == "PD Salt"
 
     def test_team2_captain_and_keeper(self, sample_next_data: dict) -> None:
         result = _extract_match_data(sample_next_data)
-        assert result["team2_name"] == "Sunrisers Hyderabad"
-        assert result["team2_espn_id"] == 5765
-        assert result["team2_captain"] == "PK Cummins"
-        assert result["team2_keeper"] == "H Klaasen"
+        m = result["match"]
+        assert m["team2_name"] == "Sunrisers Hyderabad"
+        assert m["team2_espn_id"] == 5765
+        assert m["team2_captain"] == "PK Cummins"
+        assert m["team2_keeper"] == "H Klaasen"
 
     def test_captain_wicketkeeper_dual_role(self, sample_next_data: dict) -> None:
         """CWK role means the player is both captain and keeper."""
@@ -234,12 +237,14 @@ class TestExtractMatchData:
             },
         ]
         result = _extract_match_data(data)
-        assert result["team2_captain"] == "PK Cummins"
-        assert result["team2_keeper"] == "PK Cummins"
+        m = result["match"]
+        assert m["team2_captain"] == "PK Cummins"
+        assert m["team2_keeper"] == "PK Cummins"
 
     def test_teams_enrichment_json(self, sample_next_data: dict) -> None:
         result = _extract_match_data(sample_next_data)
-        teams = json.loads(result["teams_enrichment_json"])
+        m = result["match"]
+        teams = json.loads(m["teams_enrichment_json"])
         assert len(teams) == 2
         assert teams[0]["team_name"] == "Kolkata Knight Riders"
         assert len(teams[0]["players"]) == 3
@@ -247,7 +252,8 @@ class TestExtractMatchData:
 
     def test_player_roles_in_enrichment_json(self, sample_next_data: dict) -> None:
         result = _extract_match_data(sample_next_data)
-        teams = json.loads(result["teams_enrichment_json"])
+        m = result["match"]
+        teams = json.loads(m["teams_enrichment_json"])
         kkr_players = {p["player_name"]: p for p in teams[0]["players"]}
         assert kkr_players["S Narine"]["role"] == "player"
         assert kkr_players["S Narine"]["is_captain"] is False
@@ -259,16 +265,29 @@ class TestExtractMatchData:
     def test_no_players_edge_case(self, sample_next_data_no_players: dict) -> None:
         """Matches with empty teamPlayers should still extract match metadata."""
         result = _extract_match_data(sample_next_data_no_players)
-        assert result["espn_match_id"] == 335982
-        assert result["espn_series_id"] == 313494
-        assert result["season"] == "2008"
-        assert result["team1_name"] is None
-        assert result["team1_captain"] is None
-        assert result["team2_name"] is None
+        m = result["match"]
+        assert m["espn_match_id"] == 335982
+        assert m["espn_series_id"] == 313494
+        assert m["season"] == "2008"
+        assert m["team1_name"] is None
+        assert m["team1_captain"] is None
+        assert m["team2_name"] is None
 
     def test_slug_extracted(self, sample_next_data: dict) -> None:
         result = _extract_match_data(sample_next_data)
-        assert "1410537" in result["slug"]
+        m = result["match"]
+        assert "1410537" in m["slug"]
+
+    def test_players_extracted(self, sample_next_data: dict) -> None:
+        """Player biographical data should be extracted from teamPlayers."""
+        result = _extract_match_data(sample_next_data)
+        assert len(result["players"]) == 6  # 3 per team
+
+    def test_innings_and_balls_empty_for_minimal_fixture(self, sample_next_data: dict) -> None:
+        """Minimal fixture has no innings/ball data in content."""
+        result = _extract_match_data(sample_next_data)
+        assert result["innings"] == []
+        assert result["balls"] == []
 
 
 # ---------------------------------------------------------------------------

@@ -84,6 +84,10 @@ def append_to_bronze(
     Uses a SQL anti-join for dedup instead of loading all existing IDs
     into Python memory. Scales to millions of rows without OOM.
 
+    Handles schema evolution: if the incoming data has columns not yet in
+    the target table, they are added via ALTER TABLE. Column matching is
+    done by name, not position, so column order doesn't matter.
+
     Args:
         conn: An open read-write DuckDB connection.
         table_name: Fully-qualified table name (e.g. ``bronze.matches``).
@@ -112,13 +116,30 @@ def append_to_bronze(
             conn.execute(f"CREATE TABLE {table_name} AS SELECT * FROM {tmp_name}")
             new_rows = data.num_rows
         else:
+            # Schema evolution: add any new columns from incoming data
+            existing_cols = {
+                row[0]
+                for row in conn.execute(
+                    f"SELECT column_name FROM information_schema.columns "
+                    f"WHERE table_name = '{table_name.split('.')[-1]}' "
+                    f"AND table_schema = '{table_name.split('.')[0]}'"
+                ).fetchall()
+            }
+            incoming_cols = data.column_names
+            for col in incoming_cols:
+                if col not in existing_cols:
+                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col} VARCHAR")
+
+            # Use explicit column list so order doesn't matter
+            col_list = ", ".join(incoming_cols)
+
             # Count before insert
             (count_before,) = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
 
             # Anti-join dedup: only insert rows whose id_column is not already present
             conn.execute(
-                f"""INSERT INTO {table_name}
-                    SELECT t.* FROM {tmp_name} t
+                f"""INSERT INTO {table_name} ({col_list})
+                    SELECT {col_list} FROM {tmp_name} t
                     WHERE t.{id_column} NOT IN (
                         SELECT DISTINCT {id_column} FROM {table_name}
                     )"""

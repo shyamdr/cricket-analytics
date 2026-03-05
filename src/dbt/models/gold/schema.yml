@@ -2,7 +2,7 @@ version: 2
 
 models:
   - name: dim_matches
-    description: "Match dimension — one row per match with derived analytical columns (match_result_type, winning_margin)."
+    description: "Match dimension — one row per match with derived analytical columns, enriched with ESPN data (captains, home team, timing, venue details)."
     columns:
       - name: match_id
         description: "Unique Cricsheet match identifier"
@@ -55,11 +55,41 @@ models:
         description: "Derived enum classifying the outcome: normal_win, dls_win, tie_super_over, no_result, or unknown"
       - name: winning_margin
         description: "Derived human-readable margin (e.g. '5 runs', '3 wickets', 'Team won via super over')"
-      - name: is_home_team
-        description: "Placeholder (NULL) — will be populated by venue-team enrichment"
+      - name: team1_captain
+        description: "Team 1 captain name (from ESPN enrichment, NULL if not yet scraped)"
+      - name: team1_keeper
+        description: "Team 1 wicketkeeper name (from ESPN enrichment)"
+      - name: team2_captain
+        description: "Team 2 captain name (from ESPN enrichment)"
+      - name: team2_keeper
+        description: "Team 2 wicketkeeper name (from ESPN enrichment)"
+      - name: team1_is_home
+        description: "Whether team1 is the home team at this venue (from ESPN)"
+      - name: team2_is_home
+        description: "Whether team2 is the home team at this venue (from ESPN)"
+      - name: floodlit
+        description: "Lighting condition: day, night, daynight (from ESPN enrichment)"
+      - name: start_time
+        description: "Actual match start time as UTC timestamp (from ESPN)"
+      - name: end_time
+        description: "Actual match end time as UTC timestamp (from ESPN)"
+      - name: hours_info
+        description: "Session timing breakdown in local time (from ESPN)"
+      - name: venue_timezone
+        description: "IANA timezone of the venue, e.g. 'Asia/Kolkata' (from ESPN)"
+      - name: espn_match_id
+        description: "ESPN's unique match object ID"
+      - name: espn_ground_id
+        description: "ESPN's unique ground/venue ID"
+      - name: ground_capacity
+        description: "Stadium capacity as string (from ESPN)"
+      - name: international_class_id
+        description: "ESPN international classification ID (null for franchise cricket)"
+      - name: sub_class_id
+        description: "ESPN sub-classification (warm-ups, qualifiers, etc.)"
 
   - name: dim_players
-    description: "Player dimension — one row per player who appeared in match data, joined with people.csv registry."
+    description: "Player dimension — one row per player, enriched with ESPN biographical data (DOB, batting/bowling styles, playing roles)."
     columns:
       - name: player_id
         description: "8-char hex Cricsheet identifier — stable unique ID across all matches"
@@ -73,11 +103,29 @@ models:
       - name: unique_name
         description: "Disambiguated full name from people.csv"
       - name: key_cricinfo
-        description: "ESPNcricinfo player ID"
+        description: "ESPNcricinfo player ID (string from people.csv)"
       - name: key_cricbuzz
         description: "Cricbuzz player ID"
       - name: key_bcci
         description: "BCCI player ID"
+      - name: espn_player_id
+        description: "ESPN's numeric player object ID (from ESPN enrichment)"
+      - name: date_of_birth
+        description: "Player date of birth (from ESPN enrichment)"
+      - name: batting_styles
+        description: "JSON array of batting style codes, e.g. ['rhb'] for right-hand bat (from ESPN)"
+      - name: bowling_styles
+        description: "JSON array of bowling style codes, e.g. ['sla'] for slow left-arm orthodox (from ESPN)"
+      - name: long_batting_styles
+        description: "JSON array of human-readable batting styles, e.g. ['right-hand bat'] (from ESPN)"
+      - name: long_bowling_styles
+        description: "JSON array of human-readable bowling styles (from ESPN)"
+      - name: playing_roles
+        description: "JSON array of playing roles, e.g. ['batter'], ['bowling allrounder'] (from ESPN)"
+      - name: country_team_id
+        description: "ESPN ID of player's national team (from ESPN)"
+      - name: is_overseas
+        description: "Whether the player is an overseas (non-domestic) player (from ESPN, based on most recent match)"
 
   - name: dim_teams
     description: "Team dimension — one row per team name with franchise mapping and match date range."
@@ -97,7 +145,7 @@ models:
         description: "Total number of matches played by this team"
 
   - name: dim_venues
-    description: "Venue dimension — one row per unique venue+city combination with match counts."
+    description: "Venue dimension — one row per unique venue+city combination, enriched with ESPN ground data."
     tests:
       - unique:
           column_name: "venue || '|' || coalesce(city, '')"
@@ -114,6 +162,12 @@ models:
         description: "Date of the first match at this venue"
       - name: last_match_date
         description: "Date of the most recent match at this venue"
+      - name: espn_ground_id
+        description: "ESPN's unique ground/venue ID (from ESPN enrichment)"
+      - name: ground_capacity
+        description: "Stadium capacity as string (from ESPN enrichment)"
+      - name: venue_timezone
+        description: "IANA timezone of the venue, e.g. 'Asia/Kolkata' (from ESPN enrichment)"
 
   - name: fact_deliveries
     description: "Core fact table — one row per ball bowled (excluding super overs). Incremental materialization appends new matches only."

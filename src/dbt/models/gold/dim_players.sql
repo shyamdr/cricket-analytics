@@ -1,8 +1,7 @@
 -- Player dimension: one row per player who appeared in match data.
+-- Enriched with ESPN biographical data (DOB, batting/bowling styles, playing roles).
 -- Deduplicates by player_id — some players appear with multiple name
--- spellings in the registry (e.g. "NA Saini" vs "Navdeep Saini").
--- Prefers the people.csv canonical name, falls back to the most
--- frequently used registry name.
+-- spellings in the registry. Prefers the people.csv canonical name.
 with registry_entries as (
     select
         trim(j.value::varchar, '"') as player_id,
@@ -33,15 +32,40 @@ deduped as (
 
 people as (
     select * from {{ ref('stg_people') }}
+),
+
+-- ESPN player bio: pick latest appearance per player (most recent match)
+-- to get the most up-to-date biographical data
+espn_latest as (
+    select
+        ep.*,
+        row_number() over (
+            partition by ep.espn_player_id
+            order by ep.espn_match_id desc
+        ) as rn
+    from {{ ref('stg_espn_players') }} ep
 )
 
 select
     d.player_id,
-    -- Prefer people.csv canonical name if available, else registry name
     coalesce(p.player_name, d.player_name) as player_name,
     p.unique_name,
     p.key_cricinfo,
     p.key_cricbuzz,
-    p.key_bcci
+    p.key_bcci,
+    -- ESPN enrichment: biographical data
+    el.espn_player_id,
+    el.date_of_birth,
+    el.batting_styles,
+    el.bowling_styles,
+    el.long_batting_styles,
+    el.long_bowling_styles,
+    el.playing_roles,
+    el.country_team_id,
+    el.is_overseas
 from deduped d
 left join people p on d.player_id = p.player_id
+left join espn_latest el
+    on p.key_cricinfo is not null
+    and el.espn_player_id = try_cast(p.key_cricinfo as bigint)
+    and el.rn = 1

@@ -61,26 +61,54 @@ async def _fetch_next_data(url: str, browser: Any) -> dict[str, Any]:
     return json.loads(match.group(1))
 
 
+def _extract_player_bio(player: dict[str, Any]) -> dict[str, Any]:
+    """Extract biographical fields from an ESPN player object."""
+    dob = player.get("dateOfBirth") or {}
+    return {
+        "date_of_birth_year": dob.get("year"),
+        "date_of_birth_month": dob.get("month"),
+        "date_of_birth_day": dob.get("date"),
+        "batting_styles": json.dumps(player.get("battingStyles") or []),
+        "bowling_styles": json.dumps(player.get("bowlingStyles") or []),
+        "long_batting_styles": json.dumps(player.get("longBattingStyles") or []),
+        "long_bowling_styles": json.dumps(player.get("longBowlingStyles") or []),
+        "country_team_id": player.get("countryTeamId"),
+        "playing_roles": json.dumps(player.get("playingRoles") or []),
+    }
+
+
 def _extract_match_data(next_data: dict[str, Any]) -> dict[str, Any]:
-    """Extract enrichment fields from ESPN __NEXT_DATA__."""
+    """Extract all enrichment data from ESPN __NEXT_DATA__.
+
+    Returns a dict with three keys:
+      - match: match-level enrichment record (for bronze.espn_matches)
+      - players: list of player bio records (for bronze.espn_players)
+      - innings: list of innings-level records (for bronze.espn_innings)
+    """
     app_data = next_data["props"]["appPageProps"]["data"]
     data = app_data.get("data", app_data)
     match_info = data["match"]
     content = data.get("content", {})
     match_players = content.get("matchPlayers", {})
     team_players_list = match_players.get("teamPlayers", [])
+    espn_match_id = match_info.get("objectId")
 
-    # Extract team-level player roles
+    # --- Player extraction (biographical + match role) ---
     teams_enrichment: list[dict[str, Any]] = []
+    player_records: list[dict[str, Any]] = []
+    seen_player_ids: set[int] = set()
+
     for tp in team_players_list:
         team = tp.get("team", {})
+        team_name = team.get("longName")
         players: list[dict[str, Any]] = []
         for p in tp.get("players", []):
             player = p.get("player", {})
+            pid = player.get("objectId")
             role_code = p.get("playerRoleType", "P")
             players.append(
                 {
-                    "espn_player_id": player.get("objectId"),
+                    "espn_player_id": pid,
                     "player_name": player.get("name"),
                     "player_long_name": player.get("longName"),
                     "role_code": role_code,
@@ -89,21 +117,34 @@ def _extract_match_data(next_data: dict[str, Any]) -> dict[str, Any]:
                     "is_keeper": role_code in ("WK", "CWK"),
                 }
             )
+            # Collect player bio (deduplicate across teams)
+            if pid and pid not in seen_player_ids:
+                seen_player_ids.add(pid)
+                bio = _extract_player_bio(player)
+                bio.update(
+                    {
+                        "espn_player_id": pid,
+                        "player_name": player.get("name"),
+                        "player_long_name": player.get("longName"),
+                        "is_overseas": p.get("isOverseas"),
+                        "match_role_code": role_code,
+                        "team_name": team_name,
+                        "espn_match_id": espn_match_id,
+                    }
+                )
+                player_records.append(bio)
+
         teams_enrichment.append(
             {
                 "team_name": team.get("name"),
-                "team_long_name": team.get("longName"),
+                "team_long_name": team_name,
                 "espn_team_id": team.get("objectId"),
                 "players": players,
             }
         )
 
-    # Find captains and keepers per team
-    team1_captain = None
-    team1_keeper = None
-    team2_captain = None
-    team2_keeper = None
-
+    # --- Captain / keeper extraction ---
+    team1_captain = team1_keeper = team2_captain = team2_keeper = None
     for i, te in enumerate(teams_enrichment):
         for p in te["players"]:
             if p["is_captain"]:
@@ -117,25 +158,214 @@ def _extract_match_data(next_data: dict[str, Any]) -> dict[str, Any]:
                 else:
                     team2_keeper = p["player_name"]
 
-    return {
-        "espn_match_id": match_info.get("objectId"),
+    # --- Venue / ground ---
+    ground = match_info.get("ground") or {}
+    town = ground.get("town") or {}
+
+    # --- Teams match-level ---
+    teams = match_info.get("teams") or []
+    team1_data = teams[0] if len(teams) > 0 else {}
+    team2_data = teams[1] if len(teams) > 1 else {}
+
+    # --- Replacement players ---
+    replacements = match_info.get("replacementPlayers") or []
+    replacement_records = []
+    for rp in replacements:
+        rp_player = rp.get("player") or {}
+        rp_replacing = rp.get("replacingPlayer") or {}
+        rp_team = rp.get("team") or {}
+        replacement_records.append(
+            {
+                "player_in_id": rp_player.get("objectId"),
+                "player_in_name": rp_player.get("name"),
+                "player_out_id": rp_replacing.get("objectId"),
+                "player_out_name": rp_replacing.get("name"),
+                "team": rp_team.get("name"),
+                "over": rp.get("over"),
+                "inning": rp.get("inning"),
+                "replacement_type": rp.get("playerReplacementType"),
+            }
+        )
+
+    # --- Innings-level data ---
+    innings_list = content.get("innings") or []
+    innings_records: list[dict[str, Any]] = []
+    for inn in innings_list:
+        inn_num = inn.get("inningNumber")
+        inn_team = (inn.get("team") or {}).get("longName")
+
+        # Batting details (minutes at crease, battedType, dismissalText)
+        batsmen_details = []
+        for b in inn.get("inningBatsmen") or []:
+            bp = (b.get("player") or {})
+            dismissal_text = b.get("dismissalText") or {}
+            batsmen_details.append(
+                {
+                    "espn_player_id": bp.get("objectId"),
+                    "player_name": bp.get("name"),
+                    "batted_type": b.get("battedType"),
+                    "minutes": b.get("minutes"),
+                    "dismissal_text_short": dismissal_text.get("short"),
+                    "dismissal_text_long": dismissal_text.get("long"),
+                    "dismissal_text_commentary": dismissal_text.get("commentary"),
+                }
+            )
+
+        # Partnerships
+        partnerships = []
+        for pt in inn.get("inningPartnerships") or []:
+            p1 = (pt.get("player1") or {})
+            p2 = (pt.get("player2") or {})
+            partnerships.append(
+                {
+                    "player1_id": p1.get("objectId"),
+                    "player1_name": p1.get("name"),
+                    "player1_runs": pt.get("player1Runs"),
+                    "player1_balls": pt.get("player1Balls"),
+                    "player2_id": p2.get("objectId"),
+                    "player2_name": p2.get("name"),
+                    "player2_runs": pt.get("player2Runs"),
+                    "player2_balls": pt.get("player2Balls"),
+                    "total_runs": pt.get("runs"),
+                    "total_balls": pt.get("balls"),
+                    "out_player_id": pt.get("outPlayerId"),
+                }
+            )
+
+        # DRS reviews
+        drs_reviews = []
+        for dr in inn.get("inningDRSReviews") or []:
+            drs_reviews.append(
+                {
+                    "review_side": dr.get("reviewSide"),
+                    "is_umpire_call": dr.get("isUmpireCall"),
+                    "remaining_count": dr.get("remainingCount"),
+                    "original_decision": dr.get("originalDecision"),
+                    "drs_decision": dr.get("drsDecision"),
+                    "overs_actual": dr.get("oversActual"),
+                }
+            )
+
+        # Over group phases (powerplay/middle/death)
+        over_groups = []
+        for og in inn.get("inningOverGroups") or []:
+            over_groups.append(
+                {
+                    "phase_type": og.get("type"),
+                    "start_over": og.get("startOverNumber"),
+                    "end_over": og.get("endOverNumber"),
+                    "runs": og.get("oversRuns"),
+                    "wickets": og.get("oversWickets"),
+                }
+            )
+
+        innings_records.append(
+            {
+                "espn_match_id": espn_match_id,
+                "inning_number": inn_num,
+                "batting_team": inn_team,
+                "runs_saved": inn.get("runsSaved"),
+                "catches_dropped": inn.get("catchesDropped"),
+                "batsmen_details_json": json.dumps(batsmen_details),
+                "partnerships_json": json.dumps(partnerships),
+                "drs_reviews_json": json.dumps(drs_reviews),
+                "over_groups_json": json.dumps(over_groups),
+            }
+        )
+
+    # --- Per-ball data from scorecard (inningOvers) ---
+    ball_records: list[dict[str, Any]] = []
+    for inn in innings_list:
+        inn_num = inn.get("inningNumber")
+        for over_obj in inn.get("inningOvers") or []:
+            over_num = over_obj.get("overNumber")
+            for ball in over_obj.get("balls") or []:
+                preds = ball.get("predictions") or {}
+                ball_records.append(
+                    {
+                        "espn_ball_id": ball.get("id"),
+                        "espn_match_id": espn_match_id,
+                        "inning_number": inn_num,
+                        "over_number": over_num,
+                        "ball_number": ball.get("ballNumber"),
+                        "overs_actual": ball.get("oversActual"),
+                        "batsman_player_id": ball.get("batsmanPlayerId"),
+                        "bowler_player_id": ball.get("bowlerPlayerId"),
+                        "non_striker_player_id": ball.get("nonStrikerPlayerId"),
+                        "batsman_runs": ball.get("batsmanRuns"),
+                        "total_runs": ball.get("totalRuns"),
+                        "total_inning_runs": ball.get("totalInningRuns"),
+                        "total_inning_wickets": ball.get("totalInningWickets"),
+                        "is_four": ball.get("isFour"),
+                        "is_six": ball.get("isSix"),
+                        "is_wicket": ball.get("isWicket"),
+                        "dismissal_type": ball.get("dismissalType"),
+                        "out_player_id": ball.get("outPlayerId"),
+                        "wides": ball.get("wides", 0),
+                        "noballs": ball.get("noballs", 0),
+                        "byes": ball.get("byes", 0),
+                        "legbyes": ball.get("legbyes", 0),
+                        "penalties": ball.get("penalties", 0),
+                        "wagon_x": ball.get("wagonX"),
+                        "wagon_y": ball.get("wagonY"),
+                        "wagon_zone": ball.get("wagonZone"),
+                        "pitch_line": ball.get("pitchLine"),
+                        "pitch_length": ball.get("pitchLength"),
+                        "shot_type": ball.get("shotType"),
+                        "shot_control": ball.get("shotControl"),
+                        "predicted_score": preds.get("score"),
+                        "win_probability": preds.get("winProbability"),
+                    }
+                )
+
+    # --- Match record ---
+    match_record = {
+        "espn_match_id": espn_match_id,
         "espn_series_id": match_info.get("series", {}).get("objectId"),
         "floodlit": match_info.get("floodlit"),
         "start_date": match_info.get("startDate"),
         "start_time": match_info.get("startTime"),
+        "end_time": match_info.get("endTime"),
+        "hours_info": match_info.get("hoursInfo"),
         "season": match_info.get("season"),
         "title": match_info.get("title"),
         "slug": match_info.get("slug"),
         "status_text": match_info.get("statusText"),
+        # Classification
+        "international_class_id": match_info.get("internationalClassId"),
+        "sub_class_id": match_info.get("subClassId"),
+        # Venue
+        "espn_ground_id": ground.get("objectId"),
+        "ground_capacity": ground.get("capacity"),
+        "venue_timezone": town.get("timezone"),
+        # Team 1
         "team1_name": teams_enrichment[0]["team_name"] if teams_enrichment else None,
         "team1_espn_id": teams_enrichment[0]["espn_team_id"] if teams_enrichment else None,
         "team1_captain": team1_captain,
         "team1_keeper": team1_keeper,
+        "team1_is_home": team1_data.get("isHome"),
+        "team1_points": team1_data.get("points"),
+        "team1_primary_color": (team1_data.get("team") or {}).get("primaryColor"),
+        # Team 2
         "team2_name": teams_enrichment[1]["team_name"] if len(teams_enrichment) > 1 else None,
         "team2_espn_id": teams_enrichment[1]["espn_team_id"] if len(teams_enrichment) > 1 else None,
         "team2_captain": team2_captain,
         "team2_keeper": team2_keeper,
+        "team2_is_home": team2_data.get("isHome"),
+        "team2_points": team2_data.get("points"),
+        "team2_primary_color": (team2_data.get("team") or {}).get("primaryColor"),
+        # Replacements & debut
+        "replacement_players_json": json.dumps(replacement_records) if replacement_records else None,
+        "debut_players_json": json.dumps(match_info.get("debutPlayers")),
+        # Legacy (kept for backward compat)
         "teams_enrichment_json": json.dumps(teams_enrichment),
+    }
+
+    return {
+        "match": match_record,
+        "players": player_records,
+        "innings": innings_records,
+        "balls": ball_records,
     }
 
 
@@ -146,13 +376,15 @@ async def scrape_matches_async(
     on_batch: callable | None = None,
     batch_size: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Scrape ESPN data for a list of matches.
+    """Scrape ESPN scorecard data for a list of matches.
 
-    Uses a single browser instance for all matches to avoid repeated
-    Playwright startup overhead. Includes rate limiting between requests.
+    Extracts match metadata, player bios, innings stats from the scorecard
+    page's __NEXT_DATA__. Fast (~4s/match) and reliable.
 
-    The series_id for each match is resolved dynamically via the
-    SeriesResolver (cache → seed → ESPN results page discovery).
+    Ball-by-ball spatial data (wagon wheel, pitch map) is handled separately
+    by the dedicated ball data scraper (src.enrichment.ball_data_scraper)
+    which uses a different technique (commentary page scroll interception).
+    Run it via: python -m src.enrichment.run_ball_scraper
 
     Args:
         matches: List of dicts with 'match_id', 'match_date', and 'season' keys.
@@ -184,7 +416,7 @@ async def scrape_matches_async(
             matches, browser, delay_seconds=delay_seconds
         )
 
-        # Step 2: Scrape each match using its resolved series_id
+        # Step 2: Scrape each match — scorecard only
         scrape_count = 0
         for i, m in enumerate(matches):
             match_id = str(m["match_id"])
@@ -202,17 +434,25 @@ async def scrape_matches_async(
                     series_id=series_id,
                     progress=f"{scrape_count + 1}/{len(matches)}",
                 )
+
                 next_data = await _fetch_next_data(url, browser)
-                enrichment = _extract_match_data(next_data)
-                enrichment["cricsheet_match_id"] = match_id
-                results.append(enrichment)
-                batch_buffer.append(enrichment)
+                extracted = _extract_match_data(next_data)
+                match_record = extracted["match"]
+                match_record["cricsheet_match_id"] = match_id
+
+                # Drop the scorecard's ~12 ball sample — it's incomplete and
+                # the dedicated ball scraper will capture full data separately
+                extracted["balls"] = []
+
+                results.append(extracted)
+                batch_buffer.append(extracted)
                 scrape_count += 1
                 logger.info(
                     "match_scraped",
                     match_id=match_id,
-                    captain1=enrichment["team1_captain"],
-                    captain2=enrichment["team2_captain"],
+                    captain1=match_record["team1_captain"],
+                    captain2=match_record["team2_captain"],
+                    players=len(extracted["players"]),
                 )
             except Exception:
                 logger.exception("scrape_failed", match_id=match_id, url=url)

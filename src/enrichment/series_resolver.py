@@ -138,17 +138,59 @@ class SeriesResolver:
         self._match_cache: dict[str, int] = {}
         self._load_from_db()
 
+    @staticmethod
+    def _season_variants(season: str) -> list[str]:
+        """Generate all plausible season key variants for cache lookup.
+
+        Handles the mismatch between dbt's derived season (e.g. '2008')
+        and ESPN's raw season (e.g. '2007/08'). A split-year season like
+        '2007/08' should also be findable via '2008' (the end year) and
+        '2007' (the start year). Similarly, '2020/21' maps to both '2020'
+        and '2021'.
+        """
+        variants = [season]
+        if "/" in season:
+            # '2007/08' → ['2007/08', '2007', '2008']
+            # '2020/21' → ['2020/21', '2020', '2021']
+            parts = season.split("/")
+            variants.append(parts[0])
+            if len(parts[1]) == 2:
+                variants.append(parts[0][:2] + parts[1])
+            elif len(parts[1]) == 4:
+                variants.append(parts[1])
+        else:
+            # '2008' → also try '2007/08', '2008/09'
+            try:
+                year = int(season)
+                prev = year - 1
+                variants.append(f"{prev}/{season[-2:]}")
+                next_yr = year + 1
+                variants.append(f"{season}/{str(next_yr)[-2:]}")
+            except ValueError:
+                pass
+        return variants
+
     def _load_from_db(self) -> None:
-        """Load previously discovered series from bronze.espn_series."""
+        """Load previously discovered series from bronze.espn_series.
+
+        Populates the season cache with all plausible season key variants
+        so that lookups work regardless of whether the caller uses the
+        ESPN raw season ('2007/08') or the dbt derived season ('2008').
+        """
         try:
             conn = get_read_conn()
             rows = conn.execute(
                 f"SELECT series_id, season FROM {settings.bronze_schema}.espn_series"
             ).fetchall()
             for series_id, season in rows:
-                self._season_cache[str(season)] = int(series_id)
+                sid = int(series_id)
+                # Store under all variants so both '2007/08' and '2008' resolve
+                for variant in self._season_variants(str(season)):
+                    # Don't overwrite if a more specific entry already exists
+                    if variant not in self._season_cache:
+                        self._season_cache[variant] = sid
             conn.close()
-            logger.info("series_cache_loaded", count=len(rows))
+            logger.info("series_cache_loaded", entries=len(self._season_cache), db_rows=len(rows))
         except duckdb.CatalogException:
             logger.info("no_series_table_yet")
         except Exception:
@@ -300,8 +342,10 @@ class SeriesResolver:
         sid = series_info["series_id"]
         season = str(series_info.get("season", ""))
 
-        # Update in-memory caches
-        self._season_cache[season] = sid
+        # Update in-memory caches — store under all season variants
+        for variant in self._season_variants(season):
+            if variant not in self._season_cache:
+                self._season_cache[variant] = sid
 
         # Persist to DuckDB
         try:

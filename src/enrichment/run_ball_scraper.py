@@ -1,17 +1,17 @@
-"""CLI entry point for ESPN enrichment pipeline.
+"""CLI entry point for ESPN ball-by-ball data scraping.
 
 Usage:
     # Scrape a few matches for testing
-    python -m src.enrichment.run --season 2024 --limit 3
+    python -m src.enrichment.run_ball_scraper --season 2024 --limit 3
 
     # Scrape all matches for a season
-    python -m src.enrichment.run --season 2024
+    python -m src.enrichment.run_ball_scraper --season 2024
 
-    # Scrape all seasons (full historical run)
-    python -m src.enrichment.run --all
+    # Scrape all seasons (full historical run — ~20 hours)
+    python -m src.enrichment.run_ball_scraper --all
 
     # Show what would be scraped (dry run)
-    python -m src.enrichment.run --season 2024 --dry-run
+    python -m src.enrichment.run_ball_scraper --season 2024 --dry-run
 """
 
 from __future__ import annotations
@@ -23,17 +23,37 @@ import structlog
 
 from src.config import settings
 from src.database import get_read_conn
-from src.enrichment.bronze_loader import load_espn_to_bronze
-from src.enrichment.espn_client import scrape_matches
+from src.enrichment.ball_data_scraper import scrape_ball_data
 from src.enrichment.series_resolver import SeriesResolver
 
 logger = structlog.get_logger(__name__)
 
 
-def get_matches_for_season(
+def _load_ball_records_to_bronze(records: list[dict]) -> int:
+    """Load flat ball records from the commentary scraper into bronze.espn_ball_data."""
+    if not records:
+        return 0
+    import pyarrow as pa
+
+    from src.database import append_to_bronze, get_write_conn
+
+    conn = get_write_conn()
+    try:
+        table = pa.Table.from_pylist(records)
+        return append_to_bronze(
+            conn, f"{settings.bronze_schema}.espn_ball_data", table, "espn_ball_id"
+        )
+    finally:
+        conn.close()
+
+
+def _get_matches_for_season(
     season: str, conn: duckdb.DuckDBPyConnection | None = None
 ) -> list[dict[str, str]]:
-    """Query DuckDB for all matches in a given season with dates."""
+    """Query DuckDB for all completed matches in a given season.
+
+    Excludes 'no result' matches — they have no ball data to scrape.
+    """
     close_after = conn is None
     if conn is None:
         conn = get_read_conn()
@@ -41,6 +61,7 @@ def get_matches_for_season(
         f"""SELECT match_id, match_date, season
            FROM {settings.gold_schema}.dim_matches
            WHERE season = ?
+             AND (outcome_result IS NULL OR outcome_result != 'no result')
            ORDER BY match_date""",
         [season],
     ).fetchall()
@@ -49,14 +70,20 @@ def get_matches_for_season(
     return [{"match_id": r[0], "match_date": str(r[1]), "season": r[2]} for r in rows]
 
 
-def get_all_matches(conn: duckdb.DuckDBPyConnection | None = None) -> list[dict[str, str]]:
-    """Query DuckDB for all matches across all seasons."""
+def _get_all_matches(
+    conn: duckdb.DuckDBPyConnection | None = None,
+) -> list[dict[str, str]]:
+    """Query DuckDB for all completed matches across all seasons.
+
+    Excludes 'no result' matches — they have no ball data to scrape.
+    """
     close_after = conn is None
     if conn is None:
         conn = get_read_conn()
     rows = conn.execute(
         f"""SELECT match_id, match_date, season
            FROM {settings.gold_schema}.dim_matches
+           WHERE outcome_result IS NULL OR outcome_result != 'no result'
            ORDER BY match_date""",
     ).fetchall()
     if close_after:
@@ -64,14 +91,16 @@ def get_all_matches(conn: duckdb.DuckDBPyConnection | None = None) -> list[dict[
     return [{"match_id": r[0], "match_date": str(r[1]), "season": r[2]} for r in rows]
 
 
-def get_already_scraped(conn: duckdb.DuckDBPyConnection | None = None) -> set[str]:
-    """Get match IDs already in bronze.espn_matches."""
+def _get_already_scraped_match_ids(
+    conn: duckdb.DuckDBPyConnection | None = None,
+) -> set[str]:
+    """Get match IDs that already have ball data in bronze.espn_ball_data."""
     close_after = conn is None
     if conn is None:
         conn = get_read_conn()
     try:
         rows = conn.execute(
-            f"SELECT cricsheet_match_id FROM {settings.bronze_schema}.espn_matches"
+            f"SELECT DISTINCT cricsheet_match_id FROM {settings.bronze_schema}.espn_ball_data"
         ).fetchall()
         result = {r[0] for r in rows}
     except duckdb.CatalogException:
@@ -81,27 +110,25 @@ def get_already_scraped(conn: duckdb.DuckDBPyConnection | None = None) -> set[st
     return result
 
 
-def run_enrichment(
+def run_ball_scraper(
     season: str | None = None,
     limit: int | None = None,
     dry_run: bool = False,
     all_seasons: bool = False,
     delay: float = 4.0,
 ) -> None:
-    """Run the ESPN enrichment pipeline."""
-    # Single connection for all read queries
+    """Run the ESPN ball-by-ball scraping pipeline."""
     conn = get_read_conn()
     try:
-        # Get matches to process
         if all_seasons:
-            all_matches = get_all_matches(conn)
+            all_matches = _get_all_matches(conn)
         elif season:
-            all_matches = get_matches_for_season(season, conn)
+            all_matches = _get_matches_for_season(season, conn)
         else:
             conn.close()
             return
 
-        already_scraped = get_already_scraped(conn)
+        already_scraped = _get_already_scraped_match_ids(conn)
     finally:
         conn.close()
 
@@ -110,7 +137,7 @@ def run_enrichment(
     if limit:
         pending = pending[:limit]
 
-    # Group by season for logging
+    # Log plan by season
     by_season: dict[str, int] = {}
     for m in all_matches:
         by_season[m["season"]] = by_season.get(m["season"], 0) + 1
@@ -124,7 +151,7 @@ def run_enrichment(
         total = by_season[s]
         done = scraped_by_season.get(s, 0)
         logger.info(
-            "enrichment_plan",
+            "ball_scraper_plan",
             season=s,
             total_matches=total,
             already_scraped=done,
@@ -132,7 +159,7 @@ def run_enrichment(
         )
 
     logger.info(
-        "enrichment_summary",
+        "ball_scraper_summary",
         total_pending=len(pending),
         total_matches=len(all_matches),
         already_scraped=len(already_scraped),
@@ -141,46 +168,43 @@ def run_enrichment(
     if dry_run or not pending:
         return
 
-    # Initialize resolver once — it loads the DB cache + IPL seed
     resolver = SeriesResolver()
     logger.info("series_resolver_ready", cache_size=resolver.cache_size)
 
-    # Scrape with batch persistence — writes to DuckDB every 25 matches
-    # so progress isn't lost if the job fails midway
-    total_counts: dict[str, int] = {"matches": 0, "players": 0, "innings": 0, "balls": 0}
+    total_loaded = 0
 
     def persist_batch(batch: list[dict]) -> None:
-        counts = load_espn_to_bronze(batch)
-        for k, v in counts.items():
-            total_counts[k] = total_counts.get(k, 0) + v
-        logger.info("batch_persisted", **total_counts)
+        nonlocal total_loaded
+        loaded = _load_ball_records_to_bronze(batch)
+        total_loaded += loaded
+        logger.info("ball_batch_persisted", loaded=loaded, total_loaded=total_loaded)
 
-    results = scrape_matches(
+    results = scrape_ball_data(
         pending,
         resolver=resolver,
         delay_seconds=delay,
         on_batch=persist_batch,
     )
     logger.info(
-        "enrichment_complete",
-        scraped=len(results),
-        **total_counts,
+        "ball_scraper_complete",
+        total_balls=len(results),
+        total_loaded=total_loaded,
     )
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="ESPN enrichment pipeline")
-    parser.add_argument("--season", type=str, help="IPL season to scrape (e.g. 2024)")
+    parser = argparse.ArgumentParser(description="ESPN ball-by-ball data scraper")
+    parser.add_argument("--season", type=str, help="Season to scrape (e.g. 2024)")
     parser.add_argument("--limit", type=int, help="Max matches to scrape")
     parser.add_argument("--all", action="store_true", help="Scrape all seasons")
     parser.add_argument("--dry-run", action="store_true", help="Show plan without scraping")
-    parser.add_argument("--delay", type=float, default=4.0, help="Seconds between requests")
+    parser.add_argument("--delay", type=float, default=4.0, help="Seconds between matches")
     args = parser.parse_args()
 
     if not args.season and not args.all:
         parser.error("Specify --season or --all")
 
-    run_enrichment(
+    run_ball_scraper(
         season=args.season,
         limit=args.limit,
         dry_run=args.dry_run,
