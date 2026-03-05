@@ -5,11 +5,10 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import functools
+import logging
 import time
 from collections.abc import Callable  # noqa: TC003 — used at runtime in decorators
 from typing import Any, TypeVar
-
-import logging
 
 logger = logging.getLogger(__name__)
 
