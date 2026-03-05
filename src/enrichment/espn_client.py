@@ -382,9 +382,12 @@ async def scrape_matches_async(
     page's __NEXT_DATA__. Fast (~4s/match) and reliable.
 
     Ball-by-ball spatial data (wagon wheel, pitch map) is handled separately
-    by the dedicated ball data scraper (src.enrichment.ball_data_scraper)
-    which uses a different technique (commentary page scroll interception).
-    Run it via: python -m src.enrichment.run_ball_scraper
+    by the dedicated ball data scraper (``src.enrichment.ball_data_scraper``)
+    which uses commentary page scroll interception with two page loads per
+    match (one per innings). Run it via::
+
+        python -m src.enrichment.run_ball_scraper --season 2024
+        python -m src.enrichment.run_ball_scraper --matches 1473469,1473443
 
     Args:
         matches: List of dicts with 'match_id', 'match_date', and 'season' keys.

@@ -9,9 +9,9 @@ import time
 from collections.abc import Callable  # noqa: TC003 — used at runtime in decorators
 from typing import Any, TypeVar
 
-import structlog
+import logging
 
-logger = structlog.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
@@ -41,19 +41,19 @@ def retry(
                 except exceptions as exc:
                     if attempt == max_attempts:
                         logger.error(
-                            "retry_exhausted",
-                            func=func.__name__,
-                            attempts=max_attempts,
-                            error=str(exc),
+                            "retry exhausted: func=%s, attempts=%d, error=%s",
+                            func.__name__,
+                            max_attempts,
+                            exc,
                         )
                         raise
                     logger.warning(
-                        "retry_attempt",
-                        func=func.__name__,
-                        attempt=attempt,
-                        max_attempts=max_attempts,
-                        delay=delay,
-                        error=str(exc),
+                        "retry: func=%s, attempt=%d/%d, delay=%.1fs, error=%s",
+                        func.__name__,
+                        attempt,
+                        max_attempts,
+                        delay,
+                        exc,
                     )
                     time.sleep(delay)
                     delay *= backoff_factor

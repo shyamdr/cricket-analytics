@@ -1,14 +1,30 @@
 """ESPN ball-by-ball spatial data scraper.
 
-Scrapes complete ball-level data (wagon wheel, pitch map, shot type, win probability)
-from ESPN Cricinfo's commentary pages using Playwright route interception.
+Scrapes complete ball-level data (wagon wheel, pitch map, shot type, win
+probability) from ESPN Cricinfo's commentary pages using Playwright route
+interception.
 
 Architecture:
     1. Load the ball-by-ball commentary page in headless WebKit
     2. Intercept ESPN's hs-consumer-api commentary responses via page.route()
-    3. Scroll to trigger the page's IntersectionObserver (loads ~12 balls per scroll)
-    4. Switch innings via the dropdown UI to capture both innings
+    3. Scroll to trigger the page's IntersectionObserver (~12 balls per scroll)
+    4. Use two separate page loads per match — one per innings
     5. Deduplicate and return all balls sorted by over/ball number
+
+Two-load approach:
+    Normal matches:
+      Load 1: page defaults to inning 2 → scroll to completion
+      Load 2: fresh page → switch to inning 1 immediately → scroll
+
+    Super over matches:
+      The page defaults to the "Super Over" view, not regular innings
+      commentary. The IntersectionObserver for loading balls isn't active
+      in this view, so scrolling produces zero API calls. Both innings
+      require a dropdown switch before scrolling:
+      Load 1: fresh page → switch to inning 2 via dropdown → scroll
+      Load 2: fresh page → switch to inning 1 via dropdown → scroll
+
+    Detection: ``content.supportInfo.superOver == True`` in __NEXT_DATA__.
 
 Key constraint: ESPN's WAF blocks all programmatic API calls. Only requests
 initiated by the page's own JavaScript succeed. We MUST use scroll-triggered
@@ -21,23 +37,32 @@ Usage:
         matches=[{"match_id": "1422133", "match_date": "2024-03-22", "season": "2024"}],
         on_batch=persist_fn,
     )
+
+CLI:
+    python -m src.enrichment.run_ball_scraper --season 2025
+    python -m src.enrichment.run_ball_scraper --season 2024 --limit 5
+    python -m src.enrichment.run_ball_scraper --matches 1473469,1473443
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 from typing import Any
 
-import structlog
 from playwright.async_api import Response, Route, async_playwright
 
-from src.config import settings
 from src.enrichment.series_resolver import SeriesResolver
 from src.utils import async_retry, run_async
 
-logger = structlog.get_logger(__name__)
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Field extraction & helpers
+# ---------------------------------------------------------------------------
 
 
 def _extract_balls(comments: list[dict]) -> list[dict[str, Any]]:
@@ -96,143 +121,180 @@ async def _bounce_scroll(page: Any) -> None:
     await asyncio.sleep(1.2)
 
 
+def _flatten_match_balls(
+    cricsheet_match_id: str,
+    espn_match_id: int,
+    innings: dict[int, list[dict]],
+) -> list[dict[str, Any]]:
+    """Flatten innings dict into a flat list of ball records with match IDs attached."""
+    rows = []
+    for _inn_num, balls in innings.items():
+        for ball in balls:
+            rows.append(
+                {
+                    "cricsheet_match_id": cricsheet_match_id,
+                    "espn_match_id": espn_match_id,
+                    **ball,
+                }
+            )
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# Scrolling & innings switching (two-load approach)
+# ---------------------------------------------------------------------------
+
+
 async def _scroll_until_complete(
     page: Any,
     captured_responses: list[dict],
-    all_balls: dict[int, list[dict]],
+    balls: list[dict],
     seen_ids: set[int],
     target_inning: int,
     max_scrolls: int = 30,
 ) -> bool:
-    """Scroll the page until all balls for target_inning are loaded.
+    """Scroll until all balls for target_inning are loaded.
 
-    Returns True if we reached the end (nextInningOver=None).
+    Tracks a single innings' ball list. Returns True if we reached the
+    end (nextInningOver=None).
     """
-    scroll_count = 0
     stale_rounds = 0
-    reached_end = False
 
-    while scroll_count < max_scrolls and not reached_end:
+    for _scroll in range(max_scrolls):
         prev_count = len(seen_ids)
         await _bounce_scroll(page)
-        scroll_count += 1
 
-        # Process captured API responses
+        reached_end = False
         while captured_responses:
             api_data = captured_responses.pop(0)
             comments = api_data.get("comments", [])
             api_next = api_data.get("nextInningOver")
 
-            new_count = 0
-            api_inning = None
             for ball in _extract_balls(comments):
                 bid = ball["espn_ball_id"]
                 inn = ball["inning_number"]
-                # Skip super over balls (inning 3+)
-                if bid and bid not in seen_ids and inn is not None and inn <= 2:
+                if bid and bid not in seen_ids and inn == target_inning:
                     seen_ids.add(bid)
-                    if inn in all_balls:
-                        all_balls[inn].append(ball)
-                    new_count += 1
-                    api_inning = inn
-
-            if new_count > 0:
-                logger.debug(
-                    "scroll_progress",
-                    scroll=scroll_count,
-                    new_balls=new_count,
-                    inning=api_inning,
-                    next_over=api_next,
-                )
+                    balls.append(ball)
 
             if api_next is None and comments:
-                logger.debug("inning_complete", inning=api_inning)
                 reached_end = True
                 break
 
-        # Stale detection: no new balls after a scroll
+        if reached_end:
+            return True
+
         if len(seen_ids) == prev_count:
             stale_rounds += 1
             if stale_rounds >= 4:
-                logger.debug("scroll_stale", stale_rounds=stale_rounds)
-                break
+                return False
         else:
             stale_rounds = 0
 
-    return reached_end
+    return False
 
 
 async def _switch_innings(page: Any, target_team_abbr: str, current_team_abbr: str) -> bool:
-    """Switch innings by clicking the dropdown and selecting the other team.
+    """Switch innings via the dropdown — scoped selector to avoid mis-clicks.
+
+    Scopes the option search to the elevated dropdown panel that appears
+    after clicking the innings button. ESPN renders the dropdown options in
+    a portal (``ds-bg-color-bg-elevated`` container), NOT inside the
+    popper-wrapper that holds the button.
+
+    On super over matches the dropdown button text is "Super Over 1" instead
+    of the current team abbreviation. We try the team abbreviation first,
+    then fall back to detecting the "Super Over" button.
 
     Returns True if switch was successful.
     """
-    # Scroll to top so the dropdown is visible
     await page.evaluate("window.scrollTo(0, 0)")
     await asyncio.sleep(0.5)
 
-    # Click the dropdown button (shows current team abbreviation)
     try:
-        dropdown_btn = page.locator(f'button:has-text("{current_team_abbr}")').first
-        if not await dropdown_btn.is_visible(timeout=3000):
-            logger.warning("dropdown_not_visible", team=current_team_abbr)
-            return False
+        dropdown_btn = page.locator(
+            f'.ds-popper-wrapper button:has-text("{current_team_abbr}")'
+        ).first
+
+        if not await dropdown_btn.is_visible(timeout=2000):
+            # Super over match — button text is not the team abbreviation.
+            dropdown_btn = page.locator(
+                '.ds-popper-wrapper button:has-text("Super Over")'
+            ).first
+
+            if not await dropdown_btn.is_visible(timeout=2000):
+                logger.warning("dropdown not visible for team=%s", current_team_abbr)
+                return False
+
         await dropdown_btn.click()
         await asyncio.sleep(1.0)
-    except Exception as e:
-        logger.warning("dropdown_click_failed", error=str(e))
-        return False
 
-    # Click the target team option in the dropdown
-    try:
-        option = page.locator(f'div.ds-cursor-pointer:has-text("{target_team_abbr}")').first
-        if not await option.is_visible(timeout=3000):
-            logger.warning("dropdown_option_not_visible", team=target_team_abbr)
+        # The dropdown options render in an elevated panel.
+        panel = page.locator(
+            f'div.ds-bg-color-bg-elevated:has(div.ds-cursor-pointer:has-text("{target_team_abbr}"))'
+        ).first
+
+        if not await panel.is_visible(timeout=3000):
+            logger.warning("dropdown panel not visible")
             return False
+
+        option = panel.locator(
+            f'div.ds-cursor-pointer:has-text("{target_team_abbr}")'
+        ).first
+        if not await option.is_visible(timeout=3000):
+            logger.warning("dropdown option not visible for team=%s", target_team_abbr)
+            return False
+
         await option.click()
-        logger.debug("innings_switched", from_team=current_team_abbr, to_team=target_team_abbr)
         await asyncio.sleep(2.0)
         return True
     except Exception as e:
-        logger.warning("innings_switch_failed", error=str(e))
+        logger.warning("innings switch failed: %s", e)
         return False
 
 
-@async_retry(max_attempts=2, base_delay=5.0, exceptions=(Exception,))
-async def _scrape_single_match(
-    espn_match_id: int,
-    espn_series_id: int,
+# ---------------------------------------------------------------------------
+# Per-innings page load
+# ---------------------------------------------------------------------------
+
+
+async def _load_and_scrape_innings(
+    url: str,
     browser: Any,
-) -> dict[str, Any]:
-    """Scrape complete ball-by-ball data for a single match.
+    target_inning: int,
+    team_abbrs: dict[int, str],
+    default_inning: int,
+    is_super_over_match: bool = False,
+    extract_metadata: bool = False,
+) -> tuple[list[dict], set[int], dict | None]:
+    """Load a fresh page and scrape a single innings.
 
-    Opens a single page, captures both innings via scroll + dropdown switch.
+    If target_inning != default_inning (or is_super_over_match), switches
+    via dropdown BEFORE scrolling.
 
-    Args:
-        espn_match_id: ESPN's match object ID.
-        espn_series_id: ESPN's series object ID.
-        browser: An open Playwright browser instance.
+    On super over matches the page defaults to the "Super Over" view, not
+    regular innings commentary. The IntersectionObserver for loading more
+    balls isn't active, so scrolling produces zero API calls. We must
+    switch to a regular innings via the dropdown first.
+
+    When ``extract_metadata=True``, also parses __NEXT_DATA__ and returns
+    the content dict as the third element. This lets the first page load
+    double as the metadata load, eliminating a separate page load.
 
     Returns:
-        Dict with espn_match_id, innings (dict of inning_number -> ball list),
-        and total_balls count.
+        Tuple of (ball list, seen ball IDs, metadata dict or None).
     """
-    url = (
-        f"https://www.espncricinfo.com/series/x-{espn_series_id}"
-        f"/x-{espn_match_id}/ball-by-ball-commentary"
-    )
-
-    all_balls: dict[int, list[dict]] = {}
-    captured_responses: list[dict] = []
+    captured: list[dict] = []
+    balls: list[dict] = []
     seen_ids: set[int] = set()
+    metadata: dict | None = None
 
     async def handle_route(route: Route) -> None:
-        """Intercept commentary API calls and capture response data."""
         try:
             response: Response = await route.fetch()
             body = await response.body()
             data = json.loads(body)
-            captured_responses.append(data)
+            captured.append(data)
             await route.fulfill(response=response)
         except Exception:
             await route.continue_()
@@ -252,123 +314,195 @@ async def _scrape_single_match(
 
         resp = await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         if resp and resp.status == 404:
-            raise ValueError(f"ESPN returned 404 for match {espn_match_id}")
+            raise ValueError(f"ESPN returned 404 for {url}")
 
-        # Extract __NEXT_DATA__
-        html = await page.content()
-        m = re.search(
-            r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
-            html,
-            re.DOTALL,
-        )
-        if not m:
-            raise ValueError(f"No __NEXT_DATA__ found for match {espn_match_id}")
+        needs_switch = is_super_over_match or target_inning != default_inning
 
-        next_data = json.loads(m.group(1))
-        app_data = next_data["props"]["appPageProps"]["data"]
-        data = app_data.get("data", app_data)
-        match_content = data.get("content", {})
+        if needs_switch:
+            # If we also need metadata, grab __NEXT_DATA__ before switching
+            if extract_metadata:
+                html = await page.content()
+                m = re.search(
+                    r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
+                    html,
+                    re.DOTALL,
+                )
+                if m:
+                    nd = json.loads(m.group(1))
+                    app_data = nd["props"]["appPageProps"]["data"]
+                    data = app_data.get("data", app_data)
+                    metadata = data.get("content", {})
 
-        # Determine innings count from the page data
-        # Only track regular innings (1 and 2), not super overs (3+)
-        innings_info = match_content.get("innings", [])
-        for inn_info in innings_info:
-            inn_num = inn_info.get("inningNumber")
-            if inn_num is not None and inn_num <= 2:
-                all_balls[inn_num] = []
+            current_abbr = team_abbrs.get(default_inning, "")
+            target_abbr = team_abbrs.get(target_inning, "")
 
-        # Fallback: if no innings info, assume 2 innings
-        if not all_balls:
-            all_balls = {1: [], 2: []}
+            if not target_abbr:
+                logger.warning("missing team abbreviation for inning %d", target_inning)
+                return balls, seen_ids, metadata
 
-        # Get team abbreviations for innings switching (regular innings only)
-        team_abbrs: dict[int, str] = {}
-        for inn_info in innings_info:
-            inn_num = inn_info.get("inningNumber")
-            abbr = inn_info.get("team", {}).get("abbreviation")
-            if inn_num and inn_num <= 2 and abbr:
-                team_abbrs[inn_num] = abbr
-
-        # Initial balls from __NEXT_DATA__ (last ~12 balls of most recent innings)
-        initial_comments = match_content.get("comments", [])
-        initial_inning = match_content.get("currentInningNumber", max(all_balls.keys()))
-
-        # If the page defaults to a super over innings (3+), override to inning 2
-        if initial_inning > 2:
-            initial_inning = 2
-
-        for ball in _extract_balls(initial_comments):
-            bid = ball["espn_ball_id"]
-            inn = ball["inning_number"]
-            # Skip super over balls (inning 3+)
-            if bid and bid not in seen_ids and inn is not None and inn <= 2:
-                seen_ids.add(bid)
-                if inn in all_balls:
-                    all_balls[inn].append(ball)
-
-        # Phase 1: Scroll to load all current innings balls
-        current_abbr = team_abbrs.get(initial_inning, "")
-        if not current_abbr:
-            # No team abbreviation found — likely a super over match with
-            # a different UI layout (no dropdown switcher). Log and return
-            # whatever we got from __NEXT_DATA__.
-            logger.warning(
-                "no_team_abbr_for_innings_switch",
-                espn_match_id=espn_match_id,
-                initial_inning=initial_inning,
-                team_abbrs=team_abbrs,
-            )
-        await _scroll_until_complete(page, captured_responses, all_balls, seen_ids, initial_inning)
-
-        # Phase 2: Switch to each other innings and scroll
-        other_innings = sorted(inn for inn in all_balls if inn != initial_inning)
-        for other_inning in other_innings:
-            target_abbr = team_abbrs.get(other_inning, "?")
             switched = await _switch_innings(page, target_abbr, current_abbr)
+            if not switched:
+                logger.warning("innings switch failed for inning %d", target_inning)
+                return balls, seen_ids, metadata
 
-            if switched:
-                # Process any API response from the switch
-                while captured_responses:
-                    api_data = captured_responses.pop(0)
-                    comments = api_data.get("comments", [])
-                    for ball in _extract_balls(comments):
-                        bid = ball["espn_ball_id"]
-                        inn = ball["inning_number"]
-                        if bid and bid not in seen_ids and inn is not None and inn <= 2:
-                            seen_ids.add(bid)
-                            if inn in all_balls:
-                                all_balls[inn].append(ball)
+            # Collect any balls from the switch response
+            while captured:
+                api_data = captured.pop(0)
+                for ball in _extract_balls(api_data.get("comments", [])):
+                    bid = ball["espn_ball_id"]
+                    if bid and bid not in seen_ids and ball["inning_number"] == target_inning:
+                        seen_ids.add(bid)
+                        balls.append(ball)
+        else:
+            # Collect initial balls from __NEXT_DATA__
+            html = await page.content()
+            m = re.search(
+                r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
+                html,
+                re.DOTALL,
+            )
+            if m:
+                nd = json.loads(m.group(1))
+                app_data = nd["props"]["appPageProps"]["data"]
+                data = app_data.get("data", app_data)
+                content = data.get("content", {})
 
-                # Scroll to load remaining balls
-                await _scroll_until_complete(
-                    page, captured_responses, all_balls, seen_ids, other_inning
-                )
-                current_abbr = target_abbr
-            else:
-                logger.warning(
-                    "innings_switch_failed_skipping",
-                    match_id=espn_match_id,
-                    inning=other_inning,
-                )
+                if extract_metadata:
+                    metadata = content
+
+                for ball in _extract_balls(content.get("comments", [])):
+                    bid = ball["espn_ball_id"]
+                    if bid and bid not in seen_ids and ball["inning_number"] == target_inning:
+                        seen_ids.add(bid)
+                        balls.append(ball)
+
+        # Scroll to load remaining balls
+        await _scroll_until_complete(page, captured, balls, seen_ids, target_inning)
     finally:
         await context.close()
 
-    # Sort balls within each innings
-    for inn_num in all_balls:
-        all_balls[inn_num].sort(key=lambda b: (b["over_number"] or 0, b["ball_number"] or 0))
+    balls.sort(key=lambda b: (b["over_number"] or 0, b["ball_number"] or 0))
+    return balls, seen_ids, metadata
+
+
+# ---------------------------------------------------------------------------
+# Single-match scraper
+# ---------------------------------------------------------------------------
+
+
+@async_retry(max_attempts=2, base_delay=5.0, exceptions=(Exception,))
+async def _scrape_single_match(
+    espn_match_id: int,
+    espn_series_id: int,
+    browser: Any,
+) -> dict[str, Any]:
+    """Scrape complete ball-by-ball data using two page loads (optimized).
+
+    Previous approach used 3 loads: metadata + innings 2 + innings 1.
+    Optimized approach folds metadata extraction into the first innings
+    load, saving ~3-5s per match.
+
+    Normal matches (2 loads):
+      Load 1: page defaults to inning 2 → extract metadata from
+              __NEXT_DATA__ + scroll to completion.
+      Load 2: fresh page → switch to inning 1 → scroll.
+
+    Super over matches (2 loads):
+      Load 1: fresh page → extract metadata from __NEXT_DATA__ →
+              switch to inning 2 → scroll.
+      Load 2: fresh page → switch to inning 1 → scroll.
+    """
+    url = (
+        f"https://www.espncricinfo.com/series/x-{espn_series_id}"
+        f"/x-{espn_match_id}/ball-by-ball-commentary"
+    )
+
+    # --- Load 1: default innings + metadata extraction ---
+    # We don't know yet if it's a super over match, so we load with
+    # default_inning=2 (the normal default) and extract_metadata=True.
+    # The metadata tells us the actual default inning and super over status.
+    # For normal matches this load also scrapes inning 2 (the default).
+    # For super over matches, we'll need to switch — but we still get
+    # metadata from __NEXT_DATA__ before the switch happens.
+
+    # First pass: load page, extract metadata, scrape default innings
+    first_balls, first_seen, metadata = await _load_and_scrape_innings(
+        url,
+        browser,
+        target_inning=2,  # assume default; corrected below if needed
+        team_abbrs={},  # empty — no switch on first load for normal matches
+        default_inning=2,
+        is_super_over_match=False,
+        extract_metadata=True,
+    )
+
+    if not metadata:
+        raise ValueError(f"No __NEXT_DATA__ found for match {espn_match_id}")
+
+    # Parse metadata from the content dict
+    support_info = metadata.get("supportInfo", {})
+    is_super_over_match = support_info.get("superOver") is True
+
+    innings_info = metadata.get("innings", [])
+    regular_innings: list[int] = []
+    team_abbrs: dict[int, str] = {}
+    for inn_info in innings_info:
+        inn_num = inn_info.get("inningNumber")
+        abbr = inn_info.get("team", {}).get("abbreviation")
+        if inn_num is not None and inn_num <= 2:
+            regular_innings.append(inn_num)
+            if abbr:
+                team_abbrs[inn_num] = abbr
+
+    if not regular_innings:
+        regular_innings = [1, 2]
+
+    default_inning = metadata.get("currentInningNumber", 2)
+    if default_inning > 2:
+        default_inning = 2
+
+    if is_super_over_match:
+        pass  # handled below — both innings need dropdown switch
+
+    all_balls: dict[int, list[dict]] = {}
+    global_seen: set[int] = set()
+
+    # Check if Load 1 actually scraped the default innings successfully.
+    # For normal matches where default_inning == 2, Load 1 scraped inning 2.
+    # For super over matches, Load 1 tried to scrape inning 2 without
+    # switching (since we didn't know it was a super over yet), so it got
+    # zero balls. We need to re-scrape inning 2 with the switch.
+    load1_valid = len(first_balls) > 0 and not is_super_over_match
+
+    if load1_valid:
+        all_balls[default_inning] = first_balls
+        global_seen.update(first_seen)
+
+    # Determine which innings still need scraping
+    remaining = [i for i in regular_innings if i not in all_balls]
+    # Sort: default innings first (no switch needed) if not yet scraped
+    remaining.sort(key=lambda i: (i != default_inning, i))
+
+    for inn_num in remaining:
+        balls, seen, _ = await _load_and_scrape_innings(
+            url,
+            browser,
+            inn_num,
+            team_abbrs,
+            default_inning,
+            is_super_over_match=is_super_over_match,
+        )
+        all_balls[inn_num] = balls
+        global_seen.update(seen)
 
     total = sum(len(v) for v in all_balls.values())
 
-    # Detect partial data — a completed T20 innings should have ~60-130 balls.
-    # If we got fewer than 50 balls total for a 2-innings match, something went wrong.
-    min_expected = 50
-    if total < min_expected and len(all_balls) >= 2:
+    if total < 50 and len(regular_innings) >= 2:
         logger.warning(
-            "partial_ball_data",
-            espn_match_id=espn_match_id,
-            total_balls=total,
-            innings={inn: len(balls) for inn, balls in all_balls.items()},
-            min_expected=min_expected,
+            "partial ball data: espn_match_id=%d, total_balls=%d, innings=%s",
+            espn_match_id,
+            total,
+            {inn: len(balls) for inn, balls in all_balls.items()},
         )
 
     return {
@@ -378,22 +512,10 @@ async def _scrape_single_match(
     }
 
 
-def _flatten_match_balls(
-    cricsheet_match_id: str,
-    espn_match_id: int,
-    innings: dict[int, list[dict]],
-) -> list[dict[str, Any]]:
-    """Flatten innings dict into a flat list of ball records with match IDs attached."""
-    rows = []
-    for _inn_num, balls in innings.items():
-        for ball in balls:
-            row = {
-                "cricsheet_match_id": cricsheet_match_id,
-                "espn_match_id": espn_match_id,
-                **ball,
-            }
-            rows.append(row)
-    return rows
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
 
 
 async def scrape_ball_data_async(
@@ -401,21 +523,18 @@ async def scrape_ball_data_async(
     resolver: SeriesResolver | None = None,
     delay_seconds: float = 4.0,
     on_batch: callable | None = None,
-    batch_size: int | None = None,
+    on_status: callable | None = None,
+    batch_size: int = 10,
 ) -> list[dict[str, Any]]:
     """Scrape ball-by-ball data for a list of matches.
-
-    Uses a single browser instance for all matches. Includes rate limiting
-    and batch persistence to avoid losing progress on failure.
 
     Args:
         matches: List of dicts with 'match_id', 'match_date', and 'season' keys.
         resolver: SeriesResolver instance (created if not provided).
         delay_seconds: Seconds to wait between matches (default 4).
-        on_batch: Optional callback with a list of flat ball records every batch_size
-                  matches. Used to persist intermediate results.
-        batch_size: Number of matches per batch for on_batch callback.
-                  Defaults to settings.enrichment_batch_size.
+        on_batch: Callback with list of flat ball records every batch_size matches.
+        on_status: Callback(match_id, series_id, status) for tracking outcomes.
+        batch_size: Number of matches between DB writes (default 10).
 
     Returns:
         List of flat ball record dicts (one per ball across all matches).
@@ -423,16 +542,15 @@ async def scrape_ball_data_async(
     if resolver is None:
         resolver = SeriesResolver()
 
-    if batch_size is None:
-        batch_size = settings.enrichment_batch_size
-
+    total_matches = len(matches)
     all_results: list[dict[str, Any]] = []
     batch_buffer: list[dict[str, Any]] = []
+    batch_match_count = 0
+    failed_matches: list[str] = []
 
     async with async_playwright() as pw:
         browser = await pw.webkit.launch(headless=True)
 
-        # Resolve series IDs for all matches
         series_map = await resolver.resolve_batch_async(
             matches, browser, delay_seconds=delay_seconds
         )
@@ -440,45 +558,73 @@ async def scrape_ball_data_async(
         scrape_count = 0
         for i, m in enumerate(matches):
             match_id = str(m["match_id"])
+            match_date = m.get("match_date", "?")
             series_id = series_map.get(match_id)
 
             if series_id is None:
-                logger.warning("skipping_no_series_id", match_id=match_id)
+                logger.warning("progress=%d/%d | match_id=%s | date=%s | SKIP — no series ID found",
+                               scrape_count + 1, total_matches, match_id, match_date)
+                failed_matches.append(match_id)
                 continue
 
             try:
-                logger.info(
-                    "scraping_ball_data",
-                    match_id=match_id,
-                    series_id=series_id,
-                    progress=f"{scrape_count + 1}/{len(matches)}",
+                result = await _scrape_single_match(
+                    int(match_id), int(series_id), browser
                 )
-                result = await _scrape_single_match(int(match_id), int(series_id), browser)
                 flat_balls = _flatten_match_balls(
                     match_id, result["espn_match_id"], result["innings"]
                 )
                 all_results.extend(flat_balls)
                 batch_buffer.extend(flat_balls)
+                batch_match_count += 1
                 scrape_count += 1
 
-                # Log per-innings stats
-                inn_counts = {inn: len(balls) for inn, balls in result["innings"].items()}
-                logger.info(
-                    "match_ball_data_scraped",
-                    match_id=match_id,
-                    total_balls=result["total_balls"],
-                    innings=inn_counts,
+                inn_details = " + ".join(
+                    f"inn{inn}={len(balls)}"
+                    for inn, balls in sorted(result["innings"].items())
                 )
-            except Exception:
-                logger.exception("ball_scrape_failed", match_id=match_id)
+                logger.info(
+                    "progress=%d/%d | match_id=%s | date=%s | total_balls=%d | %s",
+                    scrape_count, total_matches, match_id, match_date,
+                    result["total_balls"], inn_details,
+                )
+                if on_status:
+                    on_status(match_id, int(series_id), "success")
+            except ValueError as e:
+                if "404" in str(e):
+                    scrape_count += 1
+                    logger.info(
+                        "progress=%d/%d | match_id=%s | date=%s | no commentary (404)",
+                        scrape_count, total_matches, match_id, match_date,
+                    )
+                    if on_status:
+                        on_status(match_id, int(series_id), "no_commentary")
+                else:
+                    scrape_count += 1
+                    logger.error(
+                        "progress=%d/%d | match_id=%s | date=%s | FAILED: %s",
+                        scrape_count, total_matches, match_id, match_date, e,
+                    )
+                    failed_matches.append(match_id)
+                    if on_status:
+                        on_status(match_id, int(series_id), "failed")
+            except Exception as e:
+                scrape_count += 1
+                logger.error(
+                    "progress=%d/%d | match_id=%s | date=%s | FAILED: %s",
+                    scrape_count, total_matches, match_id, match_date, e,
+                )
+                failed_matches.append(match_id)
+                if on_status:
+                    on_status(match_id, int(series_id), "failed")
 
-            # Persist batch
-            if on_batch and len(batch_buffer) >= batch_size:
+            # Persist every batch_size matches
+            if on_batch and batch_match_count >= batch_size:
                 on_batch(batch_buffer)
                 batch_buffer = []
+                batch_match_count = 0
 
-            # Rate limit
-            if i < len(matches) - 1:
+            if i < total_matches - 1:
                 await asyncio.sleep(delay_seconds)
 
         # Flush remaining
@@ -487,7 +633,11 @@ async def scrape_ball_data_async(
 
         await browser.close()
 
+    if failed_matches:
+        logger.warning("failed matches (%d): %s", len(failed_matches), ", ".join(failed_matches))
+
     return all_results
+
 
 
 def scrape_ball_data(
@@ -495,7 +645,8 @@ def scrape_ball_data(
     resolver: SeriesResolver | None = None,
     delay_seconds: float = 4.0,
     on_batch: callable | None = None,
-    batch_size: int | None = None,
+    on_status: callable | None = None,
+    batch_size: int = 10,
 ) -> list[dict[str, Any]]:
     """Synchronous wrapper around scrape_ball_data_async."""
     return run_async(
@@ -504,6 +655,7 @@ def scrape_ball_data(
             resolver=resolver,
             delay_seconds=delay_seconds,
             on_batch=on_batch,
+            on_status=on_status,
             batch_size=batch_size,
         )
     )

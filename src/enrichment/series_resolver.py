@@ -176,19 +176,29 @@ class SeriesResolver:
         Populates the season cache with all plausible season key variants
         so that lookups work regardless of whether the caller uses the
         ESPN raw season ('2007/08') or the dbt derived season ('2008').
+
+        Two-pass approach: first pass stores exact season keys, second
+        pass stores variant keys only if not already claimed. This ensures
+        an exact match (e.g. season='2021' → series 1249214) always wins
+        over a variant match (e.g. season='2020/21' generating variant '2021').
         """
         try:
             conn = get_read_conn()
             rows = conn.execute(
                 f"SELECT series_id, season FROM {settings.bronze_schema}.espn_series"
             ).fetchall()
+
+            # Pass 1: exact season keys always win
+            for series_id, season in rows:
+                self._season_cache[str(season)] = int(series_id)
+
+            # Pass 2: variant keys only if not already claimed
             for series_id, season in rows:
                 sid = int(series_id)
-                # Store under all variants so both '2007/08' and '2008' resolve
                 for variant in self._season_variants(str(season)):
-                    # Don't overwrite if a more specific entry already exists
                     if variant not in self._season_cache:
                         self._season_cache[variant] = sid
+
             conn.close()
             logger.info("series_cache_loaded", entries=len(self._season_cache), db_rows=len(rows))
         except duckdb.CatalogException:
