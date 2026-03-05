@@ -110,9 +110,6 @@ def _get_matches_by_ids(
     return [{"match_id": r[0], "match_date": str(r[1]), "season": r[2]} for r in rows]
 
 
-
-
-
 def _get_already_scraped_match_ids(
     conn: duckdb.DuckDBPyConnection | None = None,
 ) -> set[str]:
@@ -175,15 +172,6 @@ def _record_scrape_status(match_id: str, series_id: int, status: str) -> None:
         conn.close()
 
 
-
-
-
-
-
-
-
-
-
 def run_ball_scraper(
     season: str | None = None,
     match_ids: list[str] | None = None,
@@ -215,8 +203,12 @@ def run_ball_scraper(
     if limit:
         pending = pending[:limit]
 
-    logger.info("Ball scraper: to_scrape=%d, already_done=%d, total=%d",
-                len(pending), len(already_scraped), len(all_matches))
+    logger.info(
+        "Ball scraper: to_scrape=%d, already_done=%d, total=%d",
+        len(pending),
+        len(already_scraped),
+        len(all_matches),
+    )
 
     if dry_run or not pending:
         for m in pending:
@@ -234,8 +226,12 @@ def run_ball_scraper(
         loaded = _load_ball_records_to_bronze(batch)
         total_loaded += loaded
         batches_written += 1
-        logger.info("batch %d saved | balls_in_batch=%d | total_saved=%d",
-                     batches_written, loaded, total_loaded)
+        logger.info(
+            "batch %d saved | balls_in_batch=%d | total_saved=%d",
+            batches_written,
+            loaded,
+            total_loaded,
+        )
 
     results = scrape_ball_data(
         pending,
@@ -245,16 +241,6 @@ def run_ball_scraper(
         on_status=_record_scrape_status,
     )
     logger.info("Done — balls_scraped=%d, saved_to_db=%d", len(results), total_loaded)
-
-
-
-
-
-
-
-
-
-
 
 
 def main() -> None:
@@ -301,8 +287,6 @@ def main() -> None:
         all_seasons=args.all,
         delay=args.delay,
     )
-
-
 
 
 if __name__ == "__main__":

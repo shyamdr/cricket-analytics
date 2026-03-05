@@ -197,7 +197,7 @@ def _extract_match_data(next_data: dict[str, Any]) -> dict[str, Any]:
         # Batting details (minutes at crease, battedType, dismissalText)
         batsmen_details = []
         for b in inn.get("inningBatsmen") or []:
-            bp = (b.get("player") or {})
+            bp = b.get("player") or {}
             dismissal_text = b.get("dismissalText") or {}
             batsmen_details.append(
                 {
@@ -214,8 +214,8 @@ def _extract_match_data(next_data: dict[str, Any]) -> dict[str, Any]:
         # Partnerships
         partnerships = []
         for pt in inn.get("inningPartnerships") or []:
-            p1 = (pt.get("player1") or {})
-            p2 = (pt.get("player2") or {})
+            p1 = pt.get("player1") or {}
+            p2 = pt.get("player2") or {}
             partnerships.append(
                 {
                     "player1_id": p1.get("objectId"),
@@ -355,7 +355,9 @@ def _extract_match_data(next_data: dict[str, Any]) -> dict[str, Any]:
         "team2_points": team2_data.get("points"),
         "team2_primary_color": (team2_data.get("team") or {}).get("primaryColor"),
         # Replacements & debut
-        "replacement_players_json": json.dumps(replacement_records) if replacement_records else None,
+        "replacement_players_json": json.dumps(replacement_records)
+        if replacement_records
+        else None,
         "debut_players_json": json.dumps(match_info.get("debutPlayers")),
         # Legacy (kept for backward compat)
         "teams_enrichment_json": json.dumps(teams_enrichment),

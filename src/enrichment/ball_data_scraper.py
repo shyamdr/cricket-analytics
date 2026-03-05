@@ -218,9 +218,7 @@ async def _switch_innings(page: Any, target_team_abbr: str, current_team_abbr: s
 
         if not await dropdown_btn.is_visible(timeout=2000):
             # Super over match — button text is not the team abbreviation.
-            dropdown_btn = page.locator(
-                '.ds-popper-wrapper button:has-text("Super Over")'
-            ).first
+            dropdown_btn = page.locator('.ds-popper-wrapper button:has-text("Super Over")').first
 
             if not await dropdown_btn.is_visible(timeout=2000):
                 logger.warning("dropdown not visible for team=%s", current_team_abbr)
@@ -238,9 +236,7 @@ async def _switch_innings(page: Any, target_team_abbr: str, current_team_abbr: s
             logger.warning("dropdown panel not visible")
             return False
 
-        option = panel.locator(
-            f'div.ds-cursor-pointer:has-text("{target_team_abbr}")'
-        ).first
+        option = panel.locator(f'div.ds-cursor-pointer:has-text("{target_team_abbr}")').first
         if not await option.is_visible(timeout=3000):
             logger.warning("dropdown option not visible for team=%s", target_team_abbr)
             return False
@@ -517,7 +513,6 @@ async def _scrape_single_match(
 # ---------------------------------------------------------------------------
 
 
-
 async def scrape_ball_data_async(
     matches: list[dict[str, str]],
     resolver: SeriesResolver | None = None,
@@ -562,15 +557,18 @@ async def scrape_ball_data_async(
             series_id = series_map.get(match_id)
 
             if series_id is None:
-                logger.warning("progress=%d/%d | match_id=%s | date=%s | SKIP — no series ID found",
-                               scrape_count + 1, total_matches, match_id, match_date)
+                logger.warning(
+                    "progress=%d/%d | match_id=%s | date=%s | SKIP — no series ID found",
+                    scrape_count + 1,
+                    total_matches,
+                    match_id,
+                    match_date,
+                )
                 failed_matches.append(match_id)
                 continue
 
             try:
-                result = await _scrape_single_match(
-                    int(match_id), int(series_id), browser
-                )
+                result = await _scrape_single_match(int(match_id), int(series_id), browser)
                 flat_balls = _flatten_match_balls(
                     match_id, result["espn_match_id"], result["innings"]
                 )
@@ -580,13 +578,16 @@ async def scrape_ball_data_async(
                 scrape_count += 1
 
                 inn_details = " + ".join(
-                    f"inn{inn}={len(balls)}"
-                    for inn, balls in sorted(result["innings"].items())
+                    f"inn{inn}={len(balls)}" for inn, balls in sorted(result["innings"].items())
                 )
                 logger.info(
                     "progress=%d/%d | match_id=%s | date=%s | total_balls=%d | %s",
-                    scrape_count, total_matches, match_id, match_date,
-                    result["total_balls"], inn_details,
+                    scrape_count,
+                    total_matches,
+                    match_id,
+                    match_date,
+                    result["total_balls"],
+                    inn_details,
                 )
                 if on_status:
                     on_status(match_id, int(series_id), "success")
@@ -595,7 +596,10 @@ async def scrape_ball_data_async(
                     scrape_count += 1
                     logger.info(
                         "progress=%d/%d | match_id=%s | date=%s | no commentary (404)",
-                        scrape_count, total_matches, match_id, match_date,
+                        scrape_count,
+                        total_matches,
+                        match_id,
+                        match_date,
                     )
                     if on_status:
                         on_status(match_id, int(series_id), "no_commentary")
@@ -603,7 +607,11 @@ async def scrape_ball_data_async(
                     scrape_count += 1
                     logger.error(
                         "progress=%d/%d | match_id=%s | date=%s | FAILED: %s",
-                        scrape_count, total_matches, match_id, match_date, e,
+                        scrape_count,
+                        total_matches,
+                        match_id,
+                        match_date,
+                        e,
                     )
                     failed_matches.append(match_id)
                     if on_status:
@@ -612,7 +620,11 @@ async def scrape_ball_data_async(
                 scrape_count += 1
                 logger.error(
                     "progress=%d/%d | match_id=%s | date=%s | FAILED: %s",
-                    scrape_count, total_matches, match_id, match_date, e,
+                    scrape_count,
+                    total_matches,
+                    match_id,
+                    match_date,
+                    e,
                 )
                 failed_matches.append(match_id)
                 if on_status:
@@ -637,7 +649,6 @@ async def scrape_ball_data_async(
         logger.warning("failed matches (%d): %s", len(failed_matches), ", ".join(failed_matches))
 
     return all_results
-
 
 
 def scrape_ball_data(
