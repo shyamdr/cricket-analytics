@@ -15,6 +15,14 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
+class NoRetryError(Exception):
+    """Raised when an operation fails permanently and should NOT be retried.
+
+    The retry/async_retry decorators will never catch this — it propagates
+    immediately regardless of the configured ``exceptions`` tuple.
+    """
+
+
 def retry(
     max_attempts: int = 3,
     base_delay: float = 2.0,
@@ -37,6 +45,8 @@ def retry(
             for attempt in range(1, max_attempts + 1):
                 try:
                     return func(*args, **kwargs)
+                except NoRetryError:
+                    raise
                 except exceptions as exc:
                     if attempt == max_attempts:
                         logger.error(
@@ -82,22 +92,24 @@ def async_retry(
             for attempt in range(1, max_attempts + 1):
                 try:
                     return await func(*args, **kwargs)
+                except NoRetryError:
+                    raise
                 except exceptions as exc:
                     if attempt == max_attempts:
                         logger.error(
-                            "retry_exhausted",
-                            func=func.__name__,
-                            attempts=max_attempts,
-                            error=str(exc),
+                            "retry exhausted: func=%s, attempts=%d, error=%s",
+                            func.__name__,
+                            max_attempts,
+                            exc,
                         )
                         raise
                     logger.warning(
-                        "retry_attempt",
-                        func=func.__name__,
-                        attempt=attempt,
-                        max_attempts=max_attempts,
-                        delay=delay,
-                        error=str(exc),
+                        "retry: func=%s, attempt=%d/%d, delay=%.1fs, error=%s",
+                        func.__name__,
+                        attempt,
+                        max_attempts,
+                        delay,
+                        exc,
                     )
                     await asyncio.sleep(delay)
                     delay *= backoff_factor

@@ -172,6 +172,7 @@ def espn_ball_data(context: AssetExecutionContext, config: BallDataConfig) -> Ma
     resolver = SeriesResolver()
     total_loaded = 0
     batches_written = 0
+    scrape_count = 0
 
     def persist_batch(batch: list[dict]) -> None:
         nonlocal total_loaded, batches_written
@@ -180,12 +181,38 @@ def espn_ball_data(context: AssetExecutionContext, config: BallDataConfig) -> Ma
         batches_written += 1
         context.log.info(f"Batch {batches_written}: {loaded} balls saved (total: {total_loaded})")
 
+    def track_status(
+        match_id: str, series_id: int, status: str, details: dict | None = None
+    ) -> None:
+        nonlocal scrape_count
+        scrape_count += 1
+        details = details or {}
+        date = details.get("date", "?")
+        if status == "success":
+            total_balls = details.get("total_balls", 0)
+            innings = details.get("innings", {})
+            inn_str = " + ".join(f"inn{k}={v}" for k, v in sorted(innings.items()))
+            context.log.info(
+                f"[{scrape_count}/{len(pending)}] match={match_id} | {date} | "
+                f"total_balls={total_balls} | {inn_str}"
+            )
+        elif status == "no_commentary":
+            context.log.info(
+                f"[{scrape_count}/{len(pending)}] match={match_id} | {date} | no commentary (404)"
+            )
+        else:
+            error = details.get("error", "unknown")
+            context.log.warning(
+                f"[{scrape_count}/{len(pending)}] match={match_id} | {date} | FAILED: {error}"
+            )
+        _record_scrape_status(match_id, series_id, status)
+
     results = scrape_ball_data(
         pending,
         resolver=resolver,
         delay_seconds=config.delay,
         on_batch=persist_batch,
-        on_status=_record_scrape_status,
+        on_status=track_status,
         batch_size=10,
     )
 

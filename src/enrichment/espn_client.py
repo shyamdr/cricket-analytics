@@ -16,7 +16,7 @@ from playwright.async_api import async_playwright
 
 from src.config import settings
 from src.enrichment.series_resolver import SeriesResolver
-from src.utils import async_retry, run_async
+from src.utils import NoRetryError, async_retry, run_async
 
 logger = structlog.get_logger(__name__)
 
@@ -44,7 +44,7 @@ async def _fetch_next_data(url: str, browser: Any) -> dict[str, Any]:
     try:
         response = await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         if response and response.status == 404:
-            raise ValueError(f"ESPN returned 404 for {url}")
+            raise NoRetryError(f"ESPN returned 404 for {url}")
 
         content = await page.content()
     finally:
@@ -459,6 +459,8 @@ async def scrape_matches_async(
                     captain2=match_record["team2_captain"],
                     players=len(extracted["players"]),
                 )
+            except NoRetryError as exc:
+                logger.warning("match_skipped", match_id=match_id, reason=str(exc))
             except Exception:
                 logger.exception("scrape_failed", match_id=match_id, url=url)
 

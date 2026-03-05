@@ -55,7 +55,7 @@ from typing import Any
 from playwright.async_api import Response, Route, async_playwright
 
 from src.enrichment.series_resolver import SeriesResolver
-from src.utils import async_retry, run_async
+from src.utils import NoRetryError, async_retry, run_async
 
 logger = logging.getLogger(__name__)
 
@@ -310,7 +310,7 @@ async def _load_and_scrape_innings(
 
         resp = await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         if resp and resp.status == 404:
-            raise ValueError(f"ESPN returned 404 for {url}")
+            raise NoRetryError(f"ESPN returned 404 for {url}")
 
         needs_switch = is_super_over_match or target_inning != default_inning
 
@@ -590,10 +590,22 @@ async def scrape_ball_data_async(
                     inn_details,
                 )
                 if on_status:
-                    on_status(match_id, int(series_id), "success")
-            except ValueError as e:
+                    on_status(
+                        match_id,
+                        int(series_id),
+                        "success",
+                        {
+                            "total_balls": result["total_balls"],
+                            "date": match_date,
+                            "innings": {
+                                str(inn): len(balls)
+                                for inn, balls in sorted(result["innings"].items())
+                            },
+                        },
+                    )
+            except (NoRetryError, ValueError) as e:
+                scrape_count += 1
                 if "404" in str(e):
-                    scrape_count += 1
                     logger.info(
                         "progress=%d/%d | match_id=%s | date=%s | no commentary (404)",
                         scrape_count,
@@ -602,9 +614,8 @@ async def scrape_ball_data_async(
                         match_date,
                     )
                     if on_status:
-                        on_status(match_id, int(series_id), "no_commentary")
+                        on_status(match_id, int(series_id), "no_commentary", {"date": match_date})
                 else:
-                    scrape_count += 1
                     logger.error(
                         "progress=%d/%d | match_id=%s | date=%s | FAILED: %s",
                         scrape_count,
@@ -615,7 +626,12 @@ async def scrape_ball_data_async(
                     )
                     failed_matches.append(match_id)
                     if on_status:
-                        on_status(match_id, int(series_id), "failed")
+                        on_status(
+                            match_id,
+                            int(series_id),
+                            "failed",
+                            {"date": match_date, "error": str(e)},
+                        )
             except Exception as e:
                 scrape_count += 1
                 logger.error(
@@ -628,7 +644,9 @@ async def scrape_ball_data_async(
                 )
                 failed_matches.append(match_id)
                 if on_status:
-                    on_status(match_id, int(series_id), "failed")
+                    on_status(
+                        match_id, int(series_id), "failed", {"date": match_date, "error": str(e)}
+                    )
 
             # Persist every batch_size matches
             if on_batch and batch_match_count >= batch_size:
