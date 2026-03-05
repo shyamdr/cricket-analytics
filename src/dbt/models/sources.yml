@@ -21,21 +21,9 @@ sources:
             asset_key: ["bronze_people"]
       - name: espn_matches
         description: "ESPN match-level enrichment data (venue, timing, captains, home team, etc.)"
-        meta:
-          dagster:
-            asset_key: ["espn_enrichment"]
       - name: espn_players
         description: "ESPN player biographical data (DOB, batting/bowling styles, playing roles, overseas flag)"
-        meta:
-          dagster:
-            asset_key: ["espn_enrichment"]
       - name: espn_innings
         description: "ESPN innings-level data (partnerships, DRS reviews, phase breakdowns, fielding metrics)"
-        meta:
-          dagster:
-            asset_key: ["espn_enrichment"]
       - name: espn_ball_data
         description: "ESPN per-ball spatial data (wagon wheel, pitch line/length, shot type, win probability)"
-        meta:
-          dagster:
-            asset_key: ["espn_enrichment"]
