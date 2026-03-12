@@ -1,70 +1,107 @@
-"""Centralized configuration for the cricket-analytics project."""
+"""Centralized configuration for the cricket-analytics project.
+
+Dataset configuration is loaded from config/datasets.yml — the single
+source of truth for what data gets ingested and enriched.
+
+The CRICSHEET_DATASETS dict is computed from the YAML at import time,
+maintaining backward compatibility with all existing consumers.
+"""
 
 import re
 from pathlib import Path
+from typing import Any
 
+import yaml
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
-# Cricsheet dataset registry — maps dataset keys to download URLs.
-# All follow the pattern: https://cricsheet.org/downloads/{slug}_json.zip
-CRICSHEET_DATASETS: dict[str, dict[str, str]] = {
-    # Club T20 leagues
-    "ipl": {
-        "url": "https://cricsheet.org/downloads/ipl_json.zip",
-        "name": "Indian Premier League",
-    },
-    "bbl": {
-        "url": "https://cricsheet.org/downloads/bbl_json.zip",
-        "name": "Big Bash League",
-    },
-    "psl": {
-        "url": "https://cricsheet.org/downloads/psl_json.zip",
-        "name": "Pakistan Super League",
-    },
-    "cpl": {
-        "url": "https://cricsheet.org/downloads/cpl_json.zip",
-        "name": "Caribbean Premier League",
-    },
-    "lpl": {
-        "url": "https://cricsheet.org/downloads/lpl_json.zip",
-        "name": "Lanka Premier League",
-    },
-    "sa20": {
-        "url": "https://cricsheet.org/downloads/sa20_json.zip",
-        "name": "SA20",
-    },
-    "ilt20": {
-        "url": "https://cricsheet.org/downloads/ilt20_json.zip",
-        "name": "International League T20",
-    },
-    "bpl": {
-        "url": "https://cricsheet.org/downloads/bpl_json.zip",
-        "name": "Bangladesh Premier League",
-    },
-    # International formats
-    "t20i": {
-        "url": "https://cricsheet.org/downloads/t20s_male_json.zip",
-        "name": "T20 Internationals (Men)",
-    },
-    "odi": {
-        "url": "https://cricsheet.org/downloads/odis_male_json.zip",
-        "name": "ODI (Men)",
-    },
-    "test": {
-        "url": "https://cricsheet.org/downloads/tests_male_json.zip",
-        "name": "Test Matches (Men)",
-    },
-    # Delta / recent
-    "recent_7": {
-        "url": "https://cricsheet.org/downloads/recently_added_7_json.zip",
-        "name": "Recently Added (7 days)",
-    },
-    "recent_30": {
-        "url": "https://cricsheet.org/downloads/recently_added_30_json.zip",
-        "name": "Recently Added (30 days)",
-    },
-}
+# ---------------------------------------------------------------------------
+# Dataset configuration — loaded from config/datasets.yml
+# ---------------------------------------------------------------------------
+
+_CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
+_DATASETS_YAML = _CONFIG_DIR / "datasets.yml"
+
+
+def _load_datasets_config() -> dict[str, Any]:
+    """Load and return the full datasets.yml config."""
+    with open(_DATASETS_YAML) as f:
+        return yaml.safe_load(f)
+
+
+def _build_cricsheet_datasets(config: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """Build the CRICSHEET_DATASETS lookup from the YAML config.
+
+    Returns a dict mapping dataset keys to {"url": ..., "name": ...}
+    for backward compatibility with downloader.py and other consumers.
+    Includes both regular datasets and delta feeds.
+    """
+    result: dict[str, dict[str, str]] = {}
+
+    for key, ds in config.get("datasets", {}).items():
+        result[key] = {"url": ds["url"], "name": ds["name"]}
+
+    for key, feed in config.get("delta_feeds", {}).items():
+        result[key] = {"url": feed["url"], "name": feed["name"]}
+
+    return result
+
+
+def get_enabled_datasets(config: dict[str, Any] | None = None) -> list[str]:
+    """Return list of dataset keys where enabled=true in the YAML."""
+    if config is None:
+        config = _load_datasets_config()
+    return [
+        key
+        for key, ds in config.get("datasets", {}).items()
+        if ds.get("enabled", False)
+    ]
+
+
+def get_profile_datasets(profile_name: str, config: dict[str, Any] | None = None) -> list[str]:
+    """Return dataset keys for a named profile.
+
+    Raises ValueError if the profile doesn't exist.
+    """
+    if config is None:
+        config = _load_datasets_config()
+    profiles = config.get("profiles", {})
+    if profile_name not in profiles:
+        available = ", ".join(sorted(profiles.keys()))
+        raise ValueError(f"Unknown profile '{profile_name}'. Available: {available}")
+    return profiles[profile_name]["datasets"]
+
+
+def get_default_datasets(config: dict[str, Any] | None = None) -> list[str]:
+    """Return dataset keys for the default profile defined in the YAML."""
+    if config is None:
+        config = _load_datasets_config()
+    default_profile = config.get("default_profile", "standard")
+    return get_profile_datasets(default_profile, config)
+
+
+def get_dataset_config(dataset_key: str, config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Return the full config dict for a single dataset.
+
+    Raises KeyError if the dataset doesn't exist.
+    """
+    if config is None:
+        config = _load_datasets_config()
+    datasets = config.get("datasets", {})
+    if dataset_key not in datasets:
+        available = ", ".join(sorted(datasets.keys()))
+        raise KeyError(f"Unknown dataset '{dataset_key}'. Available: {available}")
+    return datasets[dataset_key]
+
+
+# Load config at import time — fail fast if YAML is missing/broken
+datasets_config = _load_datasets_config()
+CRICSHEET_DATASETS = _build_cricsheet_datasets(datasets_config)
+
+
+# ---------------------------------------------------------------------------
+# Application settings
+# ---------------------------------------------------------------------------
 
 
 class Settings(BaseSettings):
@@ -76,7 +113,7 @@ class Settings(BaseSettings):
     raw_dir: Path = data_dir / "raw"
     duckdb_path: Path = data_dir / "cricket.duckdb"
 
-    # Cricsheet source URLs (kept for backward compat)
+    # Cricsheet source URLs (kept for backward compat — prefer datasets.yml)
     cricsheet_matches_url: str = "https://cricsheet.org/downloads/ipl_json.zip"
     cricsheet_people_url: str = "https://cricsheet.org/register/people.csv"
 

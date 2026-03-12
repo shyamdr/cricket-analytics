@@ -7,16 +7,19 @@ ingest are configured via Dagster run config.
 from dagster import AssetExecutionContext, Config, MaterializeResult, MetadataValue, asset
 from pydantic import Field
 
-from src.config import CRICSHEET_DATASETS
+from src.config import CRICSHEET_DATASETS, get_default_datasets
 from src.ingestion.bronze_loader import load_matches_to_bronze, load_people_to_bronze
 from src.ingestion.download_people import download_people
 from src.ingestion.downloader import download_dataset
+
+# Resolve default datasets from config/datasets.yml at import time
+_DEFAULT_DATASETS = get_default_datasets()
 
 
 class IngestionConfig(Config):
     """Configuration for the bronze_matches asset."""
 
-    datasets: list[str] = Field(default=["ipl"])
+    datasets: list[str] = Field(default_factory=lambda: _DEFAULT_DATASETS)
     full_refresh: bool = False
 
 

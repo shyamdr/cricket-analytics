@@ -1,0 +1,384 @@
+# ---------------------------------------------------------------------------
+# Cricket Analytics — Dataset & Enrichment Configuration
+#
+# This file is the SINGLE SOURCE OF TRUTH for what data gets ingested
+# and enriched. All consumers (CLI, Makefile, Dagster, Docker) read from here.
+#
+# To add a new league:
+#   1. Add an entry under `datasets:` with the Cricsheet URL
+#   2. Set enabled: true when ready to ingest
+#
+# To change what gets ingested by default:
+#   - Edit the `default_profile` or modify a profile's dataset list
+#   - Or just flip `enabled: true/false` on individual datasets
+#
+# URL slugs verified against https://cricsheet.org/downloads/ (March 2026)
+# ---------------------------------------------------------------------------
+
+# -- Ingestion profiles (named presets for common workflows) ----------------
+profiles:
+  minimal:
+    datasets: [ipl]
+    description: "IPL only — fast dev iteration"
+  standard:
+    datasets: [ipl, t20i]
+    description: "IPL + T20 Internationals — default"
+  t20_all:
+    datasets: [ipl, t20i, bbl, psl, cpl, sa20, lpl, ilt20, bpl, npl, mlc, msl, ssm, ntb]
+    description: "All T20 leagues + T20 internationals"
+  everything:
+    datasets: [ipl, t20i, bbl, psl, cpl, sa20, lpl, ilt20, bpl, npl, mlc, msl, ssm, ntb, odi, test, t20i_women, odi_women, test_women, wbbl, wpl]
+    description: "Every available dataset"
+
+default_profile: standard
+
+# -- Dataset registry -------------------------------------------------------
+# Each entry defines a Cricsheet dataset with its download URL and metadata.
+#
+# Fields:
+#   url:        Cricsheet download URL (verified via HTTP HEAD)
+#   name:       Human-readable name
+#   enabled:    Whether `make ingest` includes this dataset
+#   format:     T20 | ODI | Test (informational — used by UI/analytics)
+#   gender:     male | female
+#   team_type:  club | international
+#   enrichment: Which enrichment pipelines apply to this dataset
+#     espn_match:  Scrape match metadata (captain, keeper, roles, toss time)
+#     espn_ball:   Scrape ball-by-ball commentary (wagon wheel, shot type)
+#     weather:     Fetch historical weather from Open-Meteo
+#     geocoding:   Resolve venue lat/lng from OpenStreetMap Nominatim
+
+datasets:
+  # =========================================================================
+  # Club T20 Leagues
+  # =========================================================================
+  ipl:
+    url: https://cricsheet.org/downloads/ipl_json.zip
+    name: Indian Premier League
+    enabled: true
+    format: T20
+    gender: male
+    team_type: club
+    enrichment:
+      espn_match: true
+      espn_ball: true
+      weather: true
+      geocoding: true
+
+  bbl:
+    url: https://cricsheet.org/downloads/bbl_json.zip
+    name: Big Bash League
+    enabled: false
+    format: T20
+    gender: male
+    team_type: club
+    enrichment:
+      espn_match: true
+      espn_ball: true
+      weather: true
+      geocoding: true
+
+  psl:
+    url: https://cricsheet.org/downloads/psl_json.zip
+    name: Pakistan Super League
+    enabled: false
+    format: T20
+    gender: male
+    team_type: club
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+  cpl:
+    url: https://cricsheet.org/downloads/cpl_json.zip
+    name: Caribbean Premier League
+    enabled: false
+    format: T20
+    gender: male
+    team_type: club
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+  lpl:
+    url: https://cricsheet.org/downloads/lpl_json.zip
+    name: Lanka Premier League
+    enabled: false
+    format: T20
+    gender: male
+    team_type: club
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+  sa20:
+    url: https://cricsheet.org/downloads/sa20_json.zip
+    name: SA20
+    enabled: false
+    format: T20
+    gender: male
+    team_type: club
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+  ilt20:
+    url: https://cricsheet.org/downloads/ilt20_json.zip
+    name: International League T20
+    enabled: false
+    format: T20
+    gender: male
+    team_type: club
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+  bpl:
+    url: https://cricsheet.org/downloads/bpl_json.zip
+    name: Bangladesh Premier League
+    enabled: false
+    format: T20
+    gender: male
+    team_type: club
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+  npl:
+    url: https://cricsheet.org/downloads/npl_json.zip
+    name: Nepal Premier League
+    enabled: false
+    format: T20
+    gender: male
+    team_type: club
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+  mlc:
+    url: https://cricsheet.org/downloads/mlc_json.zip
+    name: Major League Cricket
+    enabled: false
+    format: T20
+    gender: male
+    team_type: club
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+  msl:
+    url: https://cricsheet.org/downloads/msl_json.zip
+    name: Mzansi Super League
+    enabled: false
+    format: T20
+    gender: male
+    team_type: club
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+  ssm:
+    url: https://cricsheet.org/downloads/ssm_json.zip
+    name: Super Smash
+    enabled: false
+    format: T20
+    gender: male
+    team_type: club
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+  ntb:
+    url: https://cricsheet.org/downloads/ntb_json.zip
+    name: T20 Blast
+    enabled: false
+    format: T20
+    gender: male
+    team_type: club
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+  # =========================================================================
+  # International Formats (Men)
+  # =========================================================================
+  t20i:
+    url: https://cricsheet.org/downloads/t20s_male_json.zip
+    name: T20 Internationals (Men)
+    enabled: true
+    format: T20
+    gender: male
+    team_type: international
+    enrichment:
+      espn_match: true
+      espn_ball: true
+      weather: true
+      geocoding: true
+
+  odi:
+    url: https://cricsheet.org/downloads/odis_male_json.zip
+    name: ODI (Men)
+    enabled: false
+    format: ODI
+    gender: male
+    team_type: international
+    enrichment:
+      espn_match: true
+      espn_ball: true
+      weather: true
+      geocoding: true
+
+  test:
+    url: https://cricsheet.org/downloads/tests_male_json.zip
+    name: Test Matches (Men)
+    enabled: false
+    format: Test
+    gender: male
+    team_type: international
+    enrichment:
+      espn_match: true
+      espn_ball: true
+      weather: true
+      geocoding: true
+
+  # =========================================================================
+  # International Formats (Women)
+  # =========================================================================
+  t20i_women:
+    url: https://cricsheet.org/downloads/t20s_female_json.zip
+    name: T20 Internationals (Women)
+    enabled: false
+    format: T20
+    gender: female
+    team_type: international
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+  odi_women:
+    url: https://cricsheet.org/downloads/odis_female_json.zip
+    name: ODI (Women)
+    enabled: false
+    format: ODI
+    gender: female
+    team_type: international
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+  test_women:
+    url: https://cricsheet.org/downloads/tests_female_json.zip
+    name: Test Matches (Women)
+    enabled: false
+    format: Test
+    gender: female
+    team_type: international
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+  # =========================================================================
+  # Women's Club Leagues
+  # =========================================================================
+  wbbl:
+    url: https://cricsheet.org/downloads/wbbl_json.zip
+    name: "Women's Big Bash League"
+    enabled: false
+    format: T20
+    gender: female
+    team_type: club
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+  wpl:
+    url: https://cricsheet.org/downloads/wpl_json.zip
+    name: "Women's Premier League"
+    enabled: false
+    format: T20
+    gender: female
+    team_type: club
+    enrichment:
+      espn_match: true
+      espn_ball: false
+      weather: true
+      geocoding: true
+
+# -- Delta feeds ------------------------------------------------------------
+# These are NOT selectable as datasets. They're used by the --recent flag
+# and contain matches from ALL formats/genders. Enrichment follows the
+# per-dataset config of whichever dataset each match belongs to.
+delta_feeds:
+  recent_7:
+    url: https://cricsheet.org/downloads/recently_added_7_json.zip
+    name: Recently Added (7 days)
+  recent_30:
+    url: https://cricsheet.org/downloads/recently_added_30_json.zip
+    name: Recently Added (30 days)
+  played_7:
+    url: https://cricsheet.org/downloads/recently_played_7_json.zip
+    name: Recently Played (7 days)
+  played_30:
+    url: https://cricsheet.org/downloads/recently_played_30_json.zip
+    name: Recently Played (30 days)
+
+# -- External enrichment sources --------------------------------------------
+# Global pipelines that run across all ingested data.
+# Controlled separately from per-dataset enrichment flags above.
+enrichment_sources:
+  weather:
+    enabled: true
+    provider: open-meteo
+    description: "Historical weather (temp, humidity, wind, precipitation)"
+    requires: geocoding
+    api_key_required: false
+
+  geocoding:
+    enabled: true
+    provider: openstreetmap-nominatim
+    description: "Venue coordinates (lat/lng) from venue name"
+    rate_limit: "1 req/sec"
+    api_key_required: false
+
+  auction:
+    enabled: false
+    provider: seed-csv
+    description: "IPL auction prices — manual CSV (data/seeds/auction_prices.csv)"
+    applies_to: [ipl]
+    api_key_required: false
+
+  player_dob:
+    enabled: false
+    provider: espncricinfo
+    description: "Player date of birth from ESPN profiles"
+    api_key_required: false

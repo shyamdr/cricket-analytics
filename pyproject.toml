@@ -1,7 +1,7 @@
 [project]
 name = "cricket-analytics"
 version = "0.1.0"
-description = "End-to-end cricket analytics platform built on IPL data from Cricsheet"
+description = "End-to-end cricket analytics platform built on ball-by-ball data from Cricsheet"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -13,6 +13,7 @@ dependencies = [
     "pyarrow>=14.0.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
+    "pyyaml>=6.0.0",
     "structlog>=24.0.0",
 ]
 
