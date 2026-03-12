@@ -29,6 +29,7 @@ select
         when m.outcome_result = 'no result' then 'no_result'
         when m.outcome_result = 'tie' and m.outcome_eliminator is not null then 'tie_super_over'
         when m.outcome_method = 'D/L' then 'dls_win'
+        when m.outcome_method = 'Awarded' then 'awarded'
         when m.outcome_winner is not null then 'normal_win'
         else 'unknown'
     end as match_result_type,

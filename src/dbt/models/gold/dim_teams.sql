@@ -1,4 +1,4 @@
--- Team dimension: all team names that have appeared in IPL
+-- Team dimension: all team names that have appeared in match data
 -- Franchise rename mappings loaded from seed CSV (team_name_mappings)
 with all_teams as (
     select team1 as team_name from {{ ref('stg_matches') }}
