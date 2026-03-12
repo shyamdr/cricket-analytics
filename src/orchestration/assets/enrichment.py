@@ -39,7 +39,9 @@ class MatchEnrichmentConfig(Config):
         "and load into bronze ESPN tables. Delta-aware — skips already-scraped matches."
     ),
 )
-def espn_match_enrichment(context: AssetExecutionContext, config: MatchEnrichmentConfig) -> MaterializeResult:
+def espn_match_enrichment(
+    context: AssetExecutionContext, config: MatchEnrichmentConfig
+) -> MaterializeResult:
     """Scrape ESPN scorecard data for matches not yet enriched."""
     # Get matches to process
     if config.all_seasons:
@@ -132,7 +134,9 @@ class BallEnrichmentConfig(Config):
         "skips already-scraped matches. Persists every 10 matches."
     ),
 )
-def espn_ball_enrichment(context: AssetExecutionContext, config: BallEnrichmentConfig) -> MaterializeResult:
+def espn_ball_enrichment(
+    context: AssetExecutionContext, config: BallEnrichmentConfig
+) -> MaterializeResult:
     """Scrape ESPN ball-by-ball data for matches not yet scraped."""
     from src.enrichment.ball_scraper import scrape_ball_data
     from src.enrichment.run_ball_scraper import (

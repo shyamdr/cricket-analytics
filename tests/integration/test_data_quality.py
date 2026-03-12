@@ -140,8 +140,7 @@ class TestGoldLayerDataIntegrity:
         """Strike rates should be non-negative. Very high rates are valid for
         short innings (e.g. 8 runs off 1 ball = 800 SR)."""
         (count,) = db_conn.execute(
-            f"SELECT COUNT(*) FROM {_gold}.fact_batting_innings "
-            "WHERE strike_rate < 0"
+            f"SELECT COUNT(*) FROM {_gold}.fact_batting_innings WHERE strike_rate < 0"
         ).fetchone()
         assert count == 0, f"{count} batting innings with negative strike rate"
 

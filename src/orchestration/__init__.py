@@ -25,7 +25,13 @@ gold_freshness_policy = FreshnessPolicy.time_window(
 )
 
 defs = Definitions(
-    assets=[bronze_matches, bronze_people, dbt_analytics_assets, espn_match_enrichment, espn_ball_enrichment],
+    assets=[
+        bronze_matches,
+        bronze_people,
+        dbt_analytics_assets,
+        espn_match_enrichment,
+        espn_ball_enrichment,
+    ],
     jobs=[
         full_pipeline_job,
         daily_refresh_job,

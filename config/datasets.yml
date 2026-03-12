@@ -30,7 +30,7 @@ profiles:
     datasets: [ipl, t20i, bbl, psl, cpl, sa20, lpl, ilt20, bpl, npl, mlc, msl, ssm, ntb, odi, test, t20i_women, odi_women, test_women, wbbl, wpl]
     description: "Every available dataset"
 
-default_profile: standard
+default_profile: minimal
 
 # -- Dataset registry -------------------------------------------------------
 # Each entry defines a Cricsheet dataset with its download URL and metadata.

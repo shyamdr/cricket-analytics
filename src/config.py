@@ -51,11 +51,7 @@ def get_enabled_datasets(config: dict[str, Any] | None = None) -> list[str]:
     """Return list of dataset keys where enabled=true in the YAML."""
     if config is None:
         config = _load_datasets_config()
-    return [
-        key
-        for key, ds in config.get("datasets", {}).items()
-        if ds.get("enabled", False)
-    ]
+    return [key for key, ds in config.get("datasets", {}).items() if ds.get("enabled", False)]
 
 
 def get_profile_datasets(profile_name: str, config: dict[str, Any] | None = None) -> list[str]:
