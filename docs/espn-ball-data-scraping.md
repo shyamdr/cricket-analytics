@@ -237,10 +237,9 @@ Estimated size: ~240 balls/match x 1169 matches = ~280K rows
 
 ## Files Referenced
 
-- `src/enrichment/ball_data_scraper.py` — production ball-by-ball scraper module
+- `src/enrichment/ball_scraper.py` — production ball-by-ball scraper module
 - `src/enrichment/run_ball_scraper.py` — CLI entry point for ball data scraping
 - `src/enrichment/bronze_loader.py` — ESPN data loader (espn_matches + espn_ball_data)
-- `src/enrichment/espn_client.py` — existing ESPN scraper (match-level)
+- `src/enrichment/match_scraper.py` — ESPN match-level scorecard scraper
 - `src/enrichment/series_resolver.py` — resolves ESPN series IDs
 - `src/config.py` — centralized settings
-- `scripts/test_ball_scraper.py` — standalone test script (used during development)

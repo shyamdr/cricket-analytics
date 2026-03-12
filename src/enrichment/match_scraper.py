@@ -1,7 +1,7 @@
-"""Thin wrapper around python-espncricinfo for ESPN data extraction.
+"""ESPN match-level scorecard scraper.
 
-Handles Playwright browser reuse, rate limiting, and data extraction
-from the __NEXT_DATA__ JSON embedded in ESPN match pages.
+Scrapes match metadata, player bios, and innings summaries from ESPN
+Cricinfo's full-scorecard pages via __NEXT_DATA__ JSON extraction.
 """
 
 from __future__ import annotations
@@ -384,9 +384,9 @@ async def scrape_matches_async(
     page's __NEXT_DATA__. Fast (~4s/match) and reliable.
 
     Ball-by-ball spatial data (wagon wheel, pitch map) is handled separately
-    by the dedicated ball data scraper (``src.enrichment.ball_data_scraper``)
-    which uses commentary page scroll interception with two page loads per
-    match (one per innings). Run it via::
+    by the dedicated ball scraper (``src.enrichment.ball_scraper``) which uses
+    commentary page scroll interception with two page loads per match (one per
+    innings). Run it via::
 
         python -m src.enrichment.run_ball_scraper --season 2024
         python -m src.enrichment.run_ball_scraper --matches 1473469,1473443

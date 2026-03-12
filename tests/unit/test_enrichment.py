@@ -14,7 +14,7 @@ import pytest
 # Skip entire module if playwright is not installed (e.g. CI unit-test job)
 pytest.importorskip("playwright", reason="playwright not installed — skipping enrichment tests")
 
-from src.enrichment.espn_client import ROLE_MAP, _extract_match_data
+from src.enrichment.match_scraper import ROLE_MAP, _extract_match_data
 from src.enrichment.series_resolver import SeriesResolver
 
 # ---------------------------------------------------------------------------

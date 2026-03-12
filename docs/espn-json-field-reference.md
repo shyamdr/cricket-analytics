@@ -890,7 +890,7 @@ Grouped by enrichment priority. Fields marked ADD above, organized by what they 
 
 ### Already Captured
 
-These fields are already extracted by our existing `espn_client.py`:
+These fields are already extracted by our existing `match_scraper.py`:
 - `espn_match_id`, `espn_series_id`, `slug`, `title`, `statusText`
 - `floodlit`, `startDate`, `startTime`, `season`
 - `team1/2_name`, `team1/2_espn_id`, `team1/2_captain`, `team1/2_keeper`

@@ -1,17 +1,17 @@
-"""CLI entry point for ESPN enrichment pipeline.
+"""CLI entry point for ESPN match-level enrichment (scorecard scraper).
 
 Usage:
     # Scrape a few matches for testing
-    python -m src.enrichment.run --season 2024 --limit 3
+    python -m src.enrichment.run_match_scraper --season 2024 --limit 3
 
     # Scrape all matches for a season
-    python -m src.enrichment.run --season 2024
+    python -m src.enrichment.run_match_scraper --season 2024
 
     # Scrape all seasons (full historical run)
-    python -m src.enrichment.run --all
+    python -m src.enrichment.run_match_scraper --all
 
     # Show what would be scraped (dry run)
-    python -m src.enrichment.run --season 2024 --dry-run
+    python -m src.enrichment.run_match_scraper --season 2024 --dry-run
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import structlog
 from src.config import settings
 from src.database import get_read_conn
 from src.enrichment.bronze_loader import load_espn_to_bronze
-from src.enrichment.espn_client import scrape_matches
+from src.enrichment.match_scraper import scrape_matches
 from src.enrichment.series_resolver import SeriesResolver
 
 logger = structlog.get_logger(__name__)

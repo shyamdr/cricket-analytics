@@ -31,7 +31,7 @@ initiated by the page's own JavaScript succeed. We MUST use scroll-triggered
 requests intercepted via route.fetch().
 
 Usage:
-    from src.enrichment.ball_data_scraper import scrape_ball_data
+    from src.enrichment.ball_scraper import scrape_ball_data
 
     results = scrape_ball_data(
         matches=[{"match_id": "1422133", "match_date": "2024-03-22", "season": "2024"}],

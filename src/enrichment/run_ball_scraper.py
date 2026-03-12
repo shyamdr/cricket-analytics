@@ -26,7 +26,7 @@ import duckdb
 
 from src.config import settings
 from src.database import get_read_conn
-from src.enrichment.ball_data_scraper import scrape_ball_data
+from src.enrichment.ball_scraper import scrape_ball_data
 from src.enrichment.series_resolver import SeriesResolver
 
 logger = logging.getLogger(__name__)

@@ -8,7 +8,7 @@ from dagster import Definitions, FreshnessPolicy, apply_freshness_policy
 from dagster_dbt import DbtCliResource
 
 from src.orchestration.assets.dbt import DBT_PROJECT_DIR, dbt_analytics_assets
-from src.orchestration.assets.enrichment import espn_ball_data, espn_enrichment
+from src.orchestration.assets.enrichment import espn_ball_enrichment, espn_match_enrichment
 from src.orchestration.assets.ingestion import bronze_matches, bronze_people
 from src.orchestration.jobs import (
     daily_refresh_job,
@@ -25,7 +25,7 @@ gold_freshness_policy = FreshnessPolicy.time_window(
 )
 
 defs = Definitions(
-    assets=[bronze_matches, bronze_people, dbt_analytics_assets, espn_enrichment, espn_ball_data],
+    assets=[bronze_matches, bronze_people, dbt_analytics_assets, espn_match_enrichment, espn_ball_enrichment],
     jobs=[
         full_pipeline_job,
         daily_refresh_job,

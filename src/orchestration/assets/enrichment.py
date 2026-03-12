@@ -1,23 +1,27 @@
-"""ESPN enrichment assets — scrapes match metadata and ball-by-ball data from ESPNcricinfo.
+"""ESPN enrichment Dagster assets — match-level and ball-by-ball scrapers.
 
 Two assets:
-1. espn_enrichment — scorecard scraper (captains, keepers, player bios, venue details)
-2. espn_ball_data — ball-by-ball spatial scraper (wagon wheel, pitch map, shot type, win prob)
+1. espn_match_enrichment — scorecard scraper (captains, keepers, player bios, venue details)
+2. espn_ball_enrichment — ball-by-ball spatial scraper (wagon wheel, pitch map, shot type, win prob)
 
 Both run after bronze ingestion + dbt transformation (need dim_matches).
-Ball data runs after scorecard enrichment (needs series IDs in bronze.espn_series).
+Ball data runs after match enrichment (needs series IDs in bronze.espn_series).
 """
 
 from dagster import AssetExecutionContext, AssetKey, Config, MaterializeResult, MetadataValue, asset
 
 from src.enrichment.bronze_loader import load_espn_to_bronze
-from src.enrichment.espn_client import scrape_matches
-from src.enrichment.run import get_all_matches, get_already_scraped, get_matches_for_season
+from src.enrichment.match_scraper import scrape_matches
+from src.enrichment.run_match_scraper import (
+    get_all_matches,
+    get_already_scraped,
+    get_matches_for_season,
+)
 from src.enrichment.series_resolver import SeriesResolver
 
 
-class EnrichmentConfig(Config):
-    """Configuration for the espn_enrichment asset."""
+class MatchEnrichmentConfig(Config):
+    """Configuration for the espn_match_enrichment asset."""
 
     season: str = ""
     all_seasons: bool = False
@@ -35,8 +39,8 @@ class EnrichmentConfig(Config):
         "and load into bronze ESPN tables. Delta-aware — skips already-scraped matches."
     ),
 )
-def espn_enrichment(context: AssetExecutionContext, config: EnrichmentConfig) -> MaterializeResult:
-    """Scrape ESPN data for matches not yet enriched."""
+def espn_match_enrichment(context: AssetExecutionContext, config: MatchEnrichmentConfig) -> MaterializeResult:
+    """Scrape ESPN scorecard data for matches not yet enriched."""
     # Get matches to process
     if config.all_seasons:
         all_matches = get_all_matches()
@@ -109,8 +113,8 @@ def espn_enrichment(context: AssetExecutionContext, config: EnrichmentConfig) ->
     )
 
 
-class BallDataConfig(Config):
-    """Configuration for the espn_ball_data asset."""
+class BallEnrichmentConfig(Config):
+    """Configuration for the espn_ball_enrichment asset."""
 
     season: str = ""
     all_seasons: bool = False
@@ -121,16 +125,16 @@ class BallDataConfig(Config):
 @asset(
     group_name="enrichment",
     compute_kind="python",
-    deps=[AssetKey("espn_enrichment"), AssetKey(["gold", "dim_matches"])],
+    deps=[AssetKey("espn_match_enrichment"), AssetKey(["gold", "dim_matches"])],
     description=(
         "Scrape ESPN ball-by-ball spatial data (wagon wheel, pitch map, shot type, "
         "shot control, win probability) from commentary pages. Delta-aware — "
         "skips already-scraped matches. Persists every 10 matches."
     ),
 )
-def espn_ball_data(context: AssetExecutionContext, config: BallDataConfig) -> MaterializeResult:
+def espn_ball_enrichment(context: AssetExecutionContext, config: BallEnrichmentConfig) -> MaterializeResult:
     """Scrape ESPN ball-by-ball data for matches not yet scraped."""
-    from src.enrichment.ball_data_scraper import scrape_ball_data
+    from src.enrichment.ball_scraper import scrape_ball_data
     from src.enrichment.run_ball_scraper import (
         _ensure_status_table,
         _get_all_matches,
