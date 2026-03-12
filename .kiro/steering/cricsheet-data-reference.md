@@ -4,10 +4,22 @@ Source: https://cricsheet.org
 
 ## Dataset Overview
 
-- 1169 IPL (Indian Premier League) match JSON files, all T20 format, male
+### IPL (Indian Premier League)
+- ~1169 match JSON files, T20 format, male
 - Seasons: 2007/08 through 2025
 - 10 teams across history (some renamed): Royal Challengers Bangalore/Bengaluru, Mumbai Indians, Chennai Super Kings, Kolkata Knight Riders, Delhi Capitals (formerly Daredevils), Punjab Kings (formerly Kings XI Punjab), Rajasthan Royals, Sunrisers Hyderabad, Gujarat Titans, Lucknow Super Giants
+- team_type: "club"
+
+### T20 Internationals (Men)
+- ~1500+ match JSON files, T20 format, male
+- Spans 2005 to present (first men's T20I: Australia vs New Zealand, Feb 2005)
+- All ICC member nations (Full Members + Associates)
+- team_type: "international"
+- Includes ICC T20 World Cup matches (event.name contains "World Cup" or "World Twenty20")
+
+### People Registry
 - People registry CSV: 16,471 people (players, officials, etc.)
+- Shared across all datasets — same identifier links IPL and T20I players
 
 ## Match JSON Structure (versions 1.0.0 and 1.1.0)
 

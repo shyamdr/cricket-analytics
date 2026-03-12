@@ -1,7 +1,8 @@
 # Cricket Analytics — Architecture & Decisions
 
 ## Project Vision
-A portfolio-grade, end-to-end cricket analytics platform built on IPL data from Cricsheet.
+A portfolio-grade, end-to-end cricket analytics platform built on ball-by-ball data from Cricsheet.
+Supports 21 datasets (IPL, T20I, BBL, PSL, ODI, Tests, WPL, WBBL, etc.) via config-driven ingestion.
 Demonstrates senior DE/Software engineering skills: architecture, design patterns, code quality,
 testing, scalability, documentation. Everything free/open-source.
 
@@ -51,6 +52,7 @@ Raw (Cricsheet JSON/CSV)
 cricket-analytics/
 ├── .github/workflows/          # CI/CD (lint, test, dbt test)
 ├── .kiro/steering/             # project context (persists across sessions)
+├── config/                     # datasets.yml — dataset & enrichment configuration
 ├── docs/                       # ADRs, data dictionary, architecture diagrams
 ├── src/
 │   ├── ingestion/              # raw data loaders (download + load into DuckDB bronze)
@@ -73,8 +75,11 @@ cricket-analytics/
 
 ## Data Portability Strategy
 - Raw data is NOT stored in git — downloaded from Cricsheet URLs by the ingestion pipeline
-  - Matches: https://cricsheet.org/downloads/ipl_json.zip
+  - Dataset URLs defined in config/datasets.yml (21 datasets available)
   - People: https://cricsheet.org/register/people.csv
+- Dataset selection controlled by config/datasets.yml — single source of truth
+  - Named profiles: minimal (IPL), standard (IPL+T20I), t20_all, everything
+  - Per-dataset enabled flag + enrichment toggles
 - DuckDB file is .gitignored — rebuilt by running the pipeline
 - New machine workflow: `git clone` → `make all` → full database in ~2-3 min
 - Docker alternative: `docker compose up` → no Python install needed
@@ -117,7 +122,9 @@ See `docs/data-enrichment-strategy.md` for full details.
 ## Workflow Commands
 ```bash
 make setup          # install deps, create virtualenv
-make ingest         # download from cricsheet + load into DuckDB bronze
+make ingest         # ingest datasets (default profile from config/datasets.yml)
+make ingest PROFILE=minimal   # IPL only
+make ingest PROFILE=t20_all   # all T20 leagues
 make transform      # dbt run (bronze → silver → gold)
 make test           # pytest + dbt test
 make lint           # ruff check + ruff format check

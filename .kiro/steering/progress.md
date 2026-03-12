@@ -19,7 +19,7 @@
 - [x] Format-agnostic season derivation — replaced hardcoded CASE/split_part logic with `EXTRACT(YEAR FROM match_date)`. Eliminates IPL-specific '2020/21' special case. Works correctly for BBL (split-year seasons span Dec-Feb) and all other leagues. Original Cricsheet season preserved as `season_raw` in silver layer.
 
 ## Verified Data (gold layer, post-season-fix)
-- dim_matches: 1,169 rows (18 seasons: 2008–2025, including 2020 COVID UAE bubble)
+- dim_matches: 1,169 rows (18 seasons: 2008–2025, including 2020 COVID UAE bubble) — IPL only, pre-T20I expansion
 - dim_players: 927 rows
 - dim_teams: 19 rows
 - dim_venues: 63 rows
@@ -33,6 +33,8 @@
 - [ ] Streamlit UI improvements — functional but needs polish
 
 ## Recently Completed
+- [x] Config-driven dataset management — created config/datasets.yml as single source of truth for all dataset and enrichment configuration. 21 Cricsheet datasets (IPL, T20I, BBL, PSL, CPL, SA20, LPL, ILT20, BPL, NPL, MLC, MSL, SSM, NTB, ODI, Test, T20I Women, ODI Women, Test Women, WBBL, WPL) with per-dataset enrichment toggles (espn_match, espn_ball, weather, geocoding). Named profiles (minimal, standard, t20_all, everything). CLI supports --profile, --enabled, --dataset, --list. All consumers (CLI, Makefile, Dagster, Docker) read from YAML. Added pyyaml to core dependencies. URLs verified via HTTP HEAD against cricsheet.org.
+- [x] Multi-dataset ingestion: T20 Internationals — default ingestion now pulls both IPL + T20I. Updated Makefile, CLI defaults, Dagster IngestionConfig, docker-compose, README, and steering files. No schema changes needed — format-agnostic code handles T20I out of the box. Requires `make ingest --full-refresh` to rebuild bronze with both datasets.
 - [x] Explicit bronze DDL + full Cricsheet field expansion — 36-column matches table, 30-column deliveries table with CREATE TABLE IF NOT EXISTS. Parser now captures: meta.created, meta.revision, team_type, match_type_number, officials (JSON), supersubs (JSON), missing (JSON), event_group, toss_uncontested, non_boundary, review (6 fields: by/umpire/batter/decision/type/umpires_call), replacements (JSON). 9 new unit tests (107 total). Requires full_refresh rebuild of DuckDB.
 - [x] pytest test suite: 107 tests (36 unit, 38 integration, 14 smoke) — all passing, pushed to GitHub
   - Unit: ingestion JSON parsing (match info + deliveries), config validation
