@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, Mapping, Optional
 
 from dagster_dbt import (
     DagsterDbtTranslator,
@@ -26,9 +27,27 @@ if _manifest.exists():
 dbt_project.prepare_if_dev()
 
 
-dagster_dbt_translator = DagsterDbtTranslator(
-    settings=DagsterDbtTranslatorSettings(enable_duplicate_source_asset_keys=True),
-)
+class CricketDbtTranslator(DagsterDbtTranslator):
+    """Custom translator to assign dbt models to medallion layer groups."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            settings=DagsterDbtTranslatorSettings(
+                enable_duplicate_source_asset_keys=True
+            ),
+        )
+
+    def get_group_name(self, dbt_resource_props: Mapping[str, Any]) -> Optional[str]:
+        fqn = dbt_resource_props.get("fqn", [])
+        # fqn looks like ["cricket_analytics", "silver", "stg_matches"]
+        # or ["cricket_analytics", "gold", "dim_venues"]
+        for part in fqn:
+            if part in ("silver", "gold"):
+                return part
+        return "default"
+
+
+dagster_dbt_translator = CricketDbtTranslator()
 
 
 @dbt_assets(

@@ -156,6 +156,10 @@ models:
           - not_null
       - name: city
         description: "City where the venue is located"
+      - name: canonical_venue
+        description: "Normalized venue name — resolves aliases (e.g. 'Feroz Shah Kotla' → 'Arun Jaitley Stadium') via venue_name_mappings seed. Falls back to original venue if no mapping exists."
+      - name: canonical_city
+        description: "Normalized city name — resolves spelling variations (e.g. 'Bangalore' → 'Bengaluru') via venue_name_mappings seed. Falls back to original city if no mapping exists."
       - name: total_matches
         description: "Number of matches played at this venue"
       - name: first_match_date

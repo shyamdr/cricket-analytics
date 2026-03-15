@@ -1,11 +1,13 @@
-"""ESPN enrichment Dagster assets — match-level and ball-by-ball scrapers.
+"""Enrichment Dagster assets — ESPN scrapers and venue geocoding.
 
-Two assets:
+Assets:
 1. espn_match_enrichment — scorecard scraper (captains, keepers, player bios, venue details)
 2. espn_ball_enrichment — ball-by-ball spatial scraper (wagon wheel, pitch map, shot type, win prob)
+3. venue_coordinates — Google Maps geocoding for venue lat/lng
 
-Both run after bronze ingestion + dbt transformation (need dim_matches).
+ESPN assets run after bronze ingestion + dbt transformation (need dim_matches).
 Ball data runs after match enrichment (needs series IDs in bronze.espn_series).
+Venue coordinates run after dbt (need dim_venues), independent of ESPN.
 """
 
 from dagster import AssetExecutionContext, AssetKey, Config, MaterializeResult, MetadataValue, asset
@@ -233,5 +235,211 @@ def espn_ball_enrichment(
             "batches_written": MetadataValue.int(batches_written),
             "already_scraped": MetadataValue.int(len(already_scraped)),
             "total_matches": MetadataValue.int(len(all_matches)),
+        }
+    )
+
+
+@asset(
+    group_name="enrichment",
+    compute_kind="python",
+    deps=[AssetKey(["bronze_matches"])],
+    description=(
+        "Geocode venue coordinates (lat/lng) via Google Maps Geocoding API. "
+        "One API call per unique venue. Delta-aware — skips already-geocoded venues. "
+        "Results stored in bronze.venue_coordinates."
+    ),
+)
+def geocode_venue_coordinates(context: AssetExecutionContext) -> MaterializeResult:
+    """Geocode all (venue, city) combos not yet in bronze.venue_coordinates.
+
+    For each new venue:
+    1. Geocode via Google Maps (two search patterns with fallback)
+    2. Compare coordinates against existing venues using ~400m bounding box
+    3. If within box of existing venue → alias (same ground, different name/city)
+       → add to venue_name_mappings seed CSV, still store coordinates
+    4. If outside all boxes → genuinely new venue → store coordinates
+    """
+    import csv
+    from pathlib import Path
+
+    import duckdb
+
+    from src.config import settings
+    from src.database import get_read_conn, get_write_conn
+    from src.enrichment.geocoder import detect_alias, geocode_venues
+
+    # Get all (venue, city) combos from bronze matches (not gold — avoids circular dep)
+    conn = get_read_conn()
+    try:
+        all_venues = conn.execute(
+            f"SELECT DISTINCT venue, city FROM {settings.bronze_schema}.matches "
+            f"WHERE venue IS NOT NULL"
+        ).fetchall()
+        all_venue_dicts = [{"venue": r[0], "city": r[1]} for r in all_venues]
+
+        # Get already-geocoded (venue, city) pairs + their coordinates
+        try:
+            already_rows = conn.execute(
+                f"SELECT venue, city, latitude, longitude "
+                f"FROM {settings.bronze_schema}.venue_coordinates"
+            ).fetchall()
+            already_set = {(r[0], r[1]) for r in already_rows}
+            existing_venues = [
+                {"venue": r[0], "city": r[1], "latitude": r[2], "longitude": r[3]}
+                for r in already_rows
+            ]
+        except duckdb.CatalogException:
+            already_set = set()
+            existing_venues = []
+    finally:
+        conn.close()
+
+    pending = [v for v in all_venue_dicts if (v["venue"], v["city"]) not in already_set]
+
+    context.log.info(
+        f"Geocoding: {len(pending)} pending, {len(already_set)} already done, "
+        f"{len(all_venue_dicts)} total venue+city combos"
+    )
+
+    if not pending:
+        return MaterializeResult(
+            metadata={
+                "geocoded": MetadataValue.int(0),
+                "aliases_found": MetadataValue.int(0),
+                "already_done": MetadataValue.int(len(already_set)),
+                "total_venues": MetadataValue.int(len(all_venue_dicts)),
+            }
+        )
+
+    results = geocode_venues(pending)
+
+    # Load existing seed CSV mappings (if any)
+    seed_path = Path(settings.project_root) / "src" / "dbt" / "seeds" / "venue_name_mappings.csv"
+    existing_mappings: list[dict[str, str]] = []
+    if seed_path.exists():
+        with open(seed_path) as f:
+            reader = csv.DictReader(f)
+            existing_mappings = list(reader)
+
+    # Track new aliases and new venues
+    new_venues: list[dict] = []
+    new_aliases: list[dict[str, str]] = []
+
+    for r in results:
+        if r["geocode_status"] != "ok" or r["latitude"] is None:
+            # Failed geocode — store as-is so we don't retry every run
+            new_venues.append(r)
+            continue
+
+        # Check bounding box against all existing venues
+        match = detect_alias(r["venue"], r["city"], r["latitude"], r["longitude"], existing_venues)
+
+        if match:
+            # Alias detected — same ground, different name/city
+            context.log.info(
+                f"Alias: ({r['venue']}, {r['city']}) -> ({match['venue']}, {match['city']})"
+            )
+            new_aliases.append(
+                {
+                    "venue_name": r["venue"],
+                    "city_name": r["city"],
+                    "canonical_venue": match["venue"],
+                    "canonical_city": match["city"],
+                }
+            )
+        else:
+            # Genuinely new venue — add to existing list so subsequent
+            # items in this batch can detect aliases against it
+            existing_venues.append(
+                {
+                    "venue": r["venue"],
+                    "city": r["city"],
+                    "latitude": r["latitude"],
+                    "longitude": r["longitude"],
+                }
+            )
+
+        # Always store coordinates (alias or not) so we don't re-geocode
+        new_venues.append(r)
+
+    # Write all geocoded results to bronze
+    wconn = get_write_conn()
+    try:
+        wconn.execute(f"""
+            CREATE TABLE IF NOT EXISTS {settings.bronze_schema}.venue_coordinates (
+                venue VARCHAR NOT NULL,
+                city VARCHAR,
+                latitude DOUBLE,
+                longitude DOUBLE,
+                formatted_address VARCHAR,
+                place_id VARCHAR,
+                geocode_status VARCHAR
+            )
+        """)
+        for r in new_venues:
+            # Upsert: delete existing row for this (venue, city) combo, then insert
+            if r["city"] is None:
+                wconn.execute(
+                    f"DELETE FROM {settings.bronze_schema}.venue_coordinates "
+                    f"WHERE venue = ? AND city IS NULL",
+                    [r["venue"]],
+                )
+            else:
+                wconn.execute(
+                    f"DELETE FROM {settings.bronze_schema}.venue_coordinates "
+                    f"WHERE venue = ? AND city = ?",
+                    [r["venue"], r["city"]],
+                )
+            wconn.execute(
+                f"""INSERT INTO {settings.bronze_schema}.venue_coordinates
+                    (venue, city, latitude, longitude, formatted_address, place_id,
+                     geocode_status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                [
+                    r["venue"],
+                    r["city"],
+                    r["latitude"],
+                    r["longitude"],
+                    r["formatted_address"],
+                    r["place_id"],
+                    r["geocode_status"],
+                ],
+            )
+    finally:
+        wconn.close()
+
+    # Write venue_name_mappings seed CSV if new aliases found
+    if new_aliases:
+        all_mappings = existing_mappings + new_aliases
+        with open(seed_path, "w", newline="") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=[
+                    "venue_name",
+                    "city_name",
+                    "canonical_venue",
+                    "canonical_city",
+                ],
+            )
+            writer.writeheader()
+            writer.writerows(all_mappings)
+        context.log.info(
+            f"Updated venue_name_mappings.csv: {len(new_aliases)} new aliases, "
+            f"{len(all_mappings)} total"
+        )
+
+    ok_count = sum(1 for r in results if r["geocode_status"] == "ok")
+    context.log.info(
+        f"Geocoding complete: {ok_count}/{len(results)} resolved, "
+        f"{len(new_aliases)} aliases detected"
+    )
+
+    return MaterializeResult(
+        metadata={
+            "geocoded": MetadataValue.int(ok_count),
+            "failed": MetadataValue.int(len(results) - ok_count),
+            "aliases_found": MetadataValue.int(len(new_aliases)),
+            "already_done": MetadataValue.int(len(already_set)),
+            "total_venues": MetadataValue.int(len(all_venue_dicts)),
         }
     )

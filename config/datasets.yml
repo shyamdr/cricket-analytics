@@ -365,10 +365,10 @@ enrichment_sources:
 
   geocoding:
     enabled: true
-    provider: openstreetmap-nominatim
-    description: "Venue coordinates (lat/lng) from venue name"
-    rate_limit: "1 req/sec"
-    api_key_required: false
+    provider: google-maps
+    description: "Venue coordinates (lat/lng) via Google Maps Geocoding API"
+    rate_limit: "50 req/sec"
+    api_key_required: true
 
   auction:
     enabled: false
