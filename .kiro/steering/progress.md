@@ -160,7 +160,7 @@ bronze_people ───→ stg_people ──→ dim_players
 
 ## Pending — Next Up
 - [ ] Fix series resolver for T20I — current resolver groups by season (one series per season), breaks for T20I which has ~588 unique (season, event_name) combos. Need to group by (season, event_name) instead. Also add event_name to match query dicts in run_match_scraper.py and run_ball_scraper.py.
-- [ ] Data enrichment Phase 1: venue coordinates (Google Geocoding API) + weather (Open-Meteo)
+- [x] Data enrichment Phase 1: venue coordinates (Google Geocoding API) + weather (Open-Meteo) — COMPLETE. 63 venues geocoded. Weather fetched for all 1175 matches via Open-Meteo archive API (free, no key). Bronze stores raw hourly+daily JSON. Silver splits into stg_weather_hourly (28,200 rows = 24 hours × 1175 matches) and stg_weather_daily (1,175 rows). Gold fact_weather combines both with WMO weather code descriptions. Persistent HTTP client, retry logic, batch persistence every 50 matches.
 - [ ] Data enrichment Phase 2: T20I ESPN enrichment (after series resolver fix)
 - [ ] Data enrichment Phase 3: Elo ratings + auction prices + player DOB
 - [ ] Data enrichment Phase 4: derived analytics (pitch profiles, advanced metrics)
