@@ -444,7 +444,7 @@ class WeatherEnrichmentConfig(Config):
 @asset(
     group_name="enrichment",
     compute_kind="python",
-    deps=[AssetKey(["geocode_venue_coordinates"]), AssetKey(["gold", "dim_matches"])],
+    deps=[AssetKey(["geocode_venue_coordinates"]), AssetKey(["silver", "stg_matches"])],
     description=(
         "Fetch historical weather from Open-Meteo API for each match. "
         "Uses venue coordinates (lat/lng) + match date. Free API, no key required. "

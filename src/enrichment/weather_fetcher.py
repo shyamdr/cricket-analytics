@@ -143,7 +143,7 @@ def _get_pending_matches(limit: int = 0) -> list[dict[str, Any]]:
             vc.latitude,
             vc.longitude,
             COALESCE(em.venue_timezone, 'Asia/Kolkata') as timezone
-        FROM {settings.gold_schema}.dim_matches m
+        FROM {settings.silver_schema}.stg_matches m
         JOIN {settings.bronze_schema}.venue_coordinates vc
             ON m.venue = vc.venue
             AND (m.city = vc.city OR (m.city IS NULL AND vc.city IS NULL))
