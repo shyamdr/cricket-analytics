@@ -28,7 +28,7 @@ sources:
       - name: espn_ball_data
         description: "ESPN per-ball spatial data (wagon wheel, pitch line/length, shot type, win probability)"
       - name: venue_coordinates
-        description: "Geocoded venue coordinates (lat/lng) from Google Maps Geocoding API"
+        description: "Geocoded venue coordinates (lat/lng, formatted address) from geocoding enrichment job. Populated by the geocode_venues asset — new venues are detected from dim_venues and geocoded automatically."
         meta:
           dagster:
             asset_key: ["geocode_venue_coordinates"]

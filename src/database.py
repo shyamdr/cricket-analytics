@@ -48,13 +48,32 @@ def get_read_conn() -> duckdb.DuckDBPyConnection:
 def get_write_conn() -> duckdb.DuckDBPyConnection:
     """Get a read-write DuckDB connection.
 
-    Creates the data directory and bronze schema if they don't exist.
+    Creates the data directory, bronze schema, and all bronze tables
+    (Cricsheet + ESPN) if they don't exist. Safe to call repeatedly.
     Use for ingestion, enrichment writes, and any DDL operations.
     """
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     conn = duckdb.connect(str(settings.duckdb_path))
     conn.execute(f"CREATE SCHEMA IF NOT EXISTS {settings.bronze_schema}")
+    _bootstrap_bronze_tables(conn)
     return conn
+
+
+def _bootstrap_bronze_tables(conn: duckdb.DuckDBPyConnection) -> None:
+    """Create all bronze tables with explicit DDL if they don't exist.
+
+    Imported lazily to avoid circular imports (ingestion/enrichment
+    bronze_loaders both import from database.py).
+    """
+    # Cricsheet tables
+    from src.ingestion.bronze_loader import _ensure_bronze_tables
+
+    _ensure_bronze_tables(conn)
+
+    # ESPN enrichment tables
+    from src.enrichment.bronze_loader import _ensure_espn_tables
+
+    _ensure_espn_tables(conn)
 
 
 def query(sql: str, params: list | None = None) -> list[dict]:

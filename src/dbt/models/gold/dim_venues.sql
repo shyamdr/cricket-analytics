@@ -32,7 +32,7 @@ espn_venue as (
     group by m.venue, e.espn_ground_id, e.ground_capacity, e.venue_timezone
 ),
 
--- Geocoded coordinates from bronze.venue_coordinates (Google Maps API)
+-- Geocoded coordinates from bronze.venue_coordinates (populated by geocoding enrichment job)
 geocoded as (
     select
         venue,

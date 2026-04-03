@@ -365,17 +365,6 @@ def geocode_venue_coordinates(context: AssetExecutionContext) -> MaterializeResu
     # Write all geocoded results to bronze
     wconn = get_write_conn()
     try:
-        wconn.execute(f"""
-            CREATE TABLE IF NOT EXISTS {settings.bronze_schema}.venue_coordinates (
-                venue VARCHAR NOT NULL,
-                city VARCHAR,
-                latitude DOUBLE,
-                longitude DOUBLE,
-                formatted_address VARCHAR,
-                place_id VARCHAR,
-                geocode_status VARCHAR
-            )
-        """)
         for r in new_venues:
             # Upsert: delete existing row for this (venue, city) combo, then insert
             if r["city"] is None:

@@ -138,8 +138,21 @@ CREATE TABLE IF NOT EXISTS {schema}.espn_ball_data (
 """
 
 
+_VENUE_COORDINATES_DDL = """
+CREATE TABLE IF NOT EXISTS {schema}.venue_coordinates (
+    venue               VARCHAR NOT NULL,
+    city                VARCHAR,
+    latitude            DOUBLE,
+    longitude           DOUBLE,
+    formatted_address   VARCHAR,
+    place_id            VARCHAR,
+    geocode_status      VARCHAR
+)
+"""
+
+
 def _ensure_espn_tables(conn: duckdb.DuckDBPyConnection) -> None:
-    """Create all 4 ESPN bronze tables with explicit schemas.
+    """Create all ESPN + geocoding bronze tables with explicit schemas.
 
     Uses CREATE TABLE IF NOT EXISTS so it's safe to call on every run.
     This avoids DuckDB inferring wrong types from NULL-heavy first batches
@@ -150,6 +163,7 @@ def _ensure_espn_tables(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute(_ESPN_PLAYERS_DDL.format(schema=schema))
     conn.execute(_ESPN_INNINGS_DDL.format(schema=schema))
     conn.execute(_ESPN_BALL_DATA_DDL.format(schema=schema))
+    conn.execute(_VENUE_COORDINATES_DDL.format(schema=schema))
 
 
 def load_espn_to_bronze(records: list[dict[str, Any]]) -> dict[str, int]:
