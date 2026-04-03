@@ -1,61 +1,62 @@
 -- Weather fact table: one row per match per hour (24 rows per match).
--- Contains hourly weather conditions + daily summary on every row.
+-- Combines hourly conditions from stg_weather_hourly with daily summary
+-- from stg_weather_daily into a single denormalized table.
+--
 -- Join to dim_matches on match_id. Use hour_local + match start_time
 -- to filter to actual match hours.
---
--- Example: get weather during a match
---   SELECT w.*
---   FROM fact_weather w
---   JOIN dim_matches m ON w.match_id = m.match_id
---   WHERE w.hour_local BETWEEN
---     EXTRACT(HOUR FROM m.start_time AT TIME ZONE m.venue_timezone)
---     AND EXTRACT(HOUR FROM m.start_time AT TIME ZONE m.venue_timezone) + 3
-
 select
-    match_id,
-    match_date,
-    hour_local,
-    latitude,
-    longitude,
-    elevation,
-    timezone,
+    h.match_id,
+    h.match_date,
+    h.hour_local,
+    h.latitude,
+    h.longitude,
+    h.elevation,
+    h.timezone,
 
     -- Hourly conditions
-    temperature_2m,
-    relative_humidity_2m,
-    dew_point_2m,
-    apparent_temperature,
-    wet_bulb_temperature_2m,
-    precipitation,
-    weather_code,
-    pressure_msl,
-    cloud_cover,
-    cloud_cover_low,
-    wind_speed_10m,
-    wind_direction_10m,
-    wind_gusts_10m,
-    is_day,
+    h.temperature_2m,
+    h.relative_humidity_2m,
+    h.dew_point_2m,
+    h.apparent_temperature,
+    h.wet_bulb_temperature_2m,
+    h.precipitation,
+    h.weather_code,
+    h.pressure_msl,
+    h.cloud_cover,
+    h.cloud_cover_low,
+    h.wind_speed_10m,
+    h.wind_direction_10m,
+    h.wind_gusts_10m,
+    h.is_day,
 
     -- Extended hourly
-    rain,
-    surface_pressure,
-    cloud_cover_mid,
-    cloud_cover_high,
-    vapour_pressure_deficit,
-    soil_temperature_0_to_7cm,
-    soil_moisture_0_to_7cm,
-    sunshine_duration,
-    shortwave_radiation,
+    h.rain,
+    h.surface_pressure,
+    h.cloud_cover_mid,
+    h.cloud_cover_high,
+    h.vapour_pressure_deficit,
+    h.soil_temperature_0_to_7cm,
+    h.soil_moisture_0_to_7cm,
+    h.sunshine_duration as hourly_sunshine_duration,
+    h.shortwave_radiation,
 
     -- Daily summary (same for all 24 hours of a match)
-    daily_temp_max,
-    daily_temp_min,
-    daily_precipitation_sum,
-    daily_precipitation_hours,
-    daily_sunrise,
-    daily_sunset,
-    daily_wind_speed_max,
-    daily_wind_direction_dominant,
-    daily_weather_code
+    d.temp_max as daily_temp_max,
+    d.temp_min as daily_temp_min,
+    d.apparent_temp_max as daily_apparent_temp_max,
+    d.apparent_temp_min as daily_apparent_temp_min,
+    d.precipitation_sum as daily_precipitation_sum,
+    d.precipitation_hours as daily_precipitation_hours,
+    d.rain_sum as daily_rain_sum,
+    d.sunrise as daily_sunrise,
+    d.sunset as daily_sunset,
+    d.sunshine_duration as daily_sunshine_duration,
+    d.daylight_duration as daily_daylight_duration,
+    d.wind_speed_max as daily_wind_speed_max,
+    d.wind_gusts_max as daily_wind_gusts_max,
+    d.wind_direction_dominant as daily_wind_direction_dominant,
+    d.shortwave_radiation_sum as daily_shortwave_radiation_sum,
+    d.weather_code as daily_weather_code
 
-from {{ ref('stg_weather') }}
+from {{ ref('stg_weather_hourly') }} h
+left join {{ ref('stg_weather_daily') }} d on h.match_id = d.match_id
