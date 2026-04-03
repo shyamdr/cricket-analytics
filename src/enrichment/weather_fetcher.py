@@ -86,14 +86,18 @@ def _fetch_weather(
     longitude: float,
     date: str,
     timezone: str = "Asia/Kolkata",
+    max_retries: int = 3,
 ) -> dict[str, Any]:
     """Fetch one day of hourly + daily weather from Open-Meteo.
+
+    Retries on timeout/connection errors with exponential backoff.
 
     Args:
         latitude: Venue latitude.
         longitude: Venue longitude.
         date: Match date in YYYY-MM-DD format.
         timezone: IANA timezone for the venue (default: Asia/Kolkata for IPL).
+        max_retries: Number of retry attempts on transient failures.
 
     Returns:
         Raw API response dict.
@@ -107,9 +111,26 @@ def _fetch_weather(
         "daily": _DAILY_VARS,
         "timezone": timezone,
     }
-    resp = httpx.get(_ARCHIVE_URL, params=params, timeout=30)
-    resp.raise_for_status()
-    return resp.json()
+    for attempt in range(max_retries + 1):
+        try:
+            resp = httpx.get(_ARCHIVE_URL, params=params, timeout=30)
+            resp.raise_for_status()
+            return resp.json()
+        except (httpx.TimeoutException, httpx.ConnectError, OSError) as exc:
+            if attempt == max_retries:
+                raise
+            wait = 2**attempt
+            logger.warning(
+                "weather_retry",
+                attempt=attempt + 1,
+                max_retries=max_retries,
+                wait=wait,
+                error=str(exc),
+            )
+            time.sleep(wait)
+    # unreachable but keeps type checker happy
+    msg = "max retries exceeded"
+    raise RuntimeError(msg)
 
 
 def _get_already_fetched() -> set[str]:
@@ -203,6 +224,8 @@ def fetch_weather_for_matches(
 
     records = []
     failed = 0
+    loaded_total = 0
+    batch_size = 50
 
     for i, match in enumerate(pending):
         match_id = match["match_id"]
@@ -230,20 +253,47 @@ def fetch_weather_for_matches(
             }
             records.append(record)
 
-            if (i + 1) % 50 == 0:
-                logger.info("weather_progress", done=i + 1, total=len(pending))
+            logger.info(
+                "weather_fetched",
+                match_id=match_id,
+                date=match["match_date"],
+                progress=f"{i + 1}/{len(pending)}",
+            )
 
             if delay_seconds > 0:
                 time.sleep(delay_seconds)
 
         except Exception as exc:
             failed += 1
-            logger.warning("weather_fetch_failed", match_id=match_id, error=str(exc))
+            logger.warning(
+                "weather_fetch_failed",
+                match_id=match_id,
+                date=match["match_date"],
+                progress=f"{i + 1}/{len(pending)}",
+                error=str(exc),
+            )
 
-    if not records:
-        return {"fetched": 0, "loaded": 0, "skipped": 0, "failed": failed}
+        # Persist batch to DB so progress isn't lost on failure
+        if len(records) >= batch_size:
+            loaded_total += _persist_batch(records, loaded_at)
+            records = []
 
-    # Load into bronze
+    # Persist remaining records
+    if records:
+        loaded_total += _persist_batch(records, loaded_at)
+
+    logger.info(
+        "weather_enrichment_complete",
+        fetched=loaded_total,
+        loaded=loaded_total,
+        failed=failed,
+        total=len(pending),
+    )
+    return {"fetched": loaded_total, "loaded": loaded_total, "skipped": 0, "failed": failed}
+
+
+def _persist_batch(records: list[dict[str, Any]], loaded_at: str) -> int:
+    """Write a batch of weather records to bronze.weather."""
     import pyarrow as pa
 
     table = pa.Table.from_pylist(records)
@@ -257,11 +307,5 @@ def fetch_weather_for_matches(
         )
     finally:
         conn.close()
-
-    logger.info(
-        "weather_enrichment_complete",
-        fetched=len(records),
-        loaded=loaded,
-        failed=failed,
-    )
-    return {"fetched": len(records), "loaded": loaded, "skipped": 0, "failed": failed}
+    logger.info("weather_batch_persisted", batch_size=len(records), new_rows=loaded)
+    return loaded
