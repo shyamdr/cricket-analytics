@@ -139,11 +139,11 @@ def _get_pending_matches(limit: int = 0) -> list[dict[str, Any]]:
     sql = f"""
         SELECT
             m.match_id,
-            m.match_date::varchar as match_date,
+            m.date as match_date,
             vc.latitude,
             vc.longitude,
             COALESCE(em.venue_timezone, 'Asia/Kolkata') as timezone
-        FROM {settings.silver_schema}.stg_matches m
+        FROM {settings.bronze_schema}.matches m
         JOIN {settings.bronze_schema}.venue_coordinates vc
             ON m.venue = vc.venue
             AND (m.city = vc.city OR (m.city IS NULL AND vc.city IS NULL))
@@ -151,7 +151,7 @@ def _get_pending_matches(limit: int = 0) -> list[dict[str, Any]]:
             ON m.match_id = em.cricsheet_match_id
         {weather_join}
         {weather_filter}
-        ORDER BY m.match_date
+        ORDER BY m.date
     """
     if limit > 0:
         sql += f" LIMIT {limit}"
