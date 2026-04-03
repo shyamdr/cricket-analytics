@@ -21,6 +21,37 @@ select
     h.wet_bulb_temperature_2m,
     h.precipitation,
     h.weather_code,
+    case h.weather_code
+        when 0 then 'Clear sky'
+        when 1 then 'Mainly clear'
+        when 2 then 'Partly cloudy'
+        when 3 then 'Overcast'
+        when 45 then 'Fog'
+        when 48 then 'Depositing rime fog'
+        when 51 then 'Light drizzle'
+        when 53 then 'Moderate drizzle'
+        when 55 then 'Dense drizzle'
+        when 56 then 'Light freezing drizzle'
+        when 57 then 'Dense freezing drizzle'
+        when 61 then 'Slight rain'
+        when 63 then 'Moderate rain'
+        when 65 then 'Heavy rain'
+        when 66 then 'Light freezing rain'
+        when 67 then 'Heavy freezing rain'
+        when 71 then 'Slight snowfall'
+        when 73 then 'Moderate snowfall'
+        when 75 then 'Heavy snowfall'
+        when 77 then 'Snow grains'
+        when 80 then 'Slight rain showers'
+        when 81 then 'Moderate rain showers'
+        when 82 then 'Violent rain showers'
+        when 85 then 'Slight snow showers'
+        when 86 then 'Heavy snow showers'
+        when 95 then 'Thunderstorm'
+        when 96 then 'Thunderstorm with slight hail'
+        when 99 then 'Thunderstorm with heavy hail'
+        else 'Unknown (' || cast(h.weather_code as varchar) || ')'
+    end as weather_description,
     h.pressure_msl,
     h.cloud_cover,
     h.cloud_cover_low,
@@ -56,7 +87,38 @@ select
     d.wind_gusts_max as daily_wind_gusts_max,
     d.wind_direction_dominant as daily_wind_direction_dominant,
     d.shortwave_radiation_sum as daily_shortwave_radiation_sum,
-    d.weather_code as daily_weather_code
+    d.weather_code as daily_weather_code,
+    case d.weather_code
+        when 0 then 'Clear sky'
+        when 1 then 'Mainly clear'
+        when 2 then 'Partly cloudy'
+        when 3 then 'Overcast'
+        when 45 then 'Fog'
+        when 48 then 'Depositing rime fog'
+        when 51 then 'Light drizzle'
+        when 53 then 'Moderate drizzle'
+        when 55 then 'Dense drizzle'
+        when 56 then 'Light freezing drizzle'
+        when 57 then 'Dense freezing drizzle'
+        when 61 then 'Slight rain'
+        when 63 then 'Moderate rain'
+        when 65 then 'Heavy rain'
+        when 66 then 'Light freezing rain'
+        when 67 then 'Heavy freezing rain'
+        when 71 then 'Slight snowfall'
+        when 73 then 'Moderate snowfall'
+        when 75 then 'Heavy snowfall'
+        when 77 then 'Snow grains'
+        when 80 then 'Slight rain showers'
+        when 81 then 'Moderate rain showers'
+        when 82 then 'Violent rain showers'
+        when 85 then 'Slight snow showers'
+        when 86 then 'Heavy snow showers'
+        when 95 then 'Thunderstorm'
+        when 96 then 'Thunderstorm with slight hail'
+        when 99 then 'Thunderstorm with heavy hail'
+        else 'Unknown (' || cast(d.weather_code as varchar) || ')'
+    end as daily_weather_description
 
 from {{ ref('stg_weather_hourly') }} h
 left join {{ ref('stg_weather_daily') }} d on h.match_id = d.match_id
