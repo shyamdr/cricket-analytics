@@ -438,6 +438,7 @@ class WeatherEnrichmentConfig(Config):
     """Configuration for the weather_enrichment asset."""
 
     limit: int = 0  # 0 = all pending; set to e.g. 10 for testing
+    delay_seconds: float = 0.1  # pause between API calls (free tier: 600/min)
 
 
 @asset(
@@ -456,7 +457,7 @@ def weather_enrichment(
     """Fetch weather for all matches not yet in bronze.weather."""
     from src.enrichment.weather_fetcher import fetch_weather_for_matches
 
-    counts = fetch_weather_for_matches(limit=config.limit)
+    counts = fetch_weather_for_matches(limit=config.limit, delay_seconds=config.delay_seconds)
 
     context.log.info(
         f"Weather: {counts['fetched']} fetched, {counts['loaded']} loaded, "

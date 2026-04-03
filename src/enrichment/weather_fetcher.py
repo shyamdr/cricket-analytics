@@ -4,13 +4,15 @@ Fetches hourly + daily weather for each match using venue coordinates
 and match date. Stores raw API response in bronze.weather.
 
 API: https://archive-api.open-meteo.com/v1/archive
-Cost: Free, no API key required.
+Cost: Free for non-commercial use, no API key required.
+Rate limits (free tier): 600 calls/min, 5000/hour, 10000/day.
 Resolution: Hourly (~25km ERA5 grid).
 """
 
 from __future__ import annotations
 
 import json
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -170,6 +172,7 @@ def _get_pending_matches(limit: int = 0) -> list[dict[str, Any]]:
 def fetch_weather_for_matches(
     limit: int = 0,
     run_id: str | None = None,
+    delay_seconds: float = 0.1,
 ) -> dict[str, int]:
     """Fetch weather for all pending matches and load into bronze.weather.
 
@@ -178,6 +181,8 @@ def fetch_weather_for_matches(
     Args:
         limit: Max matches to process (0 = all pending). Use for testing.
         run_id: Optional run identifier for audit columns.
+        delay_seconds: Pause between API calls (default 0.1s). Free tier
+            allows 600/min — 0.1s gives ~600/min max, well within limits.
 
     Returns:
         Dict with counts: fetched, loaded, skipped, failed.
@@ -227,6 +232,9 @@ def fetch_weather_for_matches(
 
             if (i + 1) % 50 == 0:
                 logger.info("weather_progress", done=i + 1, total=len(pending))
+
+            if delay_seconds > 0:
+                time.sleep(delay_seconds)
 
         except Exception as exc:
             failed += 1
