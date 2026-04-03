@@ -26,6 +26,10 @@ logger = structlog.get_logger(__name__)
 
 _ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 
+# Persistent HTTP client — reuses TLS session across calls, avoids
+# repeated SSL handshakes that cause timeout failures.
+_http_client = httpx.Client(timeout=15, http2=False)
+
 # Hourly variables to fetch — all stored in bronze, subset surfaced in gold
 _HOURLY_VARS = ",".join(
     [
@@ -113,13 +117,13 @@ def _fetch_weather(
     }
     for attempt in range(max_retries + 1):
         try:
-            resp = httpx.get(_ARCHIVE_URL, params=params, timeout=30)
+            resp = _http_client.get(_ARCHIVE_URL, params=params)
             resp.raise_for_status()
             return resp.json()
         except (httpx.TimeoutException, httpx.ConnectError, OSError) as exc:
             if attempt == max_retries:
                 raise
-            wait = 2**attempt
+            wait = min(attempt + 1, 3)
             logger.warning(
                 "weather_retry",
                 attempt=attempt + 1,
