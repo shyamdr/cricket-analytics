@@ -32,3 +32,8 @@ sources:
         meta:
           dagster:
             asset_key: ["geocode_venue_coordinates"]
+      - name: weather
+        description: "Historical weather data from Open-Meteo API. One row per match with full hourly + daily JSON. Populated by the weather_enrichment Dagster asset."
+        meta:
+          dagster:
+            asset_key: ["weather_enrichment"]

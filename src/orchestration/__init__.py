@@ -12,6 +12,7 @@ from src.orchestration.assets.enrichment import (
     espn_ball_enrichment,
     espn_match_enrichment,
     geocode_venue_coordinates,
+    weather_enrichment,
 )
 from src.orchestration.assets.ingestion import bronze_matches, bronze_people
 from src.orchestration.jobs import (
@@ -36,6 +37,7 @@ defs = Definitions(
         espn_match_enrichment,
         espn_ball_enrichment,
         geocode_venue_coordinates,
+        weather_enrichment,
     ],
     jobs=[
         full_pipeline_job,

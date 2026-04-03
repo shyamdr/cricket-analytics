@@ -50,6 +50,7 @@ all: setup ingest transform ## Full pipeline: setup + ingest + transform
 
 dagster: ## Start Dagster webserver (orchestration UI)
 	@mkdir -p .dagster
+	cd $(DBT_DIR) && dbt parse --profiles-dir .
 	export DAGSTER_HOME="$$(pwd)/.dagster" && dagster dev -m src.orchestration
 
 api: ## Start FastAPI server

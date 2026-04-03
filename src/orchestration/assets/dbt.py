@@ -20,13 +20,9 @@ DBT_PROJECT_DIR = Path(__file__).resolve().parent.parent.parent / "dbt"
 
 dbt_project = DbtProject(project_dir=DBT_PROJECT_DIR)
 
-# Always re-parse in dev to pick up sources.yml / schema.yml changes.
-# prepare_if_dev() only creates the manifest if missing — it won't
-# detect changes to source meta (e.g. asset_key mappings), which can
-# cause stale circular-dependency errors in Dagster.
-_manifest = dbt_project.manifest_path
-if _manifest.exists():
-    _manifest.unlink()
+# prepare_if_dev() creates the manifest if missing.
+# We don't delete it proactively — if sources.yml changes cause stale
+# asset key issues, run `make transform` to regenerate the manifest.
 dbt_project.prepare_if_dev()
 
 

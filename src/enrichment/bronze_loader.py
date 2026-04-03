@@ -150,6 +150,22 @@ CREATE TABLE IF NOT EXISTS {schema}.venue_coordinates (
 )
 """
 
+_WEATHER_DDL = """
+CREATE TABLE IF NOT EXISTS {schema}.weather (
+    match_id            VARCHAR NOT NULL,
+    match_date          VARCHAR,
+    latitude            DOUBLE,
+    longitude           DOUBLE,
+    elevation           DOUBLE,
+    timezone            VARCHAR,
+    utc_offset_seconds  INTEGER,
+    hourly_json         VARCHAR,
+    daily_json          VARCHAR,
+    _loaded_at          VARCHAR,
+    _run_id             VARCHAR
+)
+"""
+
 
 def _ensure_espn_tables(conn: duckdb.DuckDBPyConnection) -> None:
     """Create all ESPN + geocoding bronze tables with explicit schemas.
@@ -164,6 +180,7 @@ def _ensure_espn_tables(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute(_ESPN_INNINGS_DDL.format(schema=schema))
     conn.execute(_ESPN_BALL_DATA_DDL.format(schema=schema))
     conn.execute(_VENUE_COORDINATES_DDL.format(schema=schema))
+    conn.execute(_WEATHER_DDL.format(schema=schema))
 
 
 def load_espn_to_bronze(records: list[dict[str, Any]]) -> dict[str, int]:

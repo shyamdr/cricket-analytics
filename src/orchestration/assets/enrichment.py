@@ -432,3 +432,41 @@ def geocode_venue_coordinates(context: AssetExecutionContext) -> MaterializeResu
             "total_venues": MetadataValue.int(len(all_venue_dicts)),
         }
     )
+
+
+class WeatherEnrichmentConfig(Config):
+    """Configuration for the weather_enrichment asset."""
+
+    limit: int = 0  # 0 = all pending; set to e.g. 10 for testing
+
+
+@asset(
+    group_name="enrichment",
+    compute_kind="python",
+    deps=[AssetKey(["geocode_venue_coordinates"]), AssetKey(["gold", "dim_matches"])],
+    description=(
+        "Fetch historical weather from Open-Meteo API for each match. "
+        "Uses venue coordinates (lat/lng) + match date. Free API, no key required. "
+        "Stores full hourly + daily JSON in bronze.weather. Delta-aware."
+    ),
+)
+def weather_enrichment(
+    context: AssetExecutionContext, config: WeatherEnrichmentConfig
+) -> MaterializeResult:
+    """Fetch weather for all matches not yet in bronze.weather."""
+    from src.enrichment.weather_fetcher import fetch_weather_for_matches
+
+    counts = fetch_weather_for_matches(limit=config.limit)
+
+    context.log.info(
+        f"Weather: {counts['fetched']} fetched, {counts['loaded']} loaded, "
+        f"{counts['failed']} failed"
+    )
+
+    return MaterializeResult(
+        metadata={
+            "fetched": MetadataValue.int(counts["fetched"]),
+            "loaded": MetadataValue.int(counts["loaded"]),
+            "failed": MetadataValue.int(counts["failed"]),
+        }
+    )
