@@ -8,6 +8,8 @@ dataset and it will only pick up new matches.
 from __future__ import annotations
 
 import json
+import uuid
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -65,7 +67,10 @@ CREATE TABLE IF NOT EXISTS {schema}.matches (
     missing_json        VARCHAR,
     players_team1_json  VARCHAR,
     players_team2_json  VARCHAR,
-    registry_json       VARCHAR
+    registry_json       VARCHAR,
+    _loaded_at          TIMESTAMP NOT NULL,
+    _source_file        VARCHAR NOT NULL,
+    _run_id             VARCHAR NOT NULL
 )
 """
 
@@ -100,7 +105,10 @@ CREATE TABLE IF NOT EXISTS {schema}.deliveries (
     review_decision     VARCHAR,
     review_type         VARCHAR,
     review_umpires_call BOOLEAN,
-    replacements_json   VARCHAR
+    replacements_json   VARCHAR,
+    _loaded_at          TIMESTAMP NOT NULL,
+    _source_file        VARCHAR NOT NULL,
+    _run_id             VARCHAR NOT NULL
 )
 """
 
@@ -115,7 +123,14 @@ def _ensure_bronze_tables(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute(_DELIVERIES_DDL.format(schema=settings.bronze_schema))
 
 
-def _parse_match_info(match_id: str, data: dict[str, Any]) -> dict[str, Any]:
+def _parse_match_info(
+    match_id: str,
+    data: dict[str, Any],
+    *,
+    source_file: str = "",
+    loaded_at: str = "",
+    run_id: str = "",
+) -> dict[str, Any]:
     """Extract match-level info from a Cricsheet JSON file."""
     info = data["info"]
     meta = data["meta"]
@@ -165,10 +180,20 @@ def _parse_match_info(match_id: str, data: dict[str, Any]) -> dict[str, Any]:
             info.get("players", {}).get(teams[1], []) if len(teams) > 1 else []
         ),
         "registry_json": json.dumps(info.get("registry", {}).get("people", {})),
+        "_loaded_at": loaded_at,
+        "_source_file": source_file,
+        "_run_id": run_id,
     }
 
 
-def _parse_deliveries(match_id: str, data: dict[str, Any]) -> list[dict[str, Any]]:
+def _parse_deliveries(
+    match_id: str,
+    data: dict[str, Any],
+    *,
+    source_file: str = "",
+    loaded_at: str = "",
+    run_id: str = "",
+) -> list[dict[str, Any]]:
     """Extract ball-by-ball delivery records from a Cricsheet JSON file."""
     rows: list[dict[str, Any]] = []
 
@@ -220,6 +245,9 @@ def _parse_deliveries(match_id: str, data: dict[str, Any]) -> list[dict[str, Any
                     "review_type": review.get("type") if review else None,
                     "review_umpires_call": review.get("umpires_call") if review else None,
                     "replacements_json": (json.dumps(replacements) if replacements else None),
+                    "_loaded_at": loaded_at,
+                    "_source_file": source_file,
+                    "_run_id": run_id,
                 }
                 rows.append(row)
 
@@ -266,6 +294,8 @@ def load_matches_to_bronze(matches_dir: Path, full_refresh: bool = False) -> int
     total_new = 0
     failed_files: list[str] = []
     num_batches = (len(json_files) + _BATCH_SIZE - 1) // _BATCH_SIZE
+    run_id = str(uuid.uuid4())
+    loaded_at = datetime.now(UTC).isoformat()
 
     for batch_idx in range(num_batches):
         start = batch_idx * _BATCH_SIZE
@@ -279,8 +309,9 @@ def load_matches_to_bronze(matches_dir: Path, full_refresh: bool = False) -> int
             try:
                 with open(json_file) as f:
                     data = json.load(f)
-                batch_matches.append(_parse_match_info(match_id, data))
-                batch_deliveries.extend(_parse_deliveries(match_id, data))
+                audit = {"source_file": json_file.name, "loaded_at": loaded_at, "run_id": run_id}
+                batch_matches.append(_parse_match_info(match_id, data, **audit))
+                batch_deliveries.extend(_parse_deliveries(match_id, data, **audit))
             except Exception as exc:
                 failed_files.append(json_file.name)
                 logger.warning("parse_failed", file=json_file.name, error=str(exc))

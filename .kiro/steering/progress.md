@@ -71,7 +71,7 @@ Priority order from senior architecture review. Tackle one at a time.
 - [x] CI doesn't cache pip dependencies — added `cache: 'pip'` to all 3 setup-python steps; keyed on pyproject.toml hash
 - [x] No `make enrich` command — added `make enrich` target (supports optional `SEASON=2024` arg)
 - [x] Remove dead code download_matches() in downloader.py — removed, nothing referenced it
-- [ ] pyproject.toml says requires-python >=3.11 but dev is on 3.13 — consider CI matrix for both
+- [x] pyproject.toml says requires-python >=3.11 but dev is on 3.13 — added CI matrix for Python 3.11 + 3.13 on unit-tests and integration-tests jobs. Lint stays on 3.11 only (ruff output is version-independent).
 - [x] Integration tests have hardcoded value expectations — replaced with shape/constraint assertions (positive values, sorted order, non-empty results)
 
 ## Pending — ETL Deep Review Backlog
@@ -102,8 +102,8 @@ Items below are from the ETL deep review. See "Dagster Orchestration — Full Re
 - [ ] Add Dagster sensors — deferred until deployment strategy is decided. Requires Dagster running continuously (server/VM). See Step 5 in Dagster Orchestration Full Redesign section.
 
 ### Cross-Cutting ETL
-- [ ] Add audit columns to bronze tables — _loaded_at, _source_file, _run_id for lineage and debugging
-- [ ] Add observability beyond structlog — persist row counts per layer per run, track data freshness, consider Dagster AssetObservation/FreshnessPolicy
+- [x] Add audit columns to bronze tables — `_loaded_at` (TIMESTAMP), `_source_file` (VARCHAR), `_run_id` (VARCHAR) added to both matches (39 cols) and deliveries (33 cols) DDLs. Generated once per `load_matches_to_bronze` call (UUID run_id + UTC timestamp). Parse functions accept audit kwargs with defaults for backward compatibility. Requires full_refresh rebuild of DuckDB.
+- [x] Add observability beyond structlog — FreshnessPolicy on gold assets (1-week warn, 30-day fail), MaterializeResult metadata on Python assets (row counts visible in Dagster UI), dagster-dbt captures dbt output metrics automatically.
 
 ## Pending — Dagster Orchestration Full Redesign
 Comprehensive review of the Dagster asset graph, job definitions, and scheduling.
@@ -159,8 +159,9 @@ bronze_people ───→ stg_people ──→ dim_players
 - [ ] Add Dagster sensor to replace blind daily cron — poll Cricsheet (HTTP HEAD / Last-Modified) and only trigger daily_refresh when new data is available. Requires Dagster to be running continuously (local laptop or server). Deferred until deployment strategy is decided.
 
 ## Pending — Next Up
-- [ ] Data enrichment Phase 1: venue coordinates + weather (Open-Meteo)
-- [ ] Data enrichment Phase 2: ESPN enrichment (captain, keeper, player roles, match time)
+- [ ] Fix series resolver for T20I — current resolver groups by season (one series per season), breaks for T20I which has ~588 unique (season, event_name) combos. Need to group by (season, event_name) instead. Also add event_name to match query dicts in run_match_scraper.py and run_ball_scraper.py.
+- [ ] Data enrichment Phase 1: venue coordinates (Google Geocoding API) + weather (Open-Meteo)
+- [ ] Data enrichment Phase 2: T20I ESPN enrichment (after series resolver fix)
 - [ ] Data enrichment Phase 3: Elo ratings + auction prices + player DOB
 - [ ] Data enrichment Phase 4: derived analytics (pitch profiles, advanced metrics)
 

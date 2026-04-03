@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import TYPE_CHECKING, Any
 
 from dagster_dbt import (
     DagsterDbtTranslator,
@@ -12,6 +12,9 @@ from dagster_dbt import (
     DbtProject,
     dbt_assets,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 DBT_PROJECT_DIR = Path(__file__).resolve().parent.parent.parent / "dbt"
 
@@ -32,12 +35,10 @@ class CricketDbtTranslator(DagsterDbtTranslator):
 
     def __init__(self) -> None:
         super().__init__(
-            settings=DagsterDbtTranslatorSettings(
-                enable_duplicate_source_asset_keys=True
-            ),
+            settings=DagsterDbtTranslatorSettings(enable_duplicate_source_asset_keys=True),
         )
 
-    def get_group_name(self, dbt_resource_props: Mapping[str, Any]) -> Optional[str]:
+    def get_group_name(self, dbt_resource_props: Mapping[str, Any]) -> str | None:
         fqn = dbt_resource_props.get("fqn", [])
         # fqn looks like ["cricket_analytics", "silver", "stg_matches"]
         # or ["cricket_analytics", "gold", "dim_venues"]
