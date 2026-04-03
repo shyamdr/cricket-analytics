@@ -72,35 +72,7 @@ select
 
     -- ESPN enrichment: JSON blobs for downstream use
     e.replacement_players_json,
-    e.teams_enrichment_json,
-
-    -- Weather enrichment: match-time conditions (18:00–21:59 local window)
-    w.temperature_2m,
-    w.relative_humidity_2m,
-    w.dew_point_2m,
-    w.apparent_temperature,
-    w.wet_bulb_temperature_2m,
-    w.precipitation_match_window,
-    w.weather_code,
-    w.pressure_msl,
-    w.cloud_cover,
-    w.cloud_cover_low,
-    w.wind_speed_10m,
-    w.wind_direction_10m,
-    w.wind_gusts_10m,
-    w.is_day,
-
-    -- Weather enrichment: daily summary
-    w.daily_temp_max,
-    w.daily_temp_min,
-    w.daily_precipitation_sum,
-    w.daily_precipitation_hours,
-    w.sunrise,
-    w.sunset,
-    w.daily_wind_speed_max,
-    w.daily_wind_direction_dominant,
-    w.daily_weather_code
+    e.teams_enrichment_json
 
 from {{ ref('stg_matches') }} m
 left join {{ ref('stg_espn_matches') }} e on m.match_id = e.match_id
-left join {{ ref('stg_weather') }} w on m.match_id = w.match_id
