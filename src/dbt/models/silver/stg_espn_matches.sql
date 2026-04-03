@@ -15,7 +15,11 @@ select
     sub_class_id,
     -- Venue enrichment
     espn_ground_id,
-    ground_capacity,
+    -- Clean ground_capacity: strip commas and non-numeric suffixes (e.g. "60,000 approx" → 60000)
+    try_cast(
+        regexp_replace(replace(ground_capacity, ',', ''), '[^0-9].*', '')
+        as integer
+    ) as ground_capacity,
     venue_timezone,
     -- Team 1
     team1_name,
@@ -54,7 +58,7 @@ select
     null::bigint as international_class_id,
     null::bigint as sub_class_id,
     null::bigint as espn_ground_id,
-    null::bigint as ground_capacity,
+    null::integer as ground_capacity,
     null::varchar as venue_timezone,
     null::varchar as team1_name,
     null::bigint as team1_espn_id,
