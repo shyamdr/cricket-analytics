@@ -1,5 +1,10 @@
 # Cricket Analytics — Progress Tracker
 
+## Branding
+- Current name: **InsideEdge** — "The detail that changes everything."
+- Alternative considered: **SixthStump** — "Beyond what you see on the field." (revisit if rebranding)
+- Both are strong. InsideEdge = polished, analytical. SixthStump = bold, memorable, distinctive.
+
 ## Completed
 - [x] Git repo setup (local + GitHub remote via HTTPS)
 - [x] Local git config: user=shyamdr, email=shyamdrangapure@gmail.com

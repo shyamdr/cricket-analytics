@@ -7,8 +7,8 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Cricket Analytics",
-  description: "Deep cricket analytics powered by ball-by-ball data. Stats, insights, and analysis beyond what Cricbuzz offers.",
+  title: "InsideEdge",
+  description: "The detail that changes everything. Deep cricket analytics powered by ball-by-ball data.",
 };
 
 function Navbar() {
@@ -18,7 +18,7 @@ function Navbar() {
         <div className="flex items-center justify-between h-14">
           <Link href="/" className="flex items-center gap-2">
             <span className="text-xl">🏏</span>
-            <span className="font-semibold text-lg text-accent">Cricket Analytics</span>
+            <span className="font-semibold text-lg text-accent">InsideEdge</span>
           </Link>
           <div className="flex items-center gap-6 text-sm text-muted">
             <Link href="/matches" className="hover:text-foreground transition-colors">Matches</Link>

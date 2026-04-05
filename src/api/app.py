@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Cricket Analytics API",
+    title="InsideEdge API",
     description="Cricket analytics powered by DuckDB. Query player stats, team records, match data, and more.",
     version="0.1.0",
     lifespan=lifespan,
@@ -44,4 +44,4 @@ app.include_router(bowling.router)
 @app.get("/", tags=["health"])
 def root():
     """Health check endpoint."""
-    return {"status": "ok", "service": "cricket-analytics-api"}
+    return {"status": "ok", "service": "insideedge-api"}

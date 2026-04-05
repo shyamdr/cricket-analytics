@@ -29,7 +29,7 @@ export default async function Home() {
   if (error) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-16 text-center">
-        <h1 className="text-3xl font-bold mb-4">Cricket Analytics</h1>
+        <h1 className="text-3xl font-bold mb-4">InsideEdge</h1>
         <p className="text-muted mb-2">Could not connect to the API.</p>
         <p className="text-sm text-muted font-mono">{error}</p>
         <p className="text-sm text-muted mt-4">
@@ -43,9 +43,9 @@ export default async function Home() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Hero */}
       <div className="mb-10">
-        <h1 className="text-4xl font-bold mb-2">Cricket Analytics</h1>
+        <h1 className="text-4xl font-bold mb-2">InsideEdge</h1>
         <p className="text-muted text-lg">
-          Ball-by-ball insights across {totalMatches.toLocaleString()} matches and {totalSeasons} seasons.
+          The detail that changes everything. {totalMatches.toLocaleString()} matches, {totalSeasons} seasons of ball-by-ball insights.
         </p>
       </div>
 
