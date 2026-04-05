@@ -6,34 +6,25 @@ import Link from "next/link";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  let matches: Match[] = [];
-  let seasons: SeasonCount[] = [];
-  let topBatters: BattingStats[] = [];
-  let topBowlers: BowlingStats[] = [];
-  let error: string | null = null;
-
-  try {
-    [matches, seasons, topBatters, topBowlers] = await Promise.all([
-      fetchAPI<Match[]>("/matches?limit=10"),
-      fetchAPI<SeasonCount[]>("/matches/seasons"),
-      fetchAPI<BattingStats[]>("/batting/top?limit=5"),
-      fetchAPI<BowlingStats[]>("/bowling/top?limit=5"),
-    ]);
-  } catch (e) {
-    error = e instanceof Error ? e.message : "Failed to load data";
-  }
+  // Fetch each independently so partial failures don't blank the whole page
+  const [matches, seasons, topBatters, topBowlers] = await Promise.all([
+    fetchAPI<Match[]>("/matches?limit=10").catch(() => [] as Match[]),
+    fetchAPI<SeasonCount[]>("/matches/seasons").catch(() => [] as SeasonCount[]),
+    fetchAPI<BattingStats[]>("/batting/top?limit=5").catch(() => [] as BattingStats[]),
+    fetchAPI<BowlingStats[]>("/bowling/top?limit=5").catch(() => [] as BowlingStats[]),
+  ]);
 
   const totalMatches = seasons.reduce((sum, s) => sum + s.matches, 0);
   const totalSeasons = seasons.length;
+  const noData = matches.length === 0 && seasons.length === 0;
 
-  if (error) {
+  if (noData) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-16 text-center">
         <h1 className="text-3xl font-bold mb-4">InsideEdge</h1>
         <p className="text-muted mb-2">Could not connect to the API.</p>
-        <p className="text-sm text-muted font-mono">{error}</p>
         <p className="text-sm text-muted mt-4">
-          Make sure FastAPI is running: <code className="text-accent">make api</code>
+          The API may be waking up (free tier cold start ~30s). Try refreshing in a moment.
         </p>
       </div>
     );
