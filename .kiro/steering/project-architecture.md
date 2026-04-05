@@ -189,6 +189,11 @@ make ui             # start Streamlit app
 - CI: GitHub Actions (free for public repos)
 - Repo is public — serves as portfolio showcase + open-source project
 
+## Live Deployments
+- Frontend: https://insideedge.vercel.app (Vercel, free tier, auto-deploys from main)
+- API: https://insideedge-api.onrender.com (Render, free tier, Docker, auto-deploys from main)
+- API spins down after 15 min idle — first request after idle takes ~30 seconds
+
 ## Product Roadmap
 
 ### Phase 1: Public Website with Historical Data (current focus)
