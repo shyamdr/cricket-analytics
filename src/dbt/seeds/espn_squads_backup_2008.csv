@@ -1,0 +1,202 @@
+season,team,player_name,player_long_name,espn_id,player_role,is_withdrawn,nationality,acquisition_type,base_price,sold_price,currency,sold_price_inr,base_price_inr,sold_price_crores,capped_status,replaced_player,price_bucket,is_mega_auction_year
+2008,Bangalore Royal Challengers,R Dravid,Rahul Dravid,28114,C,,India,icon_player,,1035000,USD,46575000,,4.66,Capped,,2-5 Crore,Y
+2008,Bangalore Royal Challengers,Abdur Razzak,Abdur Razzak,56283,P,,Overseas,sold,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,NC Aiyappa,Neravanda Aiyappa,26198,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,B Akhil,Balachandra Akhil,26206,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,KP Appanna,KP Appanna,269170,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,J Arunkumar,Jagadeesh Arunkumar,26291,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,MV Boucher,Mark Boucher,44111,WK,,Overseas,sold,200000,450000,USD,20250000,9000000,2.03,,,2-5 Crore,Y
+2008,Bangalore Royal Challengers,S Chanderpaul,Shivnarine Chanderpaul,51469,P,,Overseas,sold,200000,200000,USD,9000000,9000000,0.9,,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,B Chipli,Bharat Chipli,27685,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,SP Goswami,Shreevats Goswami,302579,WK,,India,supplementary,,30000,USD,1350000,,0.14,Capped,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,W Jaffer,Wasim Jaffer,29646,P,,India,sold,150000,150000,USD,6750000,6750000,0.68,,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,SB Joshi,Sunil Joshi,29725,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,JH Kallis,Jacques Kallis,45789,P,,Overseas,sold,225000,900000,USD,40500000,10125000,4.05,,,2-5 Crore,Y
+2008,Bangalore Royal Challengers,Z Khan,Zaheer Khan,30102,P,,India,sold,200000,450000,USD,20250000,9000000,2.03,,,2-5 Crore,Y
+2008,Bangalore Royal Challengers,V Kohli,Virat Kohli,253802,P,,India,supplementary,,50000,USD,2250000,,0.23,Capped,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,P Kumar,Praveen Kumar,30732,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,A Kumble,Anil Kumble,30176,P,,India,sold,250000,500000,USD,22500000,11250000,2.25,,,2-5 Crore,Y
+2008,Bangalore Royal Challengers,Misbah-ul-Haq,Misbah-ul-Haq,41378,P,,Overseas,sold,,125000,USD,5625000,,0.56,,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,AA Noffke,Ashley Noffke,6938,P,,Overseas,replacement,,325000,USD,14625000,,1.46,,Nathan Bracken,1-2 Crore,Y
+2008,Bangalore Royal Challengers,DT Patil,Devraj Patil,32389,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,DW Steyn,Dale Steyn,47492,P,,Overseas,sold,150000,325000,USD,14625000,6750000,1.46,,,1-2 Crore,Y
+2008,Bangalore Royal Challengers,LRPL Taylor,Ross Taylor,38699,P,,Overseas,sold,,100000,USD,4500000,,0.45,,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,R Vinay Kumar,Vinay Kumar,35731,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Bangalore Royal Challengers,CL White,Cameron White,8291,P,,Overseas,sold,100000,500000,USD,22500000,4500000,2.25,,,2-5 Crore,Y
+2008,Bangalore Royal Challengers,NW Bracken,Nathan Bracken,4185,P,Y,Overseas,sold,225000,325000,USD,14625000,10125000,1.46,,,1-2 Crore,Y
+2008,Chennai Super Kings,MS Dhoni,MS Dhoni,28081,C,,India,sold,400000,1500000,USD,67500000,18000000,6.75,,,5-10 Crore,Y
+2008,Chennai Super Kings,P Amarnath,Palani  Amarnath,290629,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Chennai Super Kings,S Anirudha,Srikkanth Anirudha,26798,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Chennai Super Kings,KB Arun Karthik,Arun Karthik,319745,P,,India,signed,,20000,USD,900000,,0.09,,,Under 1 Crore,Y
+2008,Chennai Super Kings,R Ashwin,Ravichandran Ashwin,26421,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Chennai Super Kings,S Badrinath,S Badrinath,26806,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Chennai Super Kings,L Balaji,Lakshmipathy Balaji,26829,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Chennai Super Kings,N Einstein,Napoleon Einstein,279540,P,,India,supplementary,,30000,USD,1350000,,0.14,Capped,,Under 1 Crore,Y
+2008,Chennai Super Kings,SP Fleming,Stephen Fleming,37000,P,,Overseas,sold,350000,350000,USD,15750000,15750000,1.58,,,1-2 Crore,Y
+2008,Chennai Super Kings,MS Gony,Manpreet Gony,317293,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Chennai Super Kings,ML Hayden,Matthew Hayden,5616,P,,Overseas,sold,225000,375000,USD,16875000,10125000,1.69,,,1-2 Crore,Y
+2008,Chennai Super Kings,MEK Hussey,Michael Hussey,5939,P,,Overseas,sold,250000,250000,USD,11250000,11250000,1.13,,,1-2 Crore,Y
+2008,Chennai Super Kings,SB Jakati,Shadab Jakati,29655,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Chennai Super Kings,Joginder Sharma,Joginder Sharma,29976,P,,India,sold,100000,225000,USD,10125000,4500000,1.01,,,1-2 Crore,Y
+2008,Chennai Super Kings,VV Kadbe,Viraj Kadbe,340834,P,,India,supplementary,,30000,USD,1350000,,0.14,Capped,,Under 1 Crore,Y
+2008,Chennai Super Kings,CK Kapugedera,Chamara Kapugedera,209457,P,,Overseas,replacement,,200000,USD,9000000,,0.9,,Makhaya Ntini,Under 1 Crore,Y
+2008,Chennai Super Kings,SS Kumar,Suresh Kumar,313763,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Chennai Super Kings,JA Morkel,Albie Morkel,46248,P,,Overseas,sold,225000,675000,USD,30375000,10125000,3.04,,,2-5 Crore,Y
+2008,Chennai Super Kings,A Mukund,Abhinav Mukund,302582,P,,India,supplementary,,50000,USD,2250000,,0.23,Capped,,Under 1 Crore,Y
+2008,Chennai Super Kings,M Muralidaran,Muthiah Muralidaran,49636,P,,Overseas,sold,250000,600000,USD,27000000,11250000,2.7,,,2-5 Crore,Y
+2008,Chennai Super Kings,M Ntini,Makhaya Ntini,46592,P,,Overseas,sold,200000,200000,USD,9000000,9000000,0.9,,,Under 1 Crore,Y
+2008,Chennai Super Kings,JDP Oram,Jacob Oram,38062,P,,Overseas,sold,200000,675000,USD,30375000,9000000,3.04,,,2-5 Crore,Y
+2008,Chennai Super Kings,PA Patel,Parthiv Patel,32242,WK,,India,sold,150000,325000,USD,14625000,6750000,1.46,,,1-2 Crore,Y
+2008,Chennai Super Kings,SK Raina,Suresh Raina,33335,P,,India,sold,125000,650000,USD,29250000,5625000,2.93,,,2-5 Crore,Y
+2008,Chennai Super Kings,S Vidyut,Vidyut Sivaramakrishnan,35619,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Chennai Super Kings,S Tyagi,Sudeep Tyagi,317784,P,Y,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Deccan Chargers,VVS Laxman,VVS Laxman,30750,C,,India,sold,150000,375000,USD,16875000,6750000,1.69,,,1-2 Crore,Y
+2008,Deccan Chargers,SB Bangar,Sanjay Bangar,27225,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Deccan Chargers,H Das,Halhadar Das,236810,WK,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Deccan Chargers,HH Gibbs,Herschelle Gibbs,45224,P,,Overseas,sold,250000,575000,USD,25875000,11250000,2.59,,,2-5 Crore,Y
+2008,Deccan Chargers,AC Gilchrist,Adam Gilchrist,5390,WK,,Overseas,sold,300000,700000,USD,31500000,13500000,3.15,,,2-5 Crore,Y
+2008,Deccan Chargers,D Kalyankrishna,Doddapaneni Kalyankrishna,30719,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Deccan Chargers,PP Ojha,Pragyan Ojha,32130,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Deccan Chargers,DB Ravi Teja,Dwaraka Ravi Teja,237701,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Deccan Chargers,PM Sarvesh Kumar,PM Sarvesh Kumar,327127,P,,India,signed,,20000,USD,900000,,0.09,,,Under 1 Crore,Y
+2008,Deccan Chargers,Shahid Afridi,Shahid Afridi,42639,P,,Overseas,sold,225000,675000,USD,30375000,10125000,3.04,,,2-5 Crore,Y
+2008,Deccan Chargers,RG Sharma,Rohit Sharma,34102,P,,India,sold,150000,750000,USD,33750000,6750000,3.38,,,2-5 Crore,Y
+2008,Deccan Chargers,LPC Silva,Chamara Silva,50431,P,,Overseas,sold,100000,100000,USD,4500000,4500000,0.45,,,Under 1 Crore,Y
+2008,Deccan Chargers,RP Singh,RP Singh,35280,P,,India,sold,200000,875000,USD,39375000,9000000,3.94,,,2-5 Crore,Y
+2008,Deccan Chargers,SB Styris,Scott Styris,38407,P,,Overseas,sold,175000,175000,USD,7875000,7875000,0.79,,,Under 1 Crore,Y
+2008,Deccan Chargers,A Symonds,Andrew Symonds,7702,P,,Overseas,sold,250000,1350000,USD,60750000,11250000,6.08,,,5-10 Crore,Y
+2008,Deccan Chargers,WPUJC Vaas,Chaminda Vaas,50804,P,,Overseas,sold,200000,200000,USD,9000000,9000000,0.9,,,Under 1 Crore,Y
+2008,Deccan Chargers,Y Venugopal Rao,Venugopal Rao,35805,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Deccan Chargers,DP Vijaykumar,Paidikalva Vijaykumar,272949,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Deccan Chargers,AS Yadav,Arjun Yadav,36110,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Deccan Chargers,DNT Zoysa,Nuwan Zoysa,51050,P,,Overseas,sold,100000,110000,USD,4950000,4500000,0.5,,,Under 1 Crore,Y
+2008,Delhi Daredevils,V Sehwag,Virender Sehwag,35263,C,,India,icon_player,,834000,USD,37530000,,3.75,Capped,,2-5 Crore,Y
+2008,Delhi Daredevils,R Bhatia,Rajat Bhatia,26907,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Delhi Daredevils,AB de Villiers,AB de Villiers,44936,P,,Overseas,sold,200000,300000,USD,13500000,9000000,1.35,,,1-2 Crore,Y
+2008,Delhi Daredevils,S Dhawan,Shikhar Dhawan,28235,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Delhi Daredevils,TM Dilshan,Tillakaratne Dilshan,48472,P,,Overseas,sold,152000,250000,USD,11250000,6840000,1.13,,,1-2 Crore,Y
+2008,Delhi Daredevils,G Gambhir,Gautam Gambhir,28763,P,,India,sold,220000,725000,USD,32625000,9900000,3.26,,,2-5 Crore,Y
+2008,Delhi Daredevils,B Geeves,Brett Geeves,5472,P,,Overseas,sold,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Delhi Daredevils,KD Karthik,Dinesh Karthik,30045,WK,,India,sold,200000,525000,USD,23625000,9000000,2.36,,,2-5 Crore,Y
+2008,Delhi Daredevils,MF Maharoof,Farveez Maharoof,49638,P,,Overseas,sold,150000,225000,USD,10125000,6750000,1.01,,,1-2 Crore,Y
+2008,Delhi Daredevils,VY Mahesh,Yo Mahesh,31732,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Delhi Daredevils,M Manhas,Mithun Manhas,31001,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Delhi Daredevils,GD McGrath,Glenn McGrath,6565,P,,Overseas,sold,350000,350000,USD,15750000,15750000,1.58,,,1-2 Crore,Y
+2008,Delhi Daredevils,A Mishra,Amit Mishra,31107,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Delhi Daredevils,Mohammad Asif,Mohammad Asif,41411,P,,Overseas,sold,225000,650000,USD,29250000,10125000,2.93,,,2-5 Crore,Y
+2008,Delhi Daredevils,Y Nagar,Yogesh Nagar,317786,P,,India,signed,,20000,USD,900000,,0.09,,,Under 1 Crore,Y
+2008,Delhi Daredevils,PJ Sangwan,Pradeep Sangwan,279545,P,,India,supplementary,,50000,USD,2250000,,0.23,Capped,,Under 1 Crore,Y
+2008,Delhi Daredevils,Shoaib Malik,Shoaib Malik,42657,P,,Overseas,sold,300000,500000,USD,22500000,13500000,2.25,,,2-5 Crore,Y
+2008,Delhi Daredevils,M Tehlan,Mayank Tehlan,35392,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Delhi Daredevils,MK Tiwary,Manoj Tiwary,35565,P,,India,sold,100000,675000,USD,30375000,4500000,3.04,,,2-5 Crore,Y
+2008,Delhi Daredevils,TP Yadav,Tejashwi Yadav,344286,P,,India,signed,,20000,USD,900000,,0.09,,,Under 1 Crore,Y
+2008,Delhi Daredevils,DL Vettori,Daniel Vettori,38710,P,Y,Overseas,sold,250000,625000,USD,28125000,11250000,2.81,,,2-5 Crore,Y
+2008,Kings XI Punjab,Yuvraj Singh,Yuvraj Singh,36084,C,,India,icon_player,,1064000,USD,47880000,,4.79,Capped,,2-5 Crore,Y
+2008,Kings XI Punjab,DPMD Jayawardene,Mahela Jayawardene,49289,VC,,Overseas,sold,250000,475000,USD,21375000,11250000,2.14,,,2-5 Crore,Y
+2008,Kings XI Punjab,AK Argal,Ajitesh Argal,26432,P,,India,supplementary,,50000,USD,2250000,,0.23,Capped,,Under 1 Crore,Y
+2008,Kings XI Punjab,PP Chawla,Piyush Chawla,32966,P,,India,sold,125000,400000,USD,18000000,5625000,1.8,,,1-2 Crore,Y
+2008,Kings XI Punjab,P Dharmani,Pankaj Dharmani,28067,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kings XI Punjab,R Dhawan,Rishi Dhawan,290727,P,,India,signed,,20000,USD,900000,,0.09,,,Under 1 Crore,Y
+2008,Kings XI Punjab,Gagandeep Singh,Gagandeep Singh,28758,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kings XI Punjab,K Goel,Karan Goel,28997,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kings XI Punjab,JR Hopes,James Hopes,5702,P,,Overseas,sold,,300000,USD,13500000,,1.35,,,1-2 Crore,Y
+2008,Kings XI Punjab,SM Katich,Simon Katich,6128,P,,Overseas,sold,200000,200000,USD,9000000,9000000,0.9,,,Under 1 Crore,Y
+2008,Kings XI Punjab,U Kaul,Uday Kaul,30235,WK,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kings XI Punjab,SO Kukreja,Sahil Kukreja,30144,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kings XI Punjab,B Lee,Brett Lee,6278,P,,Overseas,sold,300000,900000,USD,40500000,13500000,4.05,,,2-5 Crore,Y
+2008,Kings XI Punjab,SE Marsh,Shaun Marsh,6683,P,,Overseas,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kings XI Punjab,KD Mills,Kyle Mills,37740,P,,Overseas,sold,,150000,USD,6750000,,0.68,,,Under 1 Crore,Y
+2008,Kings XI Punjab,WA Mota,Wilkin Mota,31041,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kings XI Punjab,IK Pathan,Irfan Pathan,32685,P,,India,sold,200000,925000,USD,41625000,9000000,4.16,,,2-5 Crore,Y
+2008,Kings XI Punjab,LA Pomersbach,Luke Pomersbach,232284,P,,Overseas,sold,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kings XI Punjab,RR Powar,Ramesh Powar,32391,P,,India,sold,150000,170000,USD,7650000,6750000,0.77,,,Under 1 Crore,Y
+2008,Kings XI Punjab,N Saini,Nitin Saini,274785,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kings XI Punjab,KC Sangakkara,Kumar Sangakkara,50710,WK,,Overseas,sold,250000,700000,USD,31500000,11250000,3.15,,,2-5 Crore,Y
+2008,Kings XI Punjab,RR Sarwan,Ramnaresh Sarwan,52969,P,,Overseas,sold,225000,225000,USD,10125000,10125000,1.01,,,1-2 Crore,Y
+2008,Kings XI Punjab,VRV Singh,Vikram Singh,35281,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kings XI Punjab,S Sohal,Sunny Sohal,228943,P,,Overseas,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kings XI Punjab,S Sreesanth,Sreesanth,34274,P,,India,sold,200000,625000,USD,28125000,9000000,2.81,,,2-5 Crore,Y
+2008,Kings XI Punjab,TM Srivastava,Tanmay Srivastava,35401,P,,India,supplementary,,50000,USD,2250000,,0.23,Capped,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,SC Ganguly,Sourav Ganguly,28779,C,,India,icon_player,,1093000,USD,49185000,,4.92,Capped,,2-5 Crore,Y
+2008,Kolkata Knight Riders,AB Agarkar,Ajit Agarkar,26184,P,,India,sold,200000,350000,USD,15750000,9000000,1.58,,,1-2 Crore,Y
+2008,Kolkata Knight Riders,A Chopra,Aakash Chopra,27639,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,DB Das,Debabrata Das,328163,P,,India,signed,,20000,USD,900000,,0.09,,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,AB Dinda,Ashok Dinda,227712,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,CH Gayle,Chris Gayle,51880,P,,Overseas,sold,250000,800000,USD,36000000,11250000,3.6,,,2-5 Crore,Y
+2008,Kolkata Knight Riders,BJ Hodge,Brad Hodge,5674,P,,Overseas,replacement,,700000,USD,31500000,,3.15,,Brendon McCullum,2-5 Crore,Y
+2008,Kolkata Knight Riders,DJ Hussey,David Hussey,5766,P,,Overseas,sold,100000,625000,USD,28125000,4500000,2.81,,,2-5 Crore,Y
+2008,Kolkata Knight Riders,Iqbal Abdulla,Iqbal Abdulla,277237,P,,India,supplementary,,30000,USD,1350000,,0.14,Capped,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,M Kartik,Murali Kartik,30049,P,,India,sold,200000,425000,USD,19125000,9000000,1.91,,,1-2 Crore,Y
+2008,Kolkata Knight Riders,S Kaul,Siddarth Kaul,326017,P,,India,supplementary,,50000,USD,2250000,,0.23,Capped,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,BB McCullum,Brendon McCullum,37737,WK,,Overseas,sold,175000,700000,USD,31500000,7875000,3.15,,,2-5 Crore,Y
+2008,Kolkata Knight Riders,BAW Mendis,Ajantha Mendis,268739,P,,Overseas,replacement,,800000,USD,36000000,,3.6,,Chris Gayle,2-5 Crore,Y
+2008,Kolkata Knight Riders,Mohammad Hafeez,Mohammad Hafeez,41434,P,,Overseas,sold,,100000,USD,4500000,,0.45,,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,RT Ponting,Ricky Ponting,7133,P,,Overseas,sold,335000,400000,USD,18000000,15075000,1.8,,,1-2 Crore,Y
+2008,Kolkata Knight Riders,WP Saha,Wriddhiman Saha,279810,WK,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,Salman Butt,Salman Butt,42683,P,,Overseas,sold,,100000,USD,4500000,,0.45,,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,I Sharma,Ishant Sharma,236779,P,,India,sold,150000,950000,USD,42750000,6750000,4.28,,,2-5 Crore,Y
+2008,Kolkata Knight Riders,Shoaib Akhtar,Shoaib Akhtar,42655,P,,Overseas,sold,250000,425000,USD,19125000,11250000,1.91,,,1-2 Crore,Y
+2008,Kolkata Knight Riders,LR Shukla,Laxmi Shukla,34019,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,T Taibu,Tatenda Taibu,55805,WK,,Overseas,sold,125000,125000,USD,5625000,5625000,0.56,,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,Umar Gul,Umar Gul,43524,P,,Overseas,sold,150000,150000,USD,6750000,6750000,0.68,,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,RB Banerjee,Rohan Banerjee,27014,P,Y,India,signed,,20000,USD,900000,,0.09,,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,RR Bose,Ranadeb Bose,27572,P,Y,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,SS Lahiri,Saurasish Lahiri,30740,P,Y,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,CA Pujara,Cheteshwar Pujara,32540,P,Y,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Kolkata Knight Riders,Yashpal Singh,Yashpal Singh,36130,P,Y,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Mumbai Indians,SR Tendulkar,Sachin Tendulkar,35320,C,,India,icon_player,,1121000,USD,50445000,,5.04,Capped,,5-10 Crore,Y
+2008,Mumbai Indians,LE Bosman,Loots Bosman,44098,P,,Overseas,sold,150000,175000,USD,7875000,6750000,0.79,,,Under 1 Crore,Y
+2008,Mumbai Indians,DJ Bravo,Dwayne Bravo,51439,P,,Overseas,replacement,,350000,USD,15750000,,1.58,,Lasith Malinga,1-2 Crore,Y
+2008,Mumbai Indians,AA Chavan,Ankeet Chavan,337913,P,,India,signed,,20000,USD,900000,,0.09,,,Under 1 Crore,Y
+2008,Mumbai Indians,SD Chitnis,Siddharth Chitnis,337916,P,,India,signed,,20000,USD,900000,,0.09,,,Under 1 Crore,Y
+2008,Mumbai Indians,G Dhiman,Gaurav Dhiman,28619,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Mumbai Indians,CRD Fernando,Dilhara Fernando,48835,P,,Overseas,sold,150000,150000,USD,6750000,6750000,0.68,,,Under 1 Crore,Y
+2008,Mumbai Indians,Harbhajan Singh,Harbhajan Singh,29264,P,,India,sold,250000,850000,USD,38250000,11250000,3.83,,,2-5 Crore,Y
+2008,Mumbai Indians,ST Jayasuriya,Sanath Jayasuriya,49209,P,,Overseas,sold,250000,975000,USD,43875000,11250000,4.39,,,2-5 Crore,Y
+2008,Mumbai Indians,MA Khote,Musavir Khote,30220,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Mumbai Indians,DS Kulkarni,Dhawal Kulkarni,277955,P,,India,signed,,20000,USD,900000,,0.09,,,Under 1 Crore,Y
+2008,Mumbai Indians,AM Nayar,Abhishek Nayar,32091,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Mumbai Indians,A Nehra,Ashish Nehra,31820,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Mumbai Indians,A Nel,Andre Nel,46569,P,,Overseas,replacement,,350000,USD,15750000,,1.58,,Lasith Malinga,1-2 Crore,Y
+2008,Mumbai Indians,MK Pandey,Manish Pandey,290630,P,,India,supplementary,,30000,USD,1350000,,0.14,Capped,,Under 1 Crore,Y
+2008,Mumbai Indians,RV Pawar,Rajesh Pawar,32305,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Mumbai Indians,SM Pollock,Shaun Pollock,46774,P,,Overseas,sold,200000,550000,USD,24750000,9000000,2.48,,,2-5 Crore,Y
+2008,Mumbai Indians,AG Prince,Ashwell Prince,46788,P,,Overseas,sold,,175000,USD,7875000,,0.79,,,Under 1 Crore,Y
+2008,Mumbai Indians,AM Rahane,Ajinkya Rahane,277916,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Mumbai Indians,RR Raje,Rohan Raje,290713,P,,India,signed,,20000,USD,900000,,0.09,,,Under 1 Crore,Y
+2008,Mumbai Indians,L Ronchi,Luke Ronchi,7502,P,,Overseas,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Mumbai Indians,PR Shah,Pinal Shah,34282,WK,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Mumbai Indians,DR Smith,Dwayne Smith,53118,P,,Overseas,replacement,,350000,USD,15750000,,1.58,,Lasith Malinga,1-2 Crore,Y
+2008,Mumbai Indians,Swapnil Singh,Swapnil Singh,232292,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Mumbai Indians,YV Takawale,Yogesh Takawale,35357,WK,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Mumbai Indians,DJ Thornely,Dominic Thornely,8002,P,,Overseas,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Mumbai Indians,SS Tiwary,Saurabh Tiwary,35390,P,,India,supplementary,,50000,USD,2250000,,0.23,Capped,,Under 1 Crore,Y
+2008,Mumbai Indians,RV Uthappa,Robin Uthappa,35582,P,,India,sold,200000,800000,USD,36000000,9000000,3.6,,,2-5 Crore,Y
+2008,Mumbai Indians,VS Yeligati,Vikrant Yeligati,307448,P,,India,signed,,20000,USD,900000,,0.09,,,Under 1 Crore,Y
+2008,Mumbai Indians,SL Malinga,Lasith Malinga,49758,P,Y,Overseas,sold,200000,350000,USD,15750000,9000000,1.58,,,1-2 Crore,Y
+2008,Rajasthan Royals,SK Warne,Shane Warne,8166,C,,Overseas,sold,450000,450000,USD,20250000,20250000,2.03,,,2-5 Crore,Y
+2008,Rajasthan Royals,A Angle,Aditya Angle,26388,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Rajasthan Royals,SA Asnodkar,Swapnil Asnodkar,26782,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Rajasthan Royals,RA Jadeja,Ravindra Jadeja,234675,P,,India,supplementary,,50000,USD,2250000,,0.23,Capped,,Under 1 Crore,Y
+2008,Rajasthan Royals,M Kaif,Mohammad Kaif,29990,P,,India,sold,125000,675000,USD,30375000,5625000,3.04,,,2-5 Crore,Y
+2008,Rajasthan Royals,Kamran Akmal,Kamran Akmal,41028,WK,,Overseas,sold,150000,150000,USD,6750000,6750000,0.68,,,Under 1 Crore,Y
+2008,Rajasthan Royals,S Khatri,Sumit Khatri,275731,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Rajasthan Royals,T Kohli,Taruwar Kohli,331855,P,,India,supplementary,,30000,USD,1350000,,0.14,Capped,,Under 1 Crore,Y
+2008,Rajasthan Royals,DS Lehmann,Darren Lehmann,6285,P,,Overseas,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Rajasthan Royals,PP More,Parag More,31219,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Rajasthan Royals,M Morkel,Morne Morkel,46538,P,,Overseas,sold,,60000,USD,2700000,,0.27,,,Under 1 Crore,Y
+2008,Rajasthan Royals,Pankaj Singh,Pankaj Singh,32973,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Rajasthan Royals,MM Patel,Munaf Patel,32965,P,,India,sold,100000,275000,USD,12375000,4500000,1.24,,,1-2 Crore,Y
+2008,Rajasthan Royals,NK Patel,Niraj Patel,32240,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Rajasthan Royals,YK Pathan,Yusuf Pathan,32498,P,,India,sold,100000,475000,USD,21375000,4500000,2.14,,,2-5 Crore,Y
+2008,Rajasthan Royals,M Rawat,Mahesh Rawat,33440,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Rajasthan Royals,AP Revandkar,Anup Revandkar,284355,P,,India,signed,,20000,USD,900000,,0.09,,,Under 1 Crore,Y
+2008,Rajasthan Royals,D Salunkhe,Dinesh Salunkhe,278482,P,,India,signed,,20000,USD,900000,,0.09,,,Under 1 Crore,Y
+2008,Rajasthan Royals,JN Shah,Jaydev Shah,34997,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Rajasthan Royals,GC Smith,Graeme Smith,47270,P,,Overseas,sold,250000,250000,USD,11250000,11250000,1.13,,,1-2 Crore,Y
+2008,Rajasthan Royals,Sohail Tanvir,Sohail Tanvir,43265,P,,Overseas,sold,,100000,USD,4500000,,0.45,,,Under 1 Crore,Y
+2008,Rajasthan Royals,SK Trivedi,Siddharth Trivedi,35353,P,,India,signed,,50000,USD,2250000,,0.23,,,Under 1 Crore,Y
+2008,Rajasthan Royals,SR Watson,Shane Watson,8180,P,,Overseas,sold,,125000,USD,5625000,,0.56,,,Under 1 Crore,Y
+2008,Rajasthan Royals,Younis Khan,Younis Khan,43652,P,,Overseas,sold,225000,225000,USD,10125000,10125000,1.01,,,1-2 Crore,Y
+2008,Rajasthan Royals,JL Langer,Justin Langer,6256,P,Y,Overseas,sold,200000,200000,USD,9000000,9000000,0.9,,,Under 1 Crore,Y
+2008,Rajasthan Royals,AD Mascarenhas,Dimitri Mascarenhas,16932,P,Y,Overseas,sold,,100000,USD,4500000,,0.45,,,Under 1 Crore,Y
