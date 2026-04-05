@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.database import close_conn, get_conn
 from src.api.routers import batting, bowling, matches, players, teams
@@ -20,9 +21,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Cricket Analytics API",
-    description="IPL cricket analytics powered by DuckDB. Query player stats, team records, match data, and more.",
+    description="Cricket analytics powered by DuckDB. Query player stats, team records, match data, and more.",
     version="0.1.0",
     lifespan=lifespan,
+)
+
+# CORS — allow the Next.js frontend (dev + production) to call the API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:3000",
+    allow_methods=["GET"],
+    allow_headers=["*"],
 )
 
 app.include_router(players.router)

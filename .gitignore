@@ -50,3 +50,8 @@ scripts/
 *.log
 .env
 cricsheet-website-data-format.txt
+
+# Next.js frontend
+apps/web/node_modules/
+apps/web/.next/
+apps/web/.env.local

@@ -1,4 +1,4 @@
-.PHONY: setup ingest transform test lint all api ui clean help dagster
+.PHONY: setup ingest transform test lint all api ui web web-build clean help dagster
 
 PYTHON := python3
 PIP := pip
@@ -56,8 +56,17 @@ dagster: ## Start Dagster webserver (orchestration UI)
 api: ## Start FastAPI server
 	uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload
 
-ui: ## Start Streamlit app
+ui: ## Start Streamlit app (legacy, internal use)
 	streamlit run src/ui/app.py --server.port 8501
+
+web: ## Start Next.js frontend dev server
+	cd apps/web && npm run dev
+
+web-build: ## Build Next.js frontend for production
+	cd apps/web && npm run build
+
+web-setup: ## Install Next.js frontend dependencies
+	cd apps/web && npm install
 
 clean: ## Remove generated data and build artifacts
 	rm -rf data/

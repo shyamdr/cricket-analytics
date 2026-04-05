@@ -29,8 +29,14 @@
 - fact_match_summary: 2,333 rows
 
 ## In Progress
+- [~] Phase 1: Next.js Frontend — public-facing website replacing Streamlit for end users
+  - [ ] Next.js project setup in `apps/web/` with Tailwind CSS
+  - [ ] Core pages: home, match detail, player profile, team page
+  - [ ] Wire to existing FastAPI API (may need new/adjusted endpoints)
+  - [ ] Deploy: Vercel (frontend) + Railway/Render (API with baked-in DuckDB)
+  - [ ] Goal: live URL on the internet
 - [~] Auction data pipeline — Wikipedia scraper built, bronze/silver/gold models working. See "Pending — Next Up" for details.
-- [ ] Streamlit UI improvements — functional but needs polish
+- [ ] Streamlit UI improvements — DEPRIORITIZED. Streamlit stays as internal data exploration tool. Next.js is the public-facing UI.
 
 ## Recently Completed
 - [x] Config-driven dataset management — created config/datasets.yml as single source of truth for all dataset and enrichment configuration. 21 Cricsheet datasets (IPL, T20I, BBL, PSL, CPL, SA20, LPL, ILT20, BPL, NPL, MLC, MSL, SSM, NTB, ODI, Test, T20I Women, ODI Women, Test Women, WBBL, WPL) with per-dataset enrichment toggles (espn_match, espn_ball, weather, geocoding). Named profiles (minimal, standard, t20_all, everything). CLI supports --profile, --enabled, --dataset, --list. All consumers (CLI, Makefile, Dagster, Docker) read from YAML. Added pyyaml to core dependencies. URLs verified via HTTP HEAD against cricsheet.org.
@@ -167,10 +173,73 @@ bronze_people ───→ stg_people ──→ dim_players
 - [ ] Data enrichment Phase 2: T20I ESPN enrichment (after series resolver fix) — ON HOLD
 - [ ] Data enrichment Phase 4: derived analytics (pitch profiles, advanced metrics)
 
-## Pending — Future
-- [ ] ML module (match outcome prediction, player performance forecasting)
-- [ ] Live data pipeline (CricAPI/Cricbuzz polling during matches)
+## Pending — SDE-2 Level Review Findings (Code Quality / Defensive Coding)
+Priority order. Quick wins that improve robustness.
+
+### P0 — Fix Now
+- [ ] Context manager for `get_write_conn()` — current pattern returns raw connection, callers must manually close. If exception between open and try/except, connection leaks. Make `get_write_conn()` usable as `with get_write_conn() as conn:`. DuckDB connections support `__enter__`/`__exit__`. 10-line change, eliminates entire class of bugs.
+- [ ] Anti-join pattern in `append_to_bronze()` — current `NOT IN (SELECT DISTINCT match_id ...)` is one of the worst-performing SQL patterns at scale. At 5M rows (everything profile), materializes entire subquery. Replace with `LEFT JOIN ... WHERE target.id IS NULL`. Comment says "anti-join" but implementation is `NOT IN`.
+- [ ] Fix innings dedup in enrichment bronze_loader — acknowledged-broken in comment: "accept that re-scraping a match appends duplicate innings." Fix: add composite `_innings_key` column (`espn_match_id || '_' || inning_number`) like `_player_match_key` pattern already used for players.
+
+### P1 — Quick Wins
+- [ ] Weather code CASE macro in dbt — exact same 30-line CASE statement duplicated in `fact_weather.sql` (hourly + daily). Extract to `macros/weather_description.sql`: `{% macro weather_description(column) %}`.
+- [ ] Remove dead `_get_already_fetched()` in weather_fetcher.py — defined but never called. `_get_pending_matches()` handles delta logic via LEFT JOIN.
+- [ ] Add `make check` target — single command: `lint + test -m unit + format check`. Developers should run same checks as CI before pushing.
+- [ ] Centralize table references — schema + table names scattered across 5 routers + UI pages as f-strings. Extract to a constants module or view layer so SQL injection surface is in one place.
+
+### P2 — API Hardening
+- [ ] API response models with `extra="allow"` — compromise between "no models" (current) and "strict models" (deferred). Define Pydantic models for guaranteed fields, allow extra fields to pass through. Gives useful OpenAPI docs without breaking on schema changes.
+- [ ] Consolidate 3 `query()` functions — `src.database.query` (opens/closes per call), `src.api.database.query` (singleton), `src.ui.data.query` (Streamlit cached). Same signature, different performance. Remove `src.database.query` or make it use a singleton. Having three is a maintenance trap.
+
+### P3 — Docker / DevOps
+- [ ] Docker compose doesn't pin image tag — `image: cricket-analytics:latest` is fragile. If `docker compose up api` runs without `pipeline`, gets stale `:latest`. Consider build hash or document dependency.
+
+## Pending — SDE-3 Level Review Findings (System Design / Abstraction / Team-Readiness)
+These are the gaps between "I built a thing that works" and "I built a thing a team can operate and evolve."
+
+### Abstraction & Boundaries
+- [ ] Repository/service layer (the biggest gap) — every consumer (API, UI, enrichment, tests) knows exact schema names, table names, column names, SQL dialect. Rename a column = grep 20+ files. Fix: `src/queries/` module with functions like `get_career_stats(player_name)`. API router calls it, Streamlit calls it, tests mock it. Nobody outside knows SQL. This is the Repository Pattern — minimum abstraction for evolvability.
+- [ ] Domain types — everything is `dict[str, Any]`. No function signature tells you what shape of data flows through. Fix: lightweight TypedDicts for core domain objects (`BattingInnings`, `MatchSummary`, etc.). Not Pydantic for everything — just enough that `list[BattingInnings]` communicates intent vs `list[dict[str, Any]]`.
+- [ ] Schema contract between ingestion and dbt — bronze DDL lives in Python (`_MATCHES_DDL`), dbt reads from `source('bronze', 'matches')`. No shared definition. Add column to Python DDL → dbt doesn't know. Remove one → dbt fails at runtime. Fix: shared schema definition (YAML/JSON) that both consume, or at minimum dbt source tests that validate expected columns exist.
+- [ ] Config separation — `config/datasets.yml` conflates reference data (URLs, metadata) with operational config (profiles, enrichment toggles). Registry changes when Cricsheet adds a league. Profiles change per environment. Fix: separate files or at least separate sections with env-var overrides for operational settings.
+
+### Failure Mode Thinking
+- [ ] Enrichment atomicity — if scraper crashes mid-batch after `on_batch` persists match records, next run skips those matches (in `espn_matches`) even if player/innings data was partial. Fix: write all four tables (matches, players, innings, balls) for a single match inside one transaction. Use `cricsheet_match_id` as dedup key for all.
+- [ ] Circuit breaker on external APIs — retry with backoff exists, but no circuit breaker. ESPN returning 429s/503s = 3 retries × 1169 matches = 3507 wasted requests over hours. Fix: after N consecutive failures (e.g., 5), promote to `NoRetryError` and stop the batch. Counter-based circuit breaker.
+- [ ] `run_async()` thread safety — ThreadPoolExecutor fallback spawns threads for async code in Dagster. If two assets run enrichment concurrently, concurrent DuckDB writes from different threads. DuckDB is single-writer. Latent bug — hasn't hit yet because Dagster runs sequentially by default.
+
+### Testing Gaps
+- [ ] End-to-end transformation test (golden file) — no test loads known fixture into bronze, runs dbt, asserts specific gold values. If `stg_deliveries.sql` introduces bug in `is_legal_delivery`, unit tests pass (no dbt), integration tests pass (check ranges not values). Fix: load `SAMPLE_MATCH_JSON` into bronze, run dbt, assert exact gold output.
+- [ ] Data quality metrics as first-class output — `_is_valid_extras` and `_is_valid_total` are passive columns. No way to answer "how many invalid deliveries last Tuesday?" Fix: `_data_quality` table in DuckDB, dbt models append row per run with invalid counts, null rates, row count deltas.
+
+### Team-Readiness / Documentation
+- [ ] No CONTRIBUTING.md — how does another engineer set up, run tests, add a feature?
+- [ ] No architecture diagram — README has text flow but no visual. Generate from dbt lineage graph.
+- [ ] No runbook — "how do I add a new league?" "how do I backfill enrichment for season X?" "what do I do when ESPN scraping breaks?" 5-6 common workflows documented.
+- [ ] Naming inconsistencies across source systems — `over_num`/`ball_num` (Cricsheet) vs `over_number`/`ball_number` (ESPN), `match_date` (gold) vs `date` (bronze), `innings` vs `inning_number`. Silver layer should normalize ESPN names to match Cricsheet convention.
+
+## Pending — Future (Phased Roadmap)
+
+### Phase 2: Live Match Data
+- [ ] ESPN Playwright live poller — intercept hs-consumer-api commentary during live matches
+- [ ] SSE endpoint on FastAPI for real-time push to frontend
+- [ ] Live scorecard page in Next.js (updates without refresh)
+- [ ] Deploy poller on laptop during matches, VPS later
+
+### Phase 3: ML Models + Advanced Analytics
+- [ ] Win probability model (XGBoost on historical features)
+- [ ] Batting quality index (shot_control rolling window)
+- [ ] Bowling heat maps, wagon wheels from ESPN spatial data
+- [ ] Elo rating system (team + player)
+
+### Phase 4: Polish + Growth
+- [ ] More leagues (BBL, PSL, T20 World Cup)
+- [ ] Mobile-responsive polish
+- [ ] Ads / monetization (much later, not a priority)
+
+### Parked
 - [ ] Delete old data/ folder from parent Projects directory .git issue
+- [ ] NL query interface
 
 ## Technical Notes
 - Python 3.13.2 on macOS (company laptop, Homebrew Python)
