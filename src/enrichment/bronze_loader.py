@@ -191,6 +191,7 @@ def _ensure_espn_tables(conn: duckdb.DuckDBPyConnection) -> None:
 
     # Image enrichment table (standalone scraper)
     from src.enrichment.image_scraper import _ensure_images_table
+
     _ensure_images_table(conn)
 
     # Migrate existing tables: add new image columns if they don't exist yet.
@@ -200,6 +201,8 @@ def _ensure_espn_tables(conn: duckdb.DuckDBPyConnection) -> None:
 
 def _migrate_image_columns(conn: duckdb.DuckDBPyConnection, schema: str) -> None:
     """Add image URL columns to existing ESPN tables (backward-compatible migration)."""
+    import contextlib
+
     migrations = [
         (f"{schema}.espn_players", "image_url", "VARCHAR"),
         (f"{schema}.espn_players", "headshot_image_url", "VARCHAR"),
@@ -210,14 +213,12 @@ def _migrate_image_columns(conn: duckdb.DuckDBPyConnection, schema: str) -> None
         (f"{schema}.espn_matches", "team2_long_name", "VARCHAR"),
     ]
     for table, column, dtype in migrations:
-        try:
+        with contextlib.suppress(Exception):
             conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {dtype}")
-        except Exception:
-            pass  # Table might not exist yet — CREATE TABLE IF NOT EXISTS handles it
 
     # Backfill team long names from teams_enrichment_json for existing rows
     # that were scraped before the long_name columns were added.
-    try:
+    with contextlib.suppress(Exception):
         conn.execute(f"""
             UPDATE {schema}.espn_matches
             SET team1_long_name = json_extract_string(teams_enrichment_json::json, '$[0].team_long_name'),
@@ -225,8 +226,6 @@ def _migrate_image_columns(conn: duckdb.DuckDBPyConnection, schema: str) -> None
             WHERE team1_long_name IS NULL
               AND teams_enrichment_json IS NOT NULL
         """)
-    except Exception:
-        pass
 
 
 def load_espn_to_bronze(records: list[dict[str, Any]]) -> dict[str, int]:

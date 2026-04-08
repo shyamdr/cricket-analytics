@@ -59,6 +59,7 @@ def _ensure_images_table(conn: Any) -> None:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 async def _fetch_next_data(url: str, browser: Any) -> dict[str, Any] | None:
     """Fetch a page and extract __NEXT_DATA__ JSON."""
     context = await browser.new_context(
@@ -107,6 +108,7 @@ def _get_already_scraped(entity_type: str) -> set[str]:
 # Player image scraping
 # ---------------------------------------------------------------------------
 
+
 def _get_players_to_scrape() -> list[dict[str, str]]:
     """Get players needing image scraping — all from people.csv with key_cricinfo."""
     already = _get_already_scraped("player")
@@ -122,11 +124,13 @@ def _get_players_to_scrape() -> list[dict[str, str]]:
     pending = []
     for identifier, name, key_cricinfo in rows:
         if str(key_cricinfo) not in already:
-            pending.append({
-                "player_id": identifier,
-                "player_name": name,
-                "key_cricinfo": str(key_cricinfo),
-            })
+            pending.append(
+                {
+                    "player_id": identifier,
+                    "player_name": name,
+                    "key_cricinfo": str(key_cricinfo),
+                }
+            )
     return pending
 
 
@@ -155,10 +159,7 @@ async def _scrape_player_images(
                     continue
 
                 player_data = (
-                    nd.get("props", {})
-                    .get("appPageProps", {})
-                    .get("data", {})
-                    .get("player", {})
+                    nd.get("props", {}).get("appPageProps", {}).get("data", {}).get("player", {})
                 )
 
                 image_url = player_data.get("imageUrl")
@@ -208,6 +209,7 @@ async def _scrape_player_images(
 # Team + venue image scraping (from a single series page)
 # ---------------------------------------------------------------------------
 
+
 async def _scrape_team_and_venue_images(browser: Any) -> list[dict[str, str]]:
     """Extract team logos and venue images from an IPL series page.
 
@@ -244,13 +246,15 @@ async def _scrape_team_and_venue_images(browser: Any) -> list[dict[str, str]]:
                         # Determine entity type from context
                         is_venue = obj.get("capacity") is not None or obj.get("town") is not None
                         entity_type = "venue" if is_venue else "team"
-                        results.append({
-                            "entity_type": entity_type,
-                            "entity_id": oid,
-                            "entity_name": name,
-                            "image_url": img_url,
-                            "headshot_url": None,
-                        })
+                        results.append(
+                            {
+                                "entity_type": entity_type,
+                                "entity_id": oid,
+                                "entity_name": name,
+                                "image_url": img_url,
+                                "headshot_url": None,
+                            }
+                        )
                     return
 
                 for v in obj.values():
@@ -271,13 +275,15 @@ async def _scrape_team_and_venue_images(browser: Any) -> list[dict[str, str]]:
                     key = f"{oid}|{img['url']}"
                     if key not in seen:
                         seen.add(key)
-                        results.append({
-                            "entity_type": "team",
-                            "entity_id": oid,
-                            "entity_name": team.get("longName") or team.get("name"),
-                            "image_url": img["url"],
-                            "headshot_url": None,
-                        })
+                        results.append(
+                            {
+                                "entity_type": "team",
+                                "entity_id": oid,
+                                "entity_name": team.get("longName") or team.get("name"),
+                                "image_url": img["url"],
+                                "headshot_url": None,
+                            }
+                        )
 
     logger.info(
         "team_venue_images_extracted",
@@ -291,6 +297,7 @@ async def _scrape_team_and_venue_images(browser: Any) -> list[dict[str, str]]:
 # Bronze persistence
 # ---------------------------------------------------------------------------
 
+
 def _persist_to_bronze(records: list[dict[str, str]]) -> int:
     """Write image records to bronze.espn_images with dedup."""
     if not records:
@@ -303,16 +310,14 @@ def _persist_to_bronze(records: list[dict[str, str]]) -> int:
         for rec in records:
             rec["_dedup_key"] = f"{rec['entity_type']}_{rec['entity_id']}"
         table = pa.Table.from_pylist(records)
-        count = append_to_bronze(
-            conn, f"{settings.bronze_schema}.espn_images", table, "_dedup_key"
-        )
+        count = append_to_bronze(conn, f"{settings.bronze_schema}.espn_images", table, "_dedup_key")
         # Drop the helper column
-        try:
+        import contextlib
+
+        with contextlib.suppress(Exception):
             conn.execute(
                 f"ALTER TABLE {settings.bronze_schema}.espn_images DROP COLUMN IF EXISTS _dedup_key"
             )
-        except Exception:
-            pass
         return count
     finally:
         conn.close()
@@ -321,6 +326,7 @@ def _persist_to_bronze(records: list[dict[str, str]]) -> int:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def scrape_images(
     players: bool = True,
@@ -353,7 +359,8 @@ def scrape_images(
             already_teams = _get_already_scraped("team")
             already_venues = _get_already_scraped("venue")
             new_records = [
-                r for r in tv_records
+                r
+                for r in tv_records
                 if (r["entity_type"] == "team" and r["entity_id"] not in already_teams)
                 or (r["entity_type"] == "venue" and r["entity_id"] not in already_venues)
             ]
@@ -386,6 +393,7 @@ def scrape_images(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="ESPN image enrichment scraper")

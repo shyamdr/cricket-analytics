@@ -5,15 +5,14 @@ Provides read-only and read-write connections with consistent
 configuration, schema bootstrapping, and lifecycle management.
 
 Usage:
-    from src.database import get_read_conn, get_write_conn, query
+    from src.database import get_read_conn, write_conn, query
 
     # Quick read query
-    rows = query("SELECT * FROM main_gold.dim_matches LIMIT 10")  # schema from settings
+    rows = query("SELECT * FROM main_gold.dim_matches LIMIT 10")
 
-    # Write connection (creates schemas, ensures data dir)
-    conn = get_write_conn()
-    conn.execute("INSERT INTO ...")
-    conn.close()
+    # Write connection — context manager guarantees cleanup
+    with write_conn() as conn:
+        conn.execute("INSERT INTO ...")
 
     # Read-only connection
     conn = get_read_conn()
@@ -23,12 +22,15 @@ Usage:
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 import duckdb
 import structlog
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     import pyarrow as pa
 
 from src.config import settings
@@ -51,12 +53,35 @@ def get_write_conn() -> duckdb.DuckDBPyConnection:
     Creates the data directory, bronze schema, and all bronze tables
     (Cricsheet + ESPN) if they don't exist. Safe to call repeatedly.
     Use for ingestion, enrichment writes, and any DDL operations.
+
+    PREFER ``write_conn()`` context manager over this function —
+    it guarantees the connection is closed even on exceptions.
     """
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     conn = duckdb.connect(str(settings.duckdb_path))
     conn.execute(f"CREATE SCHEMA IF NOT EXISTS {settings.bronze_schema}")
     _bootstrap_bronze_tables(conn)
     return conn
+
+
+@contextmanager
+def write_conn() -> Generator[duckdb.DuckDBPyConnection]:
+    """Context manager for a read-write DuckDB connection.
+
+    Guarantees the connection is closed when the block exits,
+    even if an exception is raised. Use this instead of
+    ``get_write_conn()`` to prevent connection leaks.
+
+    Usage::
+
+        with write_conn() as conn:
+            conn.execute("INSERT INTO ...")
+    """
+    conn = get_write_conn()
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 def _bootstrap_bronze_tables(conn: duckdb.DuckDBPyConnection) -> None:

@@ -492,7 +492,11 @@ def espn_image_enrichment(
 @asset(
     group_name="enrichment",
     compute_kind="python",
-    deps=[AssetKey(["geocode_venue_coordinates"]), AssetKey(["bronze_matches"]), AssetKey("espn_match_enrichment")],
+    deps=[
+        AssetKey(["geocode_venue_coordinates"]),
+        AssetKey(["bronze_matches"]),
+        AssetKey("espn_match_enrichment"),
+    ],
     description=(
         "Fetch historical weather from Open-Meteo API for each match. "
         "Uses venue coordinates (lat/lng) + match date. Free API, no key required. "

@@ -8,6 +8,6 @@ __all__ = [
     "bronze_matches",
     "bronze_people",
     "dbt_analytics_assets",
-    "espn_match_enrichment",
     "espn_image_enrichment",
+    "espn_match_enrichment",
 ]
