@@ -157,6 +157,8 @@ def append_to_bronze(
 
             # Use explicit column list so order doesn't matter
             col_list = ", ".join(incoming_cols)
+            # Prefixed column list for SELECT from the tmp table (avoids ambiguity in JOIN)
+            t_col_list = ", ".join(f"t.{c}" for c in incoming_cols)
 
             # Count before insert
             (count_before,) = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
@@ -165,7 +167,7 @@ def append_to_bronze(
             # Uses LEFT JOIN (NULL-safe) instead of NOT IN (breaks if any ID is NULL).
             conn.execute(
                 f"""INSERT INTO {table_name} ({col_list})
-                    SELECT {col_list} FROM {tmp_name} t
+                    SELECT {t_col_list} FROM {tmp_name} t
                     LEFT JOIN {table_name} existing ON t.{id_column} = existing.{id_column}
                     WHERE existing.{id_column} IS NULL"""
             )

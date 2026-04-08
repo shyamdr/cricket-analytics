@@ -59,10 +59,12 @@ def _get_matches_for_season(
     if conn is None:
         conn = get_read_conn()
     rows = conn.execute(
-        f"""SELECT match_id, match_date, season
-           FROM {settings.gold_schema}.dim_matches
-           WHERE season = ?
-           ORDER BY match_date""",
+        f"""SELECT match_id,
+                   CAST(date AS DATE) as match_date,
+                   CAST(EXTRACT(YEAR FROM CAST(date AS DATE)) AS VARCHAR) as season
+           FROM {settings.bronze_schema}.matches
+           WHERE CAST(EXTRACT(YEAR FROM CAST(date AS DATE)) AS VARCHAR) = ?
+           ORDER BY date""",
         [season],
     ).fetchall()
     if close_after:
@@ -78,9 +80,11 @@ def _get_all_matches(
     if conn is None:
         conn = get_read_conn()
     rows = conn.execute(
-        f"""SELECT match_id, match_date, season
-           FROM {settings.gold_schema}.dim_matches
-           ORDER BY match_date""",
+        f"""SELECT match_id,
+                   CAST(date AS DATE) as match_date,
+                   CAST(EXTRACT(YEAR FROM CAST(date AS DATE)) AS VARCHAR) as season
+           FROM {settings.bronze_schema}.matches
+           ORDER BY date""",
     ).fetchall()
     if close_after:
         conn.close()
@@ -96,10 +100,12 @@ def _get_matches_by_ids(
         conn = get_read_conn()
     placeholders = ",".join(["?"] * len(match_ids))
     rows = conn.execute(
-        f"""SELECT match_id, match_date, season
-           FROM {settings.gold_schema}.dim_matches
+        f"""SELECT match_id,
+                   CAST(date AS DATE) as match_date,
+                   CAST(EXTRACT(YEAR FROM CAST(date AS DATE)) AS VARCHAR) as season
+           FROM {settings.bronze_schema}.matches
            WHERE match_id IN ({placeholders})
-           ORDER BY match_date""",
+           ORDER BY date""",
         match_ids,
     ).fetchall()
     if close_after:

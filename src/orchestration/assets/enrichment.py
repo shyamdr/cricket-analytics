@@ -5,9 +5,9 @@ Assets:
 2. espn_ball_enrichment — ball-by-ball spatial scraper (wagon wheel, pitch map, shot type, win prob)
 3. venue_coordinates — Google Maps geocoding for venue lat/lng
 
-ESPN assets run after bronze ingestion + dbt transformation (need dim_matches).
+ESPN assets run after bronze ingestion (need match list from bronze.matches).
 Ball data runs after match enrichment (needs series IDs in bronze.espn_series).
-Venue coordinates run after dbt (need dim_venues), independent of ESPN.
+Venue coordinates run after bronze ingestion (need venue list from bronze.matches).
 """
 
 from dagster import AssetExecutionContext, AssetKey, Config, MaterializeResult, MetadataValue, asset
@@ -34,7 +34,7 @@ class MatchEnrichmentConfig(Config):
 @asset(
     group_name="enrichment",
     compute_kind="python",
-    deps=[AssetKey(["gold", "dim_matches"])],
+    deps=[AssetKey(["bronze_matches"])],
     description=(
         "Scrape ESPN match data (captain, keeper, player roles, floodlit, "
         "start time, venue details, player bios, per-ball spatial data) "
@@ -129,7 +129,7 @@ class BallEnrichmentConfig(Config):
 @asset(
     group_name="enrichment",
     compute_kind="python",
-    deps=[AssetKey("espn_match_enrichment"), AssetKey(["gold", "dim_matches"])],
+    deps=[AssetKey("espn_match_enrichment"), AssetKey(["bronze_matches"])],
     description=(
         "Scrape ESPN ball-by-ball spatial data (wagon wheel, pitch map, shot type, "
         "shot control, win probability) from commentary pages. Delta-aware — "

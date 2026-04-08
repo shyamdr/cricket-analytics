@@ -199,8 +199,8 @@ bronze.matches ──→ dbt silver ──→ dbt gold (joins silver + enrichmen
 ```
 
 Changes needed:
-- [ ] `espn_match_enrichment` — change dep from `AssetKey(["gold", "dim_matches"])` to `AssetKey("bronze_matches")`. Update `run_match_scraper.py` to query `bronze.matches` (match_id, date, season) instead of `main_gold.dim_matches`.
-- [ ] `espn_ball_enrichment` — change dep from `AssetKey(["gold", "dim_matches"])` to `AssetKey("bronze_matches")` + `AssetKey("espn_match_enrichment")`.
+- [x] `espn_match_enrichment` — changed dep from `AssetKey(["gold", "dim_matches"])` to `AssetKey("bronze_matches")`. Updated `run_match_scraper.py` to query `bronze.matches` (match_id, date, season) instead of `main_gold.dim_matches`.
+- [x] `espn_ball_enrichment` — changed dep from `AssetKey(["gold", "dim_matches"])` to `AssetKey("bronze_matches")` + `AssetKey("espn_match_enrichment")`.
 - [ ] `weather_enrichment` — remove ESPN timezone lookup from the query. Let gold handle that join. Already correctly depends on bronze.
 - [ ] `geocode_venue_coordinates` — already correct (depends on bronze_matches).
 - [ ] Gold models — already correct (LEFT JOIN silver + bronze enrichment). No changes needed.
@@ -225,8 +225,8 @@ Changes needed:
 ### API Fixes
 - [x] Fix `by-tournament` endpoint SQL INTERVAL parameter — `INTERVAL '$1 days'` doesn't work with DuckDB parameterized queries. Compute date in Python and pass as date parameter.
 
-## Pending — SDE-2 Level Review Findings (Code Quality / Defensive Coding)
-Priority order. Quick wins that improve robustness.
+## Pending — Code Quality Fixes (Defensive Coding / Robustness)
+Quick wins that improve robustness.
 
 ### P0 — Fix Now
 - [x] Context manager for `get_write_conn()` — added `write_conn()` context manager to `src/database.py`. Migrated all enrichment callers (series_resolver, run_ball_scraper, weather_fetcher, image_scraper, bronze_loader) from manual try/finally to `with write_conn() as conn:`. Eliminates connection leak risk.
@@ -246,8 +246,8 @@ Priority order. Quick wins that improve robustness.
 ### P3 — Docker / DevOps
 - [ ] Docker compose doesn't pin image tag — `image: cricket-analytics:latest` is fragile. If `docker compose up api` runs without `pipeline`, gets stale `:latest`. Consider build hash or document dependency.
 
-## Pending — SDE-3 Level Review Findings (System Design / Abstraction / Team-Readiness)
-These are the gaps between "I built a thing that works" and "I built a thing a team can operate and evolve."
+## Pending — System Design Improvements (Abstraction / Architecture / Team-Readiness)
+Gaps between "it works" and "a team can operate and evolve it."
 
 ### Abstraction & Boundaries
 - [ ] Repository/service layer (the biggest gap) — every consumer (API, UI, enrichment, tests) knows exact schema names, table names, column names, SQL dialect. Rename a column = grep 20+ files. Fix: `src/queries/` module with functions like `get_career_stats(player_name)`. API router calls it, Streamlit calls it, tests mock it. Nobody outside knows SQL. This is the Repository Pattern — minimum abstraction for evolvability.
