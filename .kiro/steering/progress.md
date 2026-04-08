@@ -178,6 +178,53 @@ bronze_people ───→ stg_people ──→ dim_players
 - [ ] Data enrichment Phase 2: T20I ESPN enrichment (after series resolver fix) — ON HOLD
 - [ ] Data enrichment Phase 4: derived analytics (pitch profiles, advanced metrics)
 
+## Pending — Pipeline Deep Review (April 2026)
+Thorough review of dbt models, Dagster assets, medallion architecture, and enrichment flows.
+
+### DAG Restructuring — Eliminate Circular Dependencies (HIGH PRIORITY)
+Current problem: enrichment reads from gold (dim_matches) to know what to enrich, then writes to bronze, which flows back up to gold. This is a circular dependency that Dagster masks but is architecturally wrong.
+
+Target state: enrichment reads from bronze (not gold), runs in parallel with dbt silver, and gold is the single join point.
+
+Current (messy):
+```
+bronze → silver → gold → enrichment → bronze → silver → gold (circular)
+```
+
+Target (clean):
+```
+bronze.matches ──→ dbt silver ──→ dbt gold (joins silver + enrichment bronze)
+       │                              ↑
+       └──→ enrichment ──→ bronze.espn_* / bronze.weather ──┘
+```
+
+Changes needed:
+- [ ] `espn_match_enrichment` — change dep from `AssetKey(["gold", "dim_matches"])` to `AssetKey("bronze_matches")`. Update `run_match_scraper.py` to query `bronze.matches` (match_id, date, season) instead of `main_gold.dim_matches`.
+- [ ] `espn_ball_enrichment` — change dep from `AssetKey(["gold", "dim_matches"])` to `AssetKey("bronze_matches")` + `AssetKey("espn_match_enrichment")`.
+- [ ] `weather_enrichment` — remove ESPN timezone lookup from the query. Let gold handle that join. Already correctly depends on bronze.
+- [ ] `geocode_venue_coordinates` — already correct (depends on bronze_matches).
+- [ ] Gold models — already correct (LEFT JOIN silver + bronze enrichment). No changes needed.
+- [ ] Verify the full Dagster DAG has no cycles after restructuring.
+
+### dbt Model Fixes
+- [x] Remove `batter` from `fact_deliveries` unique_key — grain is (match_id, innings, over_num, ball_num), not batter. Including batter means Cricsheet name corrections create duplicates instead of updates.
+- [x] Remove `extras_penalty` from bowling `runs_conceded` in `fact_bowling_innings` — penalty runs are NOT charged to the bowler (ball tampering, slow over rate). Current formula inflates economy rates.
+- [x] Fix `stg_weather_hourly` cross join — generates 24 NULL rows for matches with empty/malformed weather JSON. Add WHERE clause to filter out all-NULL rows.
+- [x] Add dbt referential integrity test: `stg_espn_matches.match_id → stg_matches.match_id` — catch silent enrichment drops from ID mismatches.
+- [ ] Fix venue coordinate join order in `dim_venues` — geocoded coordinates stored under original venue name, but canonical name mapping happens in the same query. Join should happen before or independently of the canonical mapping.
+- [ ] Consider extracting ESPN silver `WHERE false` fallback blocks into a shared macro — 6 models each have ~30 lines of typed NULL columns that must stay in sync with the real query.
+
+### Dagster Asset Fixes
+- [x] Remove `bronze_people` dependency on `bronze_matches` — people.csv is independent of match data. Current dep prevents refreshing people registry without re-ingesting matches.
+- [x] Add `espn_match_enrichment` as dependency for `weather_enrichment` — weather query uses `bronze.espn_matches` for venue timezone. Without this dep, timezone defaults to Asia/Kolkata for all non-Indian venues.
+- [ ] Consider splitting `dbt build` into `dbt run` for daily_refresh_job and `dbt build` (with tests) for full_pipeline_job — daily refresh doesn't need to run all 49 tests every time.
+
+### Ingestion Fixes
+- [ ] Fix `full_refresh` flag — currently only applies to first dataset when multiple are specified. `datasets=["ipl", "t20i"]` with `full_refresh=True` drops IPL tables but delta-appends T20I. Should drop all tables once at the start.
+
+### API Fixes
+- [x] Fix `by-tournament` endpoint SQL INTERVAL parameter — `INTERVAL '$1 days'` doesn't work with DuckDB parameterized queries. Compute date in Python and pass as date parameter.
+
 ## Pending — SDE-2 Level Review Findings (Code Quality / Defensive Coding)
 Priority order. Quick wins that improve robustness.
 

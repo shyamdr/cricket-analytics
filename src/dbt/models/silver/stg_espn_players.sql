@@ -1,3 +1,4 @@
+
 -- Staged ESPN player biographical data.
 -- One row per player per match appearance (captures role changes across matches).
 -- Returns empty result set if bronze.espn_players doesn't exist yet.

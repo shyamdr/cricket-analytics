@@ -9,12 +9,19 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 export async function fetchAPI<T>(path: string): Promise<T> {
   const url = `${API_BASE}/api/v1${path}`;
-  const res = await fetch(url, {
-    next: { revalidate: 300 }, // cache 5 minutes
-    signal: AbortSignal.timeout(30000), // 30s timeout for Render cold starts
-  });
-  if (!res.ok) {
-    throw new Error(`API error: ${res.status} ${res.statusText} for ${url}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`API error: ${res.status} ${res.statusText}`);
+    }
+    return res.json() as Promise<T>;
+  } finally {
+    clearTimeout(timeout);
   }
-  return res.json() as Promise<T>;
 }

@@ -1,5 +1,7 @@
+
 -- Player dimension: one row per player who appeared in match data.
 -- Enriched with ESPN biographical data (DOB, batting/bowling styles, playing roles).
+-- Image URLs from standalone espn_images enrichment.
 -- Deduplicates by player_id — some players appear with multiple name
 -- spellings in the registry. Prefers the people.csv canonical name.
 with registry_entries as (
@@ -44,6 +46,13 @@ espn_latest as (
             order by ep.espn_match_id desc
         ) as rn
     from {{ ref('stg_espn_players') }} ep
+),
+
+-- Player images from standalone image enrichment
+player_images as (
+    select entity_id, image_url, headshot_url
+    from {{ ref('stg_espn_images') }}
+    where entity_type = 'player'
 )
 
 select
@@ -62,10 +71,16 @@ select
     el.long_bowling_styles,
     el.playing_roles,
     el.country_team_id,
-    el.is_overseas
+    el.is_overseas,
+    -- Image URLs (CMS paths — prepend https://img1.hscicdn.com/image/upload/f_auto at display time)
+    pi.image_url,
+    pi.headshot_url as headshot_image_url
 from deduped d
 left join people p on d.player_id = p.player_id
 left join espn_latest el
     on p.key_cricinfo is not null
     and el.espn_player_id = try_cast(p.key_cricinfo as bigint)
     and el.rn = 1
+left join player_images pi
+    on p.key_cricinfo is not null
+    and pi.entity_id = p.key_cricinfo

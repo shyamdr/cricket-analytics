@@ -1,164 +1,150 @@
-import { fetchAPI } from "@/lib/api";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft, TrendingUp, Target } from "lucide-react";
+import { Spinner } from "@/components/loading";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 
-export const dynamic = "force-dynamic";
+interface PlayerProfile { player_name: string; unique_name: string | null; }
+interface CareerBatting { innings: number; total_runs: number; highest_score: number; avg_strike_rate: number; total_fours: number; total_sixes: number; fifties: number; centuries: number; }
+interface CareerBowling { innings: number; total_wickets: number; avg_economy: number; best_wickets: number; }
+interface SeasonBatting { season: string; innings: number; total_runs: number; highest_score: number; avg_strike_rate: number; fours: number; sixes: number; }
 
-interface PlayerProfile {
-  player_id: string;
-  player_name: string;
-  unique_name: string | null;
-  playing_roles: string | null;
-  batting_styles: string | null;
-  bowling_styles: string | null;
-}
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 
-interface CareerBatting {
-  batter: string;
-  innings: number;
-  total_runs: number;
-  highest_score: number;
-  avg_runs: number;
-  avg_strike_rate: number;
-  total_fours: number;
-  total_sixes: number;
-  fifties: number;
-  centuries: number;
-}
+export default function PlayerDetailPage() {
+  const params = useParams();
+  const name = decodeURIComponent(params.playerName as string);
 
-interface CareerBowling {
-  bowler: string;
-  innings: number;
-  total_wickets: number;
-  avg_economy: number;
-  bowling_avg: number | null;
-  best_wickets: number;
-}
+  const [profile, setProfile] = useState<PlayerProfile | null>(null);
+  const [batting, setBatting] = useState<CareerBatting | null>(null);
+  const [bowling, setBowling] = useState<CareerBowling | null>(null);
+  const [seasonBatting, setSeasonBatting] = useState<SeasonBatting[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-interface SeasonBatting {
-  season: string;
-  innings: number;
-  total_runs: number;
-  highest_score: number;
-  avg_strike_rate: number;
-  fours: number;
-  sixes: number;
-}
+  useEffect(() => {
+    const encoded = encodeURIComponent(name);
+    Promise.all([
+      fetch(`${API}/api/v1/players/${encoded}`).then((r) => r.ok ? r.json() : null),
+      fetch(`${API}/api/v1/batting/stats/${encoded}`).then((r) => r.json()),
+      fetch(`${API}/api/v1/bowling/stats/${encoded}`).then((r) => r.json()),
+      fetch(`${API}/api/v1/batting/season-breakdown/${encoded}`).then((r) => r.json()),
+    ]).then(([p, bat, bowl, seasons]) => {
+      setProfile(p); setBatting(bat?.[0] || null); setBowling(bowl?.[0] || null);
+      setSeasonBatting(seasons || []); setLoading(false);
+    }).catch(() => { setError(true); setLoading(false); });
+  }, [name]);
 
-export default async function PlayerDetailPage({
-  params,
-}: {
-  params: Promise<{ playerName: string }>;
-}) {
-  const { playerName } = await params;
-  const name = decodeURIComponent(playerName);
-
-  let profile: PlayerProfile | null = null;
-  let batting: CareerBatting[] = [];
-  let bowling: CareerBowling[] = [];
-  let seasonBatting: SeasonBatting[] = [];
-
-  try {
-    [profile, batting, bowling, seasonBatting] = await Promise.all([
-      fetchAPI<PlayerProfile>(`/players/${encodeURIComponent(name)}`),
-      fetchAPI<CareerBatting[]>(`/batting/stats/${encodeURIComponent(name)}`),
-      fetchAPI<CareerBowling[]>(`/bowling/stats/${encodeURIComponent(name)}`),
-      fetchAPI<SeasonBatting[]>(`/batting/season-breakdown/${encodeURIComponent(name)}`),
-    ]);
-  } catch {
+  if (loading) return <Spinner className="py-16" />;
+  if (error || !profile) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-16 text-center">
-        <p className="text-muted">Player &quot;{name}&quot; not found.</p>
-        <Link href="/players" className="text-accent hover:underline text-sm mt-2 inline-block">
-          ← Back to players
-        </Link>
+      <div className="w-full px-6 lg:px-10 py-16 text-center">
+        <p className="text-muted-foreground">Player &quot;{name}&quot; not found.</p>
+        <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/players" />} className="mt-2">
+          <ArrowLeft className="h-4 w-4 mr-1" />Back to players
+        </Button>
       </div>
     );
   }
 
-  const bat = batting[0];
-  const bowl = bowling[0];
-
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <Link href="/players" className="text-sm text-muted hover:text-accent mb-2 inline-block">
-        ← Back to players
-      </Link>
+    <div className="w-full px-6 lg:px-10 py-8 space-y-8">
+      <div>
+        <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/players" />} className="-ml-2 mb-2">
+          <ArrowLeft className="h-4 w-4 mr-1" />Back to players
+        </Button>
+        <h1 className="text-3xl font-semibold text-foreground">{profile.player_name}</h1>
+        {profile.unique_name && profile.unique_name !== profile.player_name && (
+          <p className="text-muted-foreground mt-0.5">{profile.unique_name}</p>
+        )}
+      </div>
 
-      <h1 className="text-3xl font-bold mb-1">{profile?.player_name}</h1>
-      {profile?.unique_name && profile.unique_name !== profile.player_name && (
-        <p className="text-muted mb-4">{profile.unique_name}</p>
-      )}
-
-      {/* Career batting */}
-      {bat && bat.innings > 0 && (
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-3">Batting Career</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <StatBox label="Innings" value={bat.innings.toString()} />
-            <StatBox label="Runs" value={bat.total_runs.toLocaleString()} />
-            <StatBox label="Highest" value={bat.highest_score.toString()} />
-            <StatBox label="Strike Rate" value={bat.avg_strike_rate.toString()} />
-            <StatBox label="50s / 100s" value={`${bat.fifties} / ${bat.centuries}`} />
-          </div>
-        </div>
-      )}
-
-      {/* Career bowling */}
-      {bowl && bowl.innings > 0 && (
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-3">Bowling Career</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatBox label="Innings" value={bowl.innings.toString()} />
-            <StatBox label="Wickets" value={bowl.total_wickets.toString()} />
-            <StatBox label="Economy" value={bowl.avg_economy.toString()} />
-            <StatBox label="Best" value={`${bowl.best_wickets}w`} />
-          </div>
-        </div>
-      )}
-
-      {/* Season breakdown */}
-      {seasonBatting.length > 0 && (
+      {batting && batting.innings > 0 && (
         <div>
-          <h2 className="text-xl font-semibold mb-3">Season by Season</h2>
-          <div className="bg-card border border-card-border rounded-lg overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-card-border text-muted text-xs uppercase">
-                  <th className="text-left px-4 py-2">Season</th>
-                  <th className="text-right px-4 py-2">Inn</th>
-                  <th className="text-right px-4 py-2">Runs</th>
-                  <th className="text-right px-4 py-2">HS</th>
-                  <th className="text-right px-4 py-2">SR</th>
-                  <th className="text-right px-4 py-2">4s</th>
-                  <th className="text-right px-4 py-2">6s</th>
-                </tr>
-              </thead>
-              <tbody>
-                {seasonBatting.map((s, i) => (
-                  <tr key={s.season} className={i % 2 === 0 ? "" : "bg-background/30"}>
-                    <td className="px-4 py-2 font-mono">{s.season}</td>
-                    <td className="text-right px-4 py-2 font-mono">{s.innings}</td>
-                    <td className="text-right px-4 py-2 font-mono font-semibold">{s.total_runs}</td>
-                    <td className="text-right px-4 py-2 font-mono">{s.highest_score}</td>
-                    <td className="text-right px-4 py-2 font-mono text-muted">{s.avg_strike_rate}</td>
-                    <td className="text-right px-4 py-2 font-mono text-muted">{s.fours}</td>
-                    <td className="text-right px-4 py-2 font-mono text-muted">{s.sixes}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="h-5 w-5 text-orange-500" />
+            <h2 className="text-xl font-semibold text-foreground">Batting Career</h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <StatCard label="Innings" value={batting.innings} />
+            <StatCard label="Runs" value={batting.total_runs.toLocaleString()} highlight />
+            <StatCard label="Highest" value={batting.highest_score} />
+            <StatCard label="Strike Rate" value={batting.avg_strike_rate.toFixed(1)} />
+            <StatCard label="50s / 100s" value={`${batting.fifties} / ${batting.centuries}`} />
           </div>
         </div>
+      )}
+
+      {bowling && bowling.innings > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Target className="h-5 w-5 text-purple-500" />
+            <h2 className="text-xl font-semibold text-foreground">Bowling Career</h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard label="Innings" value={bowling.innings} />
+            <StatCard label="Wickets" value={bowling.total_wickets} highlight />
+            <StatCard label="Economy" value={bowling.avg_economy.toFixed(2)} />
+            <StatCard label="Best" value={`${bowling.best_wickets}w`} />
+          </div>
+        </div>
+      )}
+
+      {seasonBatting.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Season by Season</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Season</TableHead>
+                  <TableHead className="text-right">Inn</TableHead>
+                  <TableHead className="text-right">Runs</TableHead>
+                  <TableHead className="text-right">HS</TableHead>
+                  <TableHead className="text-right">SR</TableHead>
+                  <TableHead className="text-right">4s</TableHead>
+                  <TableHead className="text-right">6s</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {seasonBatting.map((s) => (
+                  <TableRow key={s.season}>
+                    <TableCell className="font-mono">{s.season}</TableCell>
+                    <TableCell className="text-right font-mono">{s.innings}</TableCell>
+                    <TableCell className="text-right font-mono font-semibold">{s.total_runs}</TableCell>
+                    <TableCell className="text-right font-mono">{s.highest_score}</TableCell>
+                    <TableCell className="text-right font-mono text-muted-foreground">{s.avg_strike_rate}</TableCell>
+                    <TableCell className="text-right font-mono text-muted-foreground">{s.fours}</TableCell>
+                    <TableCell className="text-right font-mono text-muted-foreground">{s.sixes}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
 }
 
-function StatBox({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
   return (
-    <div className="bg-card border border-card-border rounded-lg px-4 py-3">
-      <p className="text-xs text-muted uppercase tracking-wide">{label}</p>
-      <p className="text-xl font-bold mt-1">{value}</p>
-    </div>
+    <Card>
+      <CardContent className="pt-4 pb-3 px-4">
+        <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+        <p className={`text-xl font-semibold mt-1 font-mono tabular-nums ${highlight ? "text-primary" : "text-foreground"}`}>
+          {value}
+        </p>
+      </CardContent>
+    </Card>
   );
 }

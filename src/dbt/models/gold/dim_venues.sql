@@ -1,7 +1,9 @@
+
 -- Venue dimension: unique venues with match counts
 -- Normalized via venue_name_mappings seed (alias → canonical name)
 -- Enriched with ESPN ground data (capacity, timezone, ESPN ground ID)
 -- and geocoded coordinates from bronze.venue_coordinates
+-- Venue images from standalone espn_images enrichment
 with venue_stats as (
     select
         venue,
@@ -44,6 +46,13 @@ geocoded as (
         geocode_status
     from {{ source('bronze', 'venue_coordinates') }}
     where geocode_status = 'ok'
+),
+
+-- Venue images from standalone image enrichment (keyed by espn_ground_id)
+venue_images as (
+    select entity_id, image_url as venue_image_url
+    from {{ ref('stg_espn_images') }}
+    where entity_type = 'venue'
 )
 
 select
@@ -64,7 +73,9 @@ select
     -- ESPN enrichment
     ev.espn_ground_id,
     ev.ground_capacity,
-    ev.venue_timezone
+    ev.venue_timezone,
+    -- Venue image
+    vi.venue_image_url
 from venue_stats vs
 left join espn_venue ev
     on vs.venue = ev.venue
@@ -75,3 +86,6 @@ left join {{ ref('venue_name_mappings') }} vnm
 left join geocoded gc
     on vs.venue = gc.venue
     and (vs.city = gc.city or (vs.city is null and gc.city is null))
+left join venue_images vi
+    on ev.espn_ground_id is not null
+    and vi.entity_id = cast(ev.espn_ground_id as varchar)

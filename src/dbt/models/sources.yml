@@ -37,3 +37,8 @@ sources:
         meta:
           dagster:
             asset_key: ["weather_enrichment"]
+      - name: espn_images
+        description: "Image URLs for players, teams, and venues from ESPN Cricinfo. One row per entity. Populated by the espn_image_enrichment Dagster asset."
+        meta:
+          dagster:
+            asset_key: ["espn_image_enrichment"]

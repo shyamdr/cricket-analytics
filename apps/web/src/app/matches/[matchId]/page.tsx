@@ -1,224 +1,224 @@
-import { fetchAPI } from "@/lib/api";
-import { Match } from "@/lib/types";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft, MapPin, Calendar as CalendarIcon } from "lucide-react";
+import { Spinner } from "@/components/loading";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
 
-export const dynamic = "force-dynamic";
-
+interface Match {
+  match_id: string; team1: string; team2: string; venue: string;
+  city: string | null; match_date: string; toss_winner: string;
+  toss_decision: string; outcome_winner: string | null;
+  winning_margin: string | null; match_result_type: string;
+  event_name: string | null; event_stage: string | null;
+}
 interface MatchSummary {
-  match_id: string;
-  innings: number;
-  batting_team: string;
-  total_runs: number;
-  total_wickets: number;
-  overs_played: number;
-  run_rate: number;
-  total_fours: number;
-  total_sixes: number;
+  innings: number; batting_team: string; total_runs: number;
+  total_wickets: number; overs_played: number; run_rate: number;
+  total_fours: number; total_sixes: number;
 }
-
 interface BattingInnings {
-  batter: string;
-  runs_scored: number;
-  balls_faced: number;
-  fours: number;
-  sixes: number;
-  strike_rate: number;
-  is_out: boolean;
-  dismissal_kind: string | null;
-  dismissed_by: string | null;
+  innings: number; batting_team: string; batter: string;
+  runs_scored: number; balls_faced: number; fours: number;
+  sixes: number; strike_rate: number; is_out: boolean;
+  dismissal_kind: string | null; dismissed_by: string | null;
 }
-
 interface BowlingInnings {
-  bowler: string;
-  overs_bowled: number;
-  runs_conceded: number;
-  wickets: number;
+  innings: number; batting_team: string; bowler: string;
+  overs_bowled: number; runs_conceded: number; wickets: number;
   economy_rate: number;
-  dot_balls: number;
-  wides: number;
-  noballs: number;
 }
 
-export default async function MatchDetailPage({
-  params,
-}: {
-  params: Promise<{ matchId: string }>;
-}) {
-  const { matchId } = await params;
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 
-  const [match, summary, batting, bowling] = await Promise.all([
-    fetchAPI<Match>(`/matches/${matchId}`),
-    fetchAPI<MatchSummary[]>(`/matches/${matchId}/summary`),
-    fetchAPI<BattingInnings[]>(`/matches/${matchId}/batting`),
-    fetchAPI<BowlingInnings[]>(`/matches/${matchId}/bowling`),
-  ]);
+export default function MatchDetailPage() {
+  const params = useParams();
+  const matchId = params.matchId as string;
+  const [match, setMatch] = useState<Match | null>(null);
+  const [summary, setSummary] = useState<MatchSummary[]>([]);
+  const [batting, setBatting] = useState<BattingInnings[]>([]);
+  const [bowling, setBowling] = useState<BowlingInnings[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      fetch(`${API}/api/v1/matches/${matchId}`).then((r) => r.json()),
+      fetch(`${API}/api/v1/matches/${matchId}/summary`).then((r) => r.json()),
+      fetch(`${API}/api/v1/matches/${matchId}/batting`).then((r) => r.json()),
+      fetch(`${API}/api/v1/matches/${matchId}/bowling`).then((r) => r.json()),
+    ]).then(([m, s, bat, bowl]) => {
+      setMatch(m); setSummary(s); setBatting(bat); setBowling(bowl); setLoading(false);
+    }).catch(() => { setError(true); setLoading(false); });
+  }, [matchId]);
+
+  if (loading) return <Spinner className="py-16" />;
+  if (error || !match) {
+    return (
+      <div className="w-full px-6 lg:px-10 py-16 text-center">
+        <p className="text-muted-foreground">Could not load match. API may be waking up.</p>
+        <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/matches" />}>
+          <ArrowLeft className="h-4 w-4 mr-1" />Back to matches
+        </Button>
+      </div>
+    );
+  }
+
+  const formattedDate = new Date(match.match_date).toLocaleDateString("en-US", {
+    year: "numeric", month: "long", day: "numeric",
+  });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Match header */}
-      <div className="mb-8">
-        <Link href="/matches" className="text-sm text-muted hover:text-accent mb-2 inline-block">
-          ← Back to matches
-        </Link>
-        <h1 className="text-2xl font-bold">
-          <span className={match.outcome_winner === match.team1 ? "text-win" : ""}>
-            {match.team1}
-          </span>
-          {" vs "}
-          <span className={match.outcome_winner === match.team2 ? "text-win" : ""}>
-            {match.team2}
-          </span>
-        </h1>
-        <p className="text-muted mt-1">
-          {match.venue}{match.city ? `, ${match.city}` : ""} · {match.match_date}
-          {match.event_name ? ` · ${match.event_name}` : ""}
-          {match.event_stage ? ` — ${match.event_stage}` : ""}
-        </p>
-        <p className="text-sm mt-2">
-          Toss: {match.toss_winner} chose to {match.toss_decision}
-          {match.winning_margin && (
-            <span className="ml-3 text-win font-medium">
-              {match.outcome_winner} won by {match.winning_margin}
-            </span>
-          )}
-          {match.match_result_type === "no_result" && (
-            <span className="ml-3 text-muted">No Result</span>
-          )}
-        </p>
-      </div>
+    <div className="w-full px-6 lg:px-10 py-8 space-y-6">
+      {/* Back link */}
+      <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/matches" />} className="-ml-2">
+        <ArrowLeft className="h-4 w-4 mr-1" />Back to matches
+      </Button>
 
-      {/* Innings summaries */}
-      <div className="grid sm:grid-cols-2 gap-4 mb-8">
-        {summary.map((s) => (
-          <div key={s.innings} className="bg-card border border-card-border rounded-lg px-4 py-3">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold">{s.batting_team}</h3>
-              <span className="text-xl font-bold font-mono">
-                {s.total_runs}/{s.total_wickets}
-                <span className="text-sm text-muted ml-1">({s.overs_played} ov)</span>
-              </span>
-            </div>
-            <div className="flex gap-4 text-xs text-muted">
-              <span>RR: {s.run_rate}</span>
-              <span>4s: {s.total_fours}</span>
-              <span>6s: {s.total_sixes}</span>
-            </div>
+      {/* Match header card */}
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {match.event_name && <Badge variant="secondary">{match.event_name}</Badge>}
+            {match.event_stage && <Badge variant="outline">{match.event_stage}</Badge>}
           </div>
+          <h1 className="text-2xl font-semibold text-foreground">
+            <span className={match.outcome_winner === match.team1 ? "text-primary" : ""}>{match.team1}</span>
+            <span className="text-muted-foreground mx-2">vs</span>
+            <span className={match.outcome_winner === match.team2 ? "text-primary" : ""}>{match.team2}</span>
+          </h1>
+          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{match.venue}{match.city ? `, ${match.city}` : ""}</span>
+            <span className="flex items-center gap-1"><CalendarIcon className="h-3.5 w-3.5" />{formattedDate}</span>
+          </div>
+          <Separator />
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            <span className="text-foreground">Toss: {match.toss_winner} chose to {match.toss_decision}</span>
+            {match.winning_margin && (
+              <Badge className="bg-primary/10 text-primary border-primary/20">{match.outcome_winner} won by {match.winning_margin}</Badge>
+            )}
+            {match.match_result_type === "no_result" && <Badge variant="secondary">No Result</Badge>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Innings summary cards */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        {summary.map((s) => (
+          <Card key={s.innings}>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-foreground">{s.batting_team}</h3>
+                <div className="text-right">
+                  <span className="text-2xl font-semibold font-mono text-foreground">{s.total_runs}/{s.total_wickets}</span>
+                  <span className="text-sm text-muted-foreground ml-1.5">({s.overs_played} ov)</span>
+                </div>
+              </div>
+              <div className="flex gap-4 text-xs text-muted-foreground">
+                <span>RR: {s.run_rate}</span>
+                <Separator orientation="vertical" className="h-3" />
+                <span>4s: {s.total_fours}</span>
+                <Separator orientation="vertical" className="h-3" />
+                <span>6s: {s.total_sixes}</span>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      {/* Scorecard tabs — show both innings */}
+      {/* Scorecard per innings */}
       {summary.map((s) => {
-        const innBatting = batting.filter(
-          (b) => summary.findIndex((ss) => ss.batting_team === s.batting_team) ===
-                 summary.indexOf(s) &&
-                 batting.indexOf(b) >= 0
-        );
-        // Filter batting/bowling by innings number
-        const innIdx = s.innings;
-        const batters = batting.filter((_, i) => {
-          // Group by innings order — first N batters are innings 1, rest innings 2
-          const inn1Count = batting.filter(
-            (bb) => summary[0] && bb.batter !== undefined
-          ).length;
-          return true; // Show all for now, we'll refine
-        });
-
+        const innBatting = batting.filter((b) => b.innings === s.innings);
+        const innBowling = bowling.filter((b) => b.innings === s.innings);
         return (
-          <div key={s.innings} className="mb-8">
-            <h2 className="text-lg font-semibold mb-3">
+          <div key={s.innings} className="space-y-4">
+            <h2 className="text-lg font-semibold text-foreground">
               {s.batting_team} — {s.total_runs}/{s.total_wickets} ({s.overs_played} ov)
             </h2>
 
             {/* Batting */}
-            <div className="bg-card border border-card-border rounded-lg overflow-x-auto mb-4">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-card-border text-muted text-xs uppercase">
-                    <th className="text-left px-4 py-2">Batter</th>
-                    <th className="text-right px-4 py-2">R</th>
-                    <th className="text-right px-4 py-2">B</th>
-                    <th className="text-right px-4 py-2">4s</th>
-                    <th className="text-right px-4 py-2">6s</th>
-                    <th className="text-right px-4 py-2">SR</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {batting
-                    .filter((_, idx) => {
-                      // Simple split: first half = innings 1, second half = innings 2
-                      const midpoint = batting.length / summary.length;
-                      const start = (s.innings - 1) * midpoint;
-                      const end = s.innings * midpoint;
-                      return idx >= start && idx < end;
-                    })
-                    .map((b) => (
-                      <tr key={b.batter} className="border-b border-card-border/50">
-                        <td className="px-4 py-2">
-                          <Link
-                            href={`/players/${encodeURIComponent(b.batter)}`}
-                            className="hover:text-accent transition-colors"
-                          >
+            <Card>
+              <CardHeader className="pb-0">
+                <CardTitle className="text-sm text-muted-foreground uppercase tracking-wide">Batting</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Batter</TableHead>
+                      <TableHead className="text-right">R</TableHead>
+                      <TableHead className="text-right">B</TableHead>
+                      <TableHead className="text-right">4s</TableHead>
+                      <TableHead className="text-right">6s</TableHead>
+                      <TableHead className="text-right">SR</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {innBatting.map((b) => (
+                      <TableRow key={`${b.batter}-${s.innings}`}>
+                        <TableCell>
+                          <Link href={`/players/${encodeURIComponent(b.batter)}`} className="hover:text-primary transition-colors text-foreground">
                             {b.batter}
                           </Link>
                           {b.dismissal_kind && (
-                            <span className="text-xs text-muted ml-2">
-                              {b.dismissal_kind}
-                              {b.dismissed_by ? ` b ${b.dismissed_by}` : ""}
-                            </span>
+                            <span className="text-xs text-muted-foreground ml-2">{b.dismissal_kind}{b.dismissed_by ? ` b ${b.dismissed_by}` : ""}</span>
                           )}
-                          {!b.is_out && <span className="text-xs text-win ml-2">not out</span>}
-                        </td>
-                        <td className="text-right px-4 py-2 font-mono font-semibold">{b.runs_scored}</td>
-                        <td className="text-right px-4 py-2 font-mono text-muted">{b.balls_faced}</td>
-                        <td className="text-right px-4 py-2 font-mono text-muted">{b.fours}</td>
-                        <td className="text-right px-4 py-2 font-mono text-muted">{b.sixes}</td>
-                        <td className="text-right px-4 py-2 font-mono text-muted">{b.strike_rate}</td>
-                      </tr>
+                          {!b.is_out && <span className="text-xs text-primary ml-2">not out</span>}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-semibold">{b.runs_scored}</TableCell>
+                        <TableCell className="text-right font-mono text-muted-foreground">{b.balls_faced}</TableCell>
+                        <TableCell className="text-right font-mono text-muted-foreground">{b.fours}</TableCell>
+                        <TableCell className="text-right font-mono text-muted-foreground">{b.sixes}</TableCell>
+                        <TableCell className="text-right font-mono text-muted-foreground">{b.strike_rate}</TableCell>
+                      </TableRow>
                     ))}
-                </tbody>
-              </table>
-            </div>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
 
             {/* Bowling */}
-            <div className="bg-card border border-card-border rounded-lg overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-card-border text-muted text-xs uppercase">
-                    <th className="text-left px-4 py-2">Bowler</th>
-                    <th className="text-right px-4 py-2">O</th>
-                    <th className="text-right px-4 py-2">R</th>
-                    <th className="text-right px-4 py-2">W</th>
-                    <th className="text-right px-4 py-2">Econ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bowling
-                    .filter((_, idx) => {
-                      const midpoint = bowling.length / summary.length;
-                      const start = (s.innings - 1) * midpoint;
-                      const end = s.innings * midpoint;
-                      return idx >= start && idx < end;
-                    })
-                    .map((b) => (
-                      <tr key={b.bowler} className="border-b border-card-border/50">
-                        <td className="px-4 py-2">
-                          <Link
-                            href={`/players/${encodeURIComponent(b.bowler)}`}
-                            className="hover:text-accent transition-colors"
-                          >
+            <Card>
+              <CardHeader className="pb-0">
+                <CardTitle className="text-sm text-muted-foreground uppercase tracking-wide">Bowling</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Bowler</TableHead>
+                      <TableHead className="text-right">O</TableHead>
+                      <TableHead className="text-right">R</TableHead>
+                      <TableHead className="text-right">W</TableHead>
+                      <TableHead className="text-right">Econ</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {innBowling.map((b) => (
+                      <TableRow key={`${b.bowler}-${s.innings}`}>
+                        <TableCell>
+                          <Link href={`/players/${encodeURIComponent(b.bowler)}`} className="hover:text-primary transition-colors text-foreground">
                             {b.bowler}
                           </Link>
-                        </td>
-                        <td className="text-right px-4 py-2 font-mono">{b.overs_bowled}</td>
-                        <td className="text-right px-4 py-2 font-mono">{b.runs_conceded}</td>
-                        <td className="text-right px-4 py-2 font-mono font-semibold">{b.wickets}</td>
-                        <td className="text-right px-4 py-2 font-mono text-muted">{b.economy_rate}</td>
-                      </tr>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">{b.overs_bowled}</TableCell>
+                        <TableCell className="text-right font-mono">{b.runs_conceded}</TableCell>
+                        <TableCell className="text-right font-mono font-semibold">{b.wickets}</TableCell>
+                        <TableCell className="text-right font-mono text-muted-foreground">{b.economy_rate}</TableCell>
+                      </TableRow>
                     ))}
-                </tbody>
-              </table>
-            </div>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </div>
         );
       })}

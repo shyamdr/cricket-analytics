@@ -319,7 +319,7 @@ models:
       - name: overs_bowled
         description: "Overs bowled in cricket notation (e.g. 4.0, 3.2 = 3 overs and 2 balls)"
       - name: runs_conceded
-        description: "Runs charged to the bowler: batter_runs + wides + noballs + penalty. Excludes byes and legbyes (not the bowler's fault)."
+        description: "Runs charged to the bowler: batter_runs + wides + noballs. Excludes byes, legbyes, and penalties (not the bowler's fault)."
         tests:
           - not_null
       - name: wickets
@@ -337,7 +337,7 @@ models:
       - name: sixes_conceded
         description: "Number of 6s hit off this bowler"
       - name: economy_rate
-        description: "Economy rate: bowler's runs conceded per over (excludes byes/legbyes). Calculated as (batter_runs + wides + noballs + penalty) * 6 / legal_balls, rounded to 2 decimal places. 0 if no balls bowled."
+        description: "Economy rate: bowler's runs conceded per over (excludes byes, legbyes, penalties). Calculated as (batter_runs + wides + noballs) * 6 / legal_balls, rounded to 2 decimal places. 0 if no balls bowled."
         tests:
           - not_null
 

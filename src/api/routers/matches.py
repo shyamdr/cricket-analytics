@@ -65,6 +65,88 @@ def list_venues(db: DbQuery):
     return db(f"SELECT * FROM {_gold}.dim_venues ORDER BY venue")
 
 
+@router.get("/recent")
+def recent_matches_with_scores(
+    db: DbQuery,
+    limit: int = Query(10, ge=1, le=50),
+):
+    """Recent matches with inline innings scores for the landing page."""
+    matches = db(
+        f"""
+        SELECT
+            m.match_id, m.season, m.match_date, m.city, m.venue,
+            m.team1, m.team2, m.outcome_winner, m.match_result_type,
+            m.winning_margin, m.event_name, m.event_stage, m.floodlit
+        FROM {_gold}.dim_matches m
+        ORDER BY m.match_date DESC
+        LIMIT $1
+        """,
+        [limit],
+    )
+    if not matches:
+        return []
+
+    match_ids = [m["match_id"] for m in matches]
+    placeholders = ", ".join(f"${i + 1}" for i in range(len(match_ids)))
+
+    summaries = db(
+        f"""
+        SELECT match_id, innings, batting_team, total_runs, total_wickets, overs_played
+        FROM {_gold}.fact_match_summary
+        WHERE match_id IN ({placeholders})
+        ORDER BY match_id, innings
+        """,
+        match_ids,
+    )
+
+    # Group summaries by match_id
+    summary_map: dict[str, list] = {}
+    for s in summaries:
+        summary_map.setdefault(s["match_id"], []).append(s)
+
+    # Attach inline scores to each match
+    for m in matches:
+        innings = summary_map.get(m["match_id"], [])
+        m["innings"] = innings
+
+    return matches
+
+
+@router.get("/by-tournament")
+def matches_by_tournament(
+    db: DbQuery,
+    days: int = Query(30, ge=1, le=365),
+):
+    """Recent matches grouped by tournament. Shows tournaments with activity in the last N days."""
+    from datetime import date, timedelta
+
+    cutoff = (date.today() - timedelta(days=days)).isoformat()
+
+    matches = db(
+        f"""
+        SELECT
+            m.match_id, m.season, m.match_date, m.city, m.venue,
+            m.team1, m.team2, m.outcome_winner, m.match_result_type,
+            m.winning_margin, m.event_name, m.event_stage, m.floodlit
+        FROM {_gold}.dim_matches m
+        WHERE m.match_date >= $1
+        ORDER BY m.match_date DESC
+        """,
+        [cutoff],
+    )
+
+    # Group by event_name
+    tournaments: dict[str, list] = {}
+    for m in matches:
+        name = m["event_name"] or "Other"
+        tournaments.setdefault(name, []).append(m)
+
+    return [
+        {"tournament": name, "matches": ms, "match_count": len(ms)}
+        for name, ms in tournaments.items()
+    ]
+
+
 @router.get("/{match_id}")
 def get_match(match_id: str, db: DbQuery):
     """Get details for a specific match."""

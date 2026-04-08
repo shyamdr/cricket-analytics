@@ -4,7 +4,7 @@
 {{
     config(
         materialized='incremental',
-        unique_key=['match_id', 'innings', 'over_num', 'ball_num', 'batter']
+        unique_key=['match_id', 'innings', 'over_num', 'ball_num']
     )
 }}
 

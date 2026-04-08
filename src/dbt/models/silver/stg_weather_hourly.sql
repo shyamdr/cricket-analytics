@@ -64,6 +64,8 @@ select
 
 from raw r
 cross join hours h
+-- Only produce rows where actual weather data exists for this hour
+where cast(json_extract(r.hourly_json, '$.' || 'temperature_2m[' || h.hour_idx || ']') as double) is not null
 
 {% else %}
 select

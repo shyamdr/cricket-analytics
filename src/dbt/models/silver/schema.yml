@@ -173,6 +173,9 @@ models:
         tests:
           - unique
           - not_null
+          - relationships:
+              to: ref('stg_matches')
+              field: match_id
       - name: espn_match_id
         description: "ESPN's unique match object ID"
       - name: start_time

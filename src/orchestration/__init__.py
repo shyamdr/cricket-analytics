@@ -10,6 +10,7 @@ from dagster_dbt import DbtCliResource
 from src.orchestration.assets.dbt import DBT_PROJECT_DIR, dbt_analytics_assets
 from src.orchestration.assets.enrichment import (
     espn_ball_enrichment,
+    espn_image_enrichment,
     espn_match_enrichment,
     geocode_venue_coordinates,
     weather_enrichment,
@@ -36,6 +37,7 @@ defs = Definitions(
         dbt_analytics_assets,
         espn_match_enrichment,
         espn_ball_enrichment,
+        espn_image_enrichment,
         geocode_venue_coordinates,
         weather_enrichment,
     ],

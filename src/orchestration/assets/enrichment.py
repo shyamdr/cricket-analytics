@@ -441,10 +441,58 @@ class WeatherEnrichmentConfig(Config):
     delay_seconds: float = 0.1  # pause between API calls (free tier: 600/min)
 
 
+class ImageEnrichmentConfig(Config):
+    """Configuration for the espn_image_enrichment asset."""
+
+    players: bool = True
+    teams: bool = True
+    limit: int = 0  # 0 = all pending
+    delay: float = 2.0  # seconds between player page requests
+
+
 @asset(
     group_name="enrichment",
     compute_kind="python",
-    deps=[AssetKey(["geocode_venue_coordinates"]), AssetKey(["bronze_matches"])],
+    deps=[AssetKey(["bronze_people"])],
+    description=(
+        "Scrape ESPN Cricinfo for player headshots, team logos, and venue images. "
+        "Players: hits individual profile pages using key_cricinfo from people.csv. "
+        "Teams/venues: extracts from a single IPL series page. "
+        "Delta-aware — skips already-scraped entities. "
+        "Writes to bronze.espn_images lookup table."
+    ),
+)
+def espn_image_enrichment(
+    context: AssetExecutionContext, config: ImageEnrichmentConfig
+) -> MaterializeResult:
+    """Scrape ESPN image URLs for players, teams, and venues."""
+    from src.enrichment.image_scraper import scrape_images
+
+    counts = scrape_images(
+        players=config.players,
+        teams=config.teams,
+        limit=config.limit,
+        delay=config.delay,
+    )
+
+    context.log.info(
+        f"Image enrichment: {counts['players']} players, "
+        f"{counts['teams']} teams, {counts['venues']} venues"
+    )
+
+    return MaterializeResult(
+        metadata={
+            "players": MetadataValue.int(counts["players"]),
+            "teams": MetadataValue.int(counts["teams"]),
+            "venues": MetadataValue.int(counts["venues"]),
+        }
+    )
+
+
+@asset(
+    group_name="enrichment",
+    compute_kind="python",
+    deps=[AssetKey(["geocode_venue_coordinates"]), AssetKey(["bronze_matches"]), AssetKey("espn_match_enrichment")],
     description=(
         "Fetch historical weather from Open-Meteo API for each match. "
         "Uses venue coordinates (lat/lng) + match date. Free API, no key required. "

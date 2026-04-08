@@ -1,175 +1,147 @@
-import { fetchAPI } from "@/lib/api";
-import { Match, BattingStats, BowlingStats, SeasonCount } from "@/lib/types";
-import Link from "next/link";
+"use client";
 
-// Don't prerender — fetch fresh data on each request
-export const dynamic = "force-dynamic";
+import { useEffect, useState } from "react";
+import { MatchTicker } from "@/components/home/match-ticker";
+import { MatchSpotlight } from "@/components/home/match-spotlight";
+import { SeasonSummary } from "@/components/home/season-summary";
+import { LatestResults } from "@/components/home/latest-results";
+import { TopPerformers } from "@/components/home/top-performers";
+import { ExploreCards } from "@/components/home/explore-cards";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getLatestSeason } from "@/lib/landing-utils";
+import type { RecentMatch } from "@/lib/landing-utils";
+import type { BattingStats, BowlingStats, SeasonCount } from "@/lib/types";
 
-export default async function Home() {
-  // Fetch each independently so partial failures don't blank the whole page
-  const [matches, seasons, topBatters, topBowlers] = await Promise.all([
-    fetchAPI<Match[]>("/matches?limit=10").catch(() => [] as Match[]),
-    fetchAPI<SeasonCount[]>("/matches/seasons").catch(() => [] as SeasonCount[]),
-    fetchAPI<BattingStats[]>("/batting/top?limit=5").catch(() => [] as BattingStats[]),
-    fetchAPI<BowlingStats[]>("/bowling/top?limit=5").catch(() => [] as BowlingStats[]),
-  ]);
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 
-  const totalMatches = seasons.reduce((sum, s) => sum + s.matches, 0);
-  const totalSeasons = seasons.length;
-  const noData = matches.length === 0 && seasons.length === 0;
+export default function Home() {
+  const [matches, setMatches] = useState<RecentMatch[]>([]);
+  const [seasons, setSeasons] = useState<SeasonCount[]>([]);
+  const [batters, setBatters] = useState<BattingStats[]>([]);
+  const [bowlers, setBowlers] = useState<BowlingStats[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [slowApi, setSlowApi] = useState(false);
 
-  if (noData) {
+  useEffect(() => {
+    const slowTimer = setTimeout(() => setSlowApi(true), 10_000);
+
+    async function loadData() {
+      // Batch 1: matches + seasons in parallel
+      const [matchData, seasonData] = await Promise.all([
+        fetch(`${API}/api/v1/matches/recent?limit=20`)
+          .then((r) => (r.ok ? r.json() : []))
+          .catch(() => [] as RecentMatch[]),
+        fetch(`${API}/api/v1/matches/seasons`)
+          .then((r) => (r.ok ? r.json() : []))
+          .catch(() => [] as SeasonCount[]),
+      ]);
+
+      setMatches(matchData);
+      setSeasons(seasonData);
+
+      // Batch 2: batting + bowling stats for latest season
+      const latest = getLatestSeason(seasonData);
+      if (latest) {
+        const [battingData, bowlingData] = await Promise.all([
+          fetch(`${API}/api/v1/batting/?season=${latest}&limit=5`)
+            .then((r) => (r.ok ? r.json() : []))
+            .catch(() => [] as BattingStats[]),
+          fetch(`${API}/api/v1/bowling/?season=${latest}&limit=5`)
+            .then((r) => (r.ok ? r.json() : []))
+            .catch(() => [] as BowlingStats[]),
+        ]);
+        setBatters(battingData);
+        setBowlers(bowlingData);
+      }
+
+      setLoading(false);
+      clearTimeout(slowTimer);
+    }
+
+    loadData();
+    return () => clearTimeout(slowTimer);
+  }, []);
+
+  const latestSeason = getLatestSeason(seasons);
+  const latestSeasonCount =
+    seasons.find((s) => s.season === latestSeason)?.matches ?? 0;
+
+  if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-16 text-center">
-        <h1 className="text-3xl font-bold mb-4">InsideEdge</h1>
-        <p className="text-muted mb-2">Could not connect to the API.</p>
-        <p className="text-sm text-muted mt-4">
-          The API may be waking up (free tier cold start ~30s). Try refreshing in a moment.
-        </p>
+      <div className="min-h-screen bg-background">
+        {/* Ticker skeleton */}
+        <Skeleton className="w-full h-24" />
+
+        {/* Spotlight skeleton */}
+        <div className="w-full px-6 lg:px-10 py-6">
+          <Skeleton className="w-full h-48 rounded-lg" />
+        </div>
+
+        {/* Season summary skeleton */}
+        <Skeleton className="w-full h-10" />
+
+        {/* Two-column skeleton */}
+        <div className="w-full px-6 lg:px-10 py-8 grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <Skeleton className="lg:col-span-3 h-64 rounded-lg" />
+          <Skeleton className="lg:col-span-2 h-64 rounded-lg" />
+        </div>
+
+        {/* Explore cards — static, no skeleton needed */}
+        <ExploreCards />
+
+        {slowApi && (
+          <p className="text-center text-sm text-muted-foreground py-4">
+            Data is loading — the API may be waking up
+          </p>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Hero */}
-      <div className="mb-10">
-        <h1 className="text-4xl font-bold mb-2">InsideEdge</h1>
-        <p className="text-muted text-lg">
-          The detail that changes everything. {totalMatches.toLocaleString()} matches, {totalSeasons} seasons of ball-by-ball insights.
-        </p>
-      </div>
+    <div className="min-h-screen bg-background">
+      {/* Match Ticker — full width below navbar */}
+      <MatchTicker matches={matches} />
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
-        <StatCard label="Matches" value={totalMatches.toLocaleString()} />
-        <StatCard label="Seasons" value={totalSeasons.toString()} />
-        <StatCard label="Latest Season" value={seasons.at(-1)?.season ?? "—"} />
-        <StatCard
-          label="Latest Match"
-          value={matches[0]?.match_date ?? "—"}
+      {/* Section 1: Match Spotlight */}
+      <MatchSpotlight match={matches[0] ?? null} />
+
+      {/* Section 2: Season Summary */}
+      <div className="animate-section-2">
+        <SeasonSummary
+          season={latestSeason}
+          matchCount={latestSeasonCount}
+          topScorer={
+            batters[0]
+              ? { name: batters[0].batter, runs: batters[0].total_runs }
+              : null
+          }
+          topWicketTaker={
+            bowlers[0]
+              ? { name: bowlers[0].bowler, wickets: bowlers[0].total_wickets }
+              : null
+          }
         />
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-8">
-        {/* Recent matches */}
+      {/* Section 3: Two-column — results + top performers */}
+      <div className="w-full px-6 lg:px-10 py-8 grid grid-cols-1 lg:grid-cols-5 gap-6 animate-section-3">
+        <div className="lg:col-span-3">
+          <LatestResults matches={matches.slice(0, 6)} />
+        </div>
         <div className="lg:col-span-2">
-          <h2 className="text-xl font-semibold mb-4">Recent Matches</h2>
-          <div className="space-y-3">
-            {matches.map((m) => (
-              <MatchCard key={m.match_id} match={m} />
-            ))}
-          </div>
-          <Link
-            href="/matches"
-            className="inline-block mt-4 text-sm text-accent hover:underline"
-          >
-            View all matches →
-          </Link>
-        </div>
-
-        {/* Leaderboards */}
-        <div className="space-y-8">
-          <div>
-            <h2 className="text-xl font-semibold mb-4">Top Run Scorers</h2>
-            <div className="bg-card border border-card-border rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-card-border text-muted text-xs uppercase">
-                    <th className="text-left px-4 py-2">Player</th>
-                    <th className="text-right px-4 py-2">Runs</th>
-                    <th className="text-right px-4 py-2">SR</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topBatters.map((b, i) => (
-                    <tr key={b.batter} className={i % 2 === 0 ? "" : "bg-background/30"}>
-                      <td className="px-4 py-2">
-                        <Link href={`/players/${encodeURIComponent(b.batter)}`} className="hover:text-accent transition-colors">
-                          {b.batter}
-                        </Link>
-                      </td>
-                      <td className="text-right px-4 py-2 font-mono">{b.total_runs.toLocaleString()}</td>
-                      <td className="text-right px-4 py-2 font-mono text-muted">{b.avg_strike_rate}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-xl font-semibold mb-4">Top Wicket Takers</h2>
-            <div className="bg-card border border-card-border rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-card-border text-muted text-xs uppercase">
-                    <th className="text-left px-4 py-2">Player</th>
-                    <th className="text-right px-4 py-2">Wkts</th>
-                    <th className="text-right px-4 py-2">Econ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topBowlers.map((b, i) => (
-                    <tr key={b.bowler} className={i % 2 === 0 ? "" : "bg-background/30"}>
-                      <td className="px-4 py-2">
-                        <Link href={`/players/${encodeURIComponent(b.bowler)}`} className="hover:text-accent transition-colors">
-                          {b.bowler}
-                        </Link>
-                      </td>
-                      <td className="text-right px-4 py-2 font-mono">{b.total_wickets}</td>
-                      <td className="text-right px-4 py-2 font-mono text-muted">{b.avg_economy}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <TopPerformers
+            batters={batters}
+            bowlers={bowlers}
+            season={latestSeason ?? ""}
+          />
         </div>
       </div>
-    </div>
-  );
-}
 
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-card border border-card-border rounded-lg px-4 py-3">
-      <p className="text-xs text-muted uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-bold mt-1">{value}</p>
-    </div>
-  );
-}
-
-function MatchCard({ match }: { match: Match }) {
-  const isNoResult = match.match_result_type === "no_result";
-  return (
-    <Link
-      href={`/matches/${match.match_id}`}
-      className="block bg-card border border-card-border rounded-lg px-4 py-3 hover:border-accent/50 transition-colors"
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 text-sm">
-            <span className={match.outcome_winner === match.team1 ? "font-semibold text-win" : ""}>
-              {match.team1}
-            </span>
-            <span className="text-muted">vs</span>
-            <span className={match.outcome_winner === match.team2 ? "font-semibold text-win" : ""}>
-              {match.team2}
-            </span>
-          </div>
-          <p className="text-xs text-muted mt-1">
-            {match.venue}{match.city ? `, ${match.city}` : ""} · {match.match_date}
-          </p>
-        </div>
-        <div className="text-right text-xs">
-          {isNoResult ? (
-            <span className="text-muted">No Result</span>
-          ) : match.winning_margin ? (
-            <span className="text-muted">Won by {match.winning_margin}</span>
-          ) : null}
-        </div>
+      {/* Section 4: Explore */}
+      <div className="animate-section-4">
+        <ExploreCards />
       </div>
-    </Link>
+    </div>
   );
 }
