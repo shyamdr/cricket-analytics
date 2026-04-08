@@ -38,16 +38,13 @@ def _load_ball_records_to_bronze(records: list[dict]) -> int:
         return 0
     import pyarrow as pa
 
-    from src.database import append_to_bronze, get_write_conn
+    from src.database import append_to_bronze, write_conn
 
-    conn = get_write_conn()
-    try:
+    with write_conn() as conn:
         table = pa.Table.from_pylist(records)
         return append_to_bronze(
             conn, f"{settings.bronze_schema}.espn_ball_data", table, "espn_ball_id"
         )
-    finally:
-        conn.close()
 
 
 def _get_matches_for_season(
@@ -140,10 +137,9 @@ def _get_already_scraped_match_ids(
 
 def _ensure_status_table() -> None:
     """Create the ball scrape status tracking table if it doesn't exist."""
-    from src.database import get_write_conn
+    from src.database import write_conn
 
-    conn = get_write_conn()
-    try:
+    with write_conn() as conn:
         conn.execute(
             f"""CREATE TABLE IF NOT EXISTS {settings.bronze_schema}.espn_ball_scrape_status (
                 cricsheet_match_id VARCHAR PRIMARY KEY,
@@ -152,24 +148,19 @@ def _ensure_status_table() -> None:
                 scraped_at TIMESTAMP DEFAULT current_timestamp
             )"""
         )
-    finally:
-        conn.close()
 
 
 def _record_scrape_status(match_id: str, series_id: int, status: str) -> None:
     """Insert or update a match's scrape status."""
-    from src.database import get_write_conn
+    from src.database import write_conn
 
-    conn = get_write_conn()
-    try:
+    with write_conn() as conn:
         conn.execute(
             f"""INSERT OR REPLACE INTO {settings.bronze_schema}.espn_ball_scrape_status
                 (cricsheet_match_id, espn_series_id, status, scraped_at)
                 VALUES (?, ?, ?, current_timestamp)""",
             [match_id, series_id, status],
         )
-    finally:
-        conn.close()
 
 
 def run_ball_scraper(

@@ -5,11 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 
 from src.api.database import DbQuery  # noqa: TC001 — runtime dep for FastAPI DI
-from src.config import settings
+from src.tables import BATTING_INNINGS
 
 router = APIRouter(prefix="/api/v1/batting", tags=["batting"])
-
-_gold = settings.gold_schema
 
 
 @router.get("/top")
@@ -26,7 +24,7 @@ def top_run_scorers(
                    SUM(runs_scored) as total_runs,
                    ROUND(AVG(strike_rate), 2) as avg_strike_rate,
                    SUM(fours) as total_fours, SUM(sixes) as total_sixes
-            FROM {_gold}.fact_batting_innings
+            FROM {BATTING_INNINGS}
             WHERE season = $1
             GROUP BY batter ORDER BY total_runs DESC LIMIT $2
             """,
@@ -38,7 +36,7 @@ def top_run_scorers(
                SUM(runs_scored) as total_runs,
                ROUND(AVG(strike_rate), 2) as avg_strike_rate,
                SUM(fours) as total_fours, SUM(sixes) as total_sixes
-        FROM {_gold}.fact_batting_innings
+        FROM {BATTING_INNINGS}
         GROUP BY batter ORDER BY total_runs DESC LIMIT $1
         """,
         [limit],
@@ -61,7 +59,7 @@ def player_batting_stats(player_name: str, db: DbQuery):
                SUM(dot_balls) as total_dot_balls,
                SUM(CASE WHEN runs_scored >= 50 AND runs_scored < 100 THEN 1 ELSE 0 END) as fifties,
                SUM(CASE WHEN runs_scored >= 100 THEN 1 ELSE 0 END) as centuries
-        FROM {_gold}.fact_batting_innings
+        FROM {BATTING_INNINGS}
         WHERE batter = $1
         GROUP BY batter
         """,
@@ -79,7 +77,7 @@ def player_season_breakdown(player_name: str, db: DbQuery):
                MAX(runs_scored) as highest_score,
                ROUND(AVG(strike_rate), 2) as avg_strike_rate,
                SUM(fours) as fours, SUM(sixes) as sixes
-        FROM {_gold}.fact_batting_innings
+        FROM {BATTING_INNINGS}
         WHERE batter = $1
         GROUP BY season ORDER BY season
         """,

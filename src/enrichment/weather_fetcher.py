@@ -20,7 +20,7 @@ import httpx
 import structlog
 
 from src.config import settings
-from src.database import append_to_bronze, get_read_conn, get_write_conn
+from src.database import append_to_bronze, get_read_conn
 
 logger = structlog.get_logger(__name__)
 
@@ -135,17 +135,6 @@ def _fetch_weather(
     # unreachable but keeps type checker happy
     msg = "max retries exceeded"
     raise RuntimeError(msg)
-
-
-def _get_already_fetched() -> set[str]:
-    """Return match_ids already in bronze.weather."""
-    try:
-        conn = get_read_conn()
-        rows = conn.execute(f"SELECT match_id FROM {settings.bronze_schema}.weather").fetchall()
-        conn.close()
-        return {r[0] for r in rows}
-    except Exception:
-        return set()
 
 
 def _get_pending_matches(limit: int = 0) -> list[dict[str, Any]]:
@@ -300,16 +289,15 @@ def _persist_batch(records: list[dict[str, Any]], loaded_at: str) -> int:
     """Write a batch of weather records to bronze.weather."""
     import pyarrow as pa
 
+    from src.database import write_conn
+
     table = pa.Table.from_pylist(records)
-    conn = get_write_conn()
-    try:
+    with write_conn() as conn:
         loaded = append_to_bronze(
             conn,
             f"{settings.bronze_schema}.weather",
             table,
             "match_id",
         )
-    finally:
-        conn.close()
     logger.info("weather_batch_persisted", batch_size=len(records), new_rows=loaded)
     return loaded

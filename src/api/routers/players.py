@@ -5,11 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from src.api.database import DbQuery  # noqa: TC001 — runtime dep for FastAPI DI
-from src.config import settings
+from src.tables import BATTING_INNINGS, BOWLING_INNINGS, PLAYERS
 
 router = APIRouter(prefix="/api/v1/players", tags=["players"])
-
-_gold = settings.gold_schema
 
 
 @router.get("")
@@ -23,7 +21,7 @@ def list_players(
     if search:
         return db(
             f"""
-            SELECT * FROM {_gold}.dim_players
+            SELECT * FROM {PLAYERS}
             WHERE player_name ILIKE '%' || $1 || '%'
             ORDER BY player_name
             LIMIT $2 OFFSET $3
@@ -31,7 +29,7 @@ def list_players(
             [search, limit, offset],
         )
     return db(
-        f"SELECT * FROM {_gold}.dim_players ORDER BY player_name LIMIT $1 OFFSET $2",
+        f"SELECT * FROM {PLAYERS} ORDER BY player_name LIMIT $1 OFFSET $2",
         [limit, offset],
     )
 
@@ -40,7 +38,7 @@ def list_players(
 def get_player(player_name: str, db: DbQuery):
     """Get a specific player's profile."""
     rows = db(
-        f"SELECT * FROM {_gold}.dim_players WHERE player_name = $1",
+        f"SELECT * FROM {PLAYERS} WHERE player_name = $1",
         [player_name],
     )
     if not rows:
@@ -60,7 +58,7 @@ def get_player_batting(
     if season:
         return db(
             f"""
-            SELECT * FROM {_gold}.fact_batting_innings
+            SELECT * FROM {BATTING_INNINGS}
             WHERE batter = $1 AND season = $2
             ORDER BY match_date
             LIMIT $3 OFFSET $4
@@ -69,7 +67,7 @@ def get_player_batting(
         )
     return db(
         f"""
-        SELECT * FROM {_gold}.fact_batting_innings
+        SELECT * FROM {BATTING_INNINGS}
         WHERE batter = $1
         ORDER BY match_date
         LIMIT $2 OFFSET $3
@@ -90,7 +88,7 @@ def get_player_bowling(
     if season:
         return db(
             f"""
-            SELECT * FROM {_gold}.fact_bowling_innings
+            SELECT * FROM {BOWLING_INNINGS}
             WHERE bowler = $1 AND season = $2
             ORDER BY match_date
             LIMIT $3 OFFSET $4
@@ -99,7 +97,7 @@ def get_player_bowling(
         )
     return db(
         f"""
-        SELECT * FROM {_gold}.fact_bowling_innings
+        SELECT * FROM {BOWLING_INNINGS}
         WHERE bowler = $1
         ORDER BY match_date
         LIMIT $2 OFFSET $3

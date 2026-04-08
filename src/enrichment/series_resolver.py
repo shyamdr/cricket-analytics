@@ -26,7 +26,7 @@ import structlog
 from playwright.async_api import async_playwright
 
 from src.config import settings
-from src.database import get_read_conn, get_write_conn
+from src.database import get_read_conn
 from src.utils import async_retry, run_async
 
 logger = structlog.get_logger(__name__)
@@ -359,36 +359,36 @@ class SeriesResolver:
 
         # Persist to DuckDB
         try:
-            conn = get_write_conn()
-            _ensure_series_table(conn)
+            from src.database import write_conn
 
-            # Upsert — don't fail on duplicate series_id
-            existing = conn.execute(
-                f"SELECT 1 FROM {settings.bronze_schema}.espn_series WHERE series_id = ?",
-                [sid],
-            ).fetchone()
+            with write_conn() as conn:
+                _ensure_series_table(conn)
 
-            if existing is None:
-                conn.execute(
-                    f"""INSERT INTO {settings.bronze_schema}.espn_series
-                        (series_id, series_name, season, series_slug, discovered_from)
-                        VALUES (?, ?, ?, ?, ?)""",
-                    [
-                        sid,
-                        series_info.get("series_name", ""),
-                        season,
-                        series_info.get("series_slug", ""),
-                        series_info.get("discovered_from", ""),
-                    ],
-                )
-                logger.info(
-                    "series_persisted",
-                    series_id=sid,
-                    series_name=series_info.get("series_name"),
-                    season=season,
-                )
+                # Upsert — don't fail on duplicate series_id
+                existing = conn.execute(
+                    f"SELECT 1 FROM {settings.bronze_schema}.espn_series WHERE series_id = ?",
+                    [sid],
+                ).fetchone()
 
-            conn.close()
+                if existing is None:
+                    conn.execute(
+                        f"""INSERT INTO {settings.bronze_schema}.espn_series
+                            (series_id, series_name, season, series_slug, discovered_from)
+                            VALUES (?, ?, ?, ?, ?)""",
+                        [
+                            sid,
+                            series_info.get("series_name", ""),
+                            season,
+                            series_info.get("series_slug", ""),
+                            series_info.get("discovered_from", ""),
+                        ],
+                    )
+                    logger.info(
+                        "series_persisted",
+                        series_id=sid,
+                        series_name=series_info.get("series_name"),
+                        season=season,
+                    )
         except Exception:
             logger.exception("failed_persisting_series")
 

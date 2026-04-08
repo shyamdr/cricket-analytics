@@ -27,7 +27,7 @@ import structlog
 from playwright.async_api import async_playwright
 
 from src.config import settings
-from src.database import append_to_bronze, get_read_conn, get_write_conn
+from src.database import append_to_bronze, get_read_conn
 from src.utils import run_async
 
 logger = structlog.get_logger(__name__)
@@ -302,25 +302,22 @@ def _persist_to_bronze(records: list[dict[str, str]]) -> int:
     """Write image records to bronze.espn_images with dedup."""
     if not records:
         return 0
-    conn = get_write_conn()
-    try:
+    import contextlib
+
+    from src.database import write_conn
+
+    with write_conn() as conn:
         _ensure_images_table(conn)
-        table = pa.Table.from_pylist(records)
         # Dedup on composite key: entity_type + entity_id
         for rec in records:
             rec["_dedup_key"] = f"{rec['entity_type']}_{rec['entity_id']}"
         table = pa.Table.from_pylist(records)
         count = append_to_bronze(conn, f"{settings.bronze_schema}.espn_images", table, "_dedup_key")
-        # Drop the helper column
-        import contextlib
-
         with contextlib.suppress(Exception):
             conn.execute(
                 f"ALTER TABLE {settings.bronze_schema}.espn_images DROP COLUMN IF EXISTS _dedup_key"
             )
         return count
-    finally:
-        conn.close()
 
 
 # ---------------------------------------------------------------------------

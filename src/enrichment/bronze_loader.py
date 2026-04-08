@@ -11,7 +11,7 @@ import pyarrow as pa
 import structlog
 
 from src.config import settings
-from src.database import append_to_bronze, get_write_conn
+from src.database import append_to_bronze, write_conn
 
 logger = structlog.get_logger(__name__)
 
@@ -254,10 +254,9 @@ def load_espn_to_bronze(records: list[dict[str, Any]]) -> dict[str, int]:
         innings_rows.extend(rec.get("innings") or [])
         ball_rows.extend(rec.get("balls") or [])
 
-    conn = get_write_conn()
-    counts = {}
+    counts: dict[str, int] = {}
 
-    try:
+    with write_conn() as conn:
         # Ensure tables exist with correct types before any data is inserted
         _ensure_espn_tables(conn)
 
@@ -282,13 +281,12 @@ def load_espn_to_bronze(records: list[dict[str, Any]]) -> dict[str, int]:
             counts["players"] = 0
 
         if innings_rows:
+            # Composite key for dedup: one row per match per innings
+            for row in innings_rows:
+                row["_innings_key"] = f"{row['espn_match_id']}_{row['inning_number']}"
             table = pa.Table.from_pylist(innings_rows)
-            # Composite key: match + inning number — use match_id for dedup
-            # (append_to_bronze dedup is on single column, so we use espn_match_id
-            # and accept that re-scraping a match appends duplicate innings.
-            # In practice, matches are only scraped once due to the already_scraped check.)
             counts["innings"] = append_to_bronze(
-                conn, f"{settings.bronze_schema}.espn_innings", table, "espn_match_id"
+                conn, f"{settings.bronze_schema}.espn_innings", table, "_innings_key"
             )
         else:
             counts["innings"] = 0
@@ -300,8 +298,6 @@ def load_espn_to_bronze(records: list[dict[str, Any]]) -> dict[str, int]:
             )
         else:
             counts["balls"] = 0
-    finally:
-        conn.close()
 
     logger.info(
         "espn_bronze_loaded",

@@ -35,6 +35,9 @@ lint: ## Run linting (ruff check + ruff format check)
 	ruff check src/ tests/
 	ruff format --check src/ tests/
 
+check: lint ## Run lint + unit tests (same checks as CI, run before pushing)
+	$(PYTHON) -m pytest tests/ -v -m unit
+
 format: ## Auto-format code
 	ruff check --fix src/ tests/
 	ruff format src/ tests/

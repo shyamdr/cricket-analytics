@@ -112,12 +112,12 @@ class TestGetConnections:
         conn.close()
 
     def test_query_helper_returns_dicts(self) -> None:
-        """The query() helper should return list of dicts."""
+        """The query() helper in api.database should return list of dicts."""
         from src.config import settings
 
         if not settings.duckdb_path.exists():
             pytest.skip("DuckDB not found — run `make all` first")
-        from src.database import query
+        from src.api.database import query
 
         result = query("SELECT 1 as val, 'hello' as msg")
         assert len(result) == 1

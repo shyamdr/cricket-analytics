@@ -5,11 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from src.api.database import DbQuery  # noqa: TC001 — runtime dep for FastAPI DI
-from src.config import settings
+from src.tables import BATTING_INNINGS, BOWLING_INNINGS, MATCH_SUMMARY, MATCHES, VENUES
 
 router = APIRouter(prefix="/api/v1/matches", tags=["matches"])
-
-_gold = settings.gold_schema
 
 
 @router.get("")
@@ -39,7 +37,7 @@ def list_matches(
 
     return db(
         f"""
-        SELECT * FROM {_gold}.dim_matches
+        SELECT * FROM {MATCHES}
         {where}
         ORDER BY match_date DESC
         LIMIT ${idx} OFFSET ${idx + 1}
@@ -53,7 +51,7 @@ def list_seasons(db: DbQuery):
     """List all available seasons with match counts."""
     return db(f"""
         SELECT season, COUNT(*) as matches
-        FROM {_gold}.dim_matches
+        FROM {MATCHES}
         GROUP BY season
         ORDER BY season
         """)
@@ -62,7 +60,7 @@ def list_seasons(db: DbQuery):
 @router.get("/venues")
 def list_venues(db: DbQuery):
     """List all venues."""
-    return db(f"SELECT * FROM {_gold}.dim_venues ORDER BY venue")
+    return db(f"SELECT * FROM {VENUES} ORDER BY venue")
 
 
 @router.get("/recent")
@@ -77,7 +75,7 @@ def recent_matches_with_scores(
             m.match_id, m.season, m.match_date, m.city, m.venue,
             m.team1, m.team2, m.outcome_winner, m.match_result_type,
             m.winning_margin, m.event_name, m.event_stage, m.floodlit
-        FROM {_gold}.dim_matches m
+        FROM {MATCHES} m
         ORDER BY m.match_date DESC
         LIMIT $1
         """,
@@ -92,22 +90,19 @@ def recent_matches_with_scores(
     summaries = db(
         f"""
         SELECT match_id, innings, batting_team, total_runs, total_wickets, overs_played
-        FROM {_gold}.fact_match_summary
+        FROM {MATCH_SUMMARY}
         WHERE match_id IN ({placeholders})
         ORDER BY match_id, innings
         """,
         match_ids,
     )
 
-    # Group summaries by match_id
     summary_map: dict[str, list] = {}
     for s in summaries:
         summary_map.setdefault(s["match_id"], []).append(s)
 
-    # Attach inline scores to each match
     for m in matches:
-        innings = summary_map.get(m["match_id"], [])
-        m["innings"] = innings
+        m["innings"] = summary_map.get(m["match_id"], [])
 
     return matches
 
@@ -128,14 +123,13 @@ def matches_by_tournament(
             m.match_id, m.season, m.match_date, m.city, m.venue,
             m.team1, m.team2, m.outcome_winner, m.match_result_type,
             m.winning_margin, m.event_name, m.event_stage, m.floodlit
-        FROM {_gold}.dim_matches m
+        FROM {MATCHES} m
         WHERE m.match_date >= $1
         ORDER BY m.match_date DESC
         """,
         [cutoff],
     )
 
-    # Group by event_name
     tournaments: dict[str, list] = {}
     for m in matches:
         name = m["event_name"] or "Other"
@@ -151,7 +145,7 @@ def matches_by_tournament(
 def get_match(match_id: str, db: DbQuery):
     """Get details for a specific match."""
     rows = db(
-        f"SELECT * FROM {_gold}.dim_matches WHERE match_id = $1",
+        f"SELECT * FROM {MATCHES} WHERE match_id = $1",
         [match_id],
     )
     if not rows:
@@ -164,7 +158,7 @@ def get_match_summary(match_id: str, db: DbQuery):
     """Get team-level summary for a match (both innings)."""
     return db(
         f"""
-        SELECT * FROM {_gold}.fact_match_summary
+        SELECT * FROM {MATCH_SUMMARY}
         WHERE match_id = $1
         ORDER BY innings
         """,
@@ -177,7 +171,7 @@ def get_match_batting(match_id: str, db: DbQuery):
     """Get all batting innings for a match."""
     return db(
         f"""
-        SELECT * FROM {_gold}.fact_batting_innings
+        SELECT * FROM {BATTING_INNINGS}
         WHERE match_id = $1
         ORDER BY innings, runs_scored DESC
         """,
@@ -190,7 +184,7 @@ def get_match_bowling(match_id: str, db: DbQuery):
     """Get all bowling innings for a match."""
     return db(
         f"""
-        SELECT * FROM {_gold}.fact_bowling_innings
+        SELECT * FROM {BOWLING_INNINGS}
         WHERE match_id = $1
         ORDER BY innings, wickets DESC
         """,

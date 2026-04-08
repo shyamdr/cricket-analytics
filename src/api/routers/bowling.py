@@ -5,11 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 
 from src.api.database import DbQuery  # noqa: TC001 — runtime dep for FastAPI DI
-from src.config import settings
+from src.tables import BOWLING_INNINGS
 
 router = APIRouter(prefix="/api/v1/bowling", tags=["bowling"])
-
-_gold = settings.gold_schema
 
 
 @router.get("/top")
@@ -26,7 +24,7 @@ def top_wicket_takers(
                    SUM(wickets) as total_wickets,
                    ROUND(AVG(economy_rate), 2) as avg_economy,
                    ROUND(SUM(runs_conceded) * 1.0 / NULLIF(SUM(wickets), 0), 2) as bowling_avg
-            FROM {_gold}.fact_bowling_innings
+            FROM {BOWLING_INNINGS}
             WHERE season = $1
             GROUP BY bowler ORDER BY total_wickets DESC LIMIT $2
             """,
@@ -38,7 +36,7 @@ def top_wicket_takers(
                SUM(wickets) as total_wickets,
                ROUND(AVG(economy_rate), 2) as avg_economy,
                ROUND(SUM(runs_conceded) * 1.0 / NULLIF(SUM(wickets), 0), 2) as bowling_avg
-        FROM {_gold}.fact_bowling_innings
+        FROM {BOWLING_INNINGS}
         GROUP BY bowler ORDER BY total_wickets DESC LIMIT $1
         """,
         [limit],
@@ -60,7 +58,7 @@ def player_bowling_stats(player_name: str, db: DbQuery):
                SUM(dot_balls) as total_dot_balls,
                SUM(wides) as total_wides,
                SUM(noballs) as total_noballs
-        FROM {_gold}.fact_bowling_innings
+        FROM {BOWLING_INNINGS}
         WHERE bowler = $1
         GROUP BY bowler
         """,
@@ -78,7 +76,7 @@ def player_bowling_season_breakdown(player_name: str, db: DbQuery):
                SUM(runs_conceded) as total_runs_conceded,
                ROUND(AVG(economy_rate), 2) as avg_economy,
                MAX(wickets) as best_wickets
-        FROM {_gold}.fact_bowling_innings
+        FROM {BOWLING_INNINGS}
         WHERE bowler = $1
         GROUP BY season ORDER BY season
         """,

@@ -229,19 +229,19 @@ Changes needed:
 Priority order. Quick wins that improve robustness.
 
 ### P0 — Fix Now
-- [ ] Context manager for `get_write_conn()` — current pattern returns raw connection, callers must manually close. If exception between open and try/except, connection leaks. Make `get_write_conn()` usable as `with get_write_conn() as conn:`. DuckDB connections support `__enter__`/`__exit__`. 10-line change, eliminates entire class of bugs.
-- [ ] Anti-join pattern in `append_to_bronze()` — current `NOT IN (SELECT DISTINCT match_id ...)` is one of the worst-performing SQL patterns at scale. At 5M rows (everything profile), materializes entire subquery. Replace with `LEFT JOIN ... WHERE target.id IS NULL`. Comment says "anti-join" but implementation is `NOT IN`.
-- [ ] Fix innings dedup in enrichment bronze_loader — acknowledged-broken in comment: "accept that re-scraping a match appends duplicate innings." Fix: add composite `_innings_key` column (`espn_match_id || '_' || inning_number`) like `_player_match_key` pattern already used for players.
+- [x] Context manager for `get_write_conn()` — added `write_conn()` context manager to `src/database.py`. Migrated all enrichment callers (series_resolver, run_ball_scraper, weather_fetcher, image_scraper, bronze_loader) from manual try/finally to `with write_conn() as conn:`. Eliminates connection leak risk.
+- [x] Anti-join pattern in `append_to_bronze()` — replaced `NOT IN (SELECT DISTINCT ...)` with `LEFT JOIN ... WHERE IS NULL`. NULL-safe, better performance at scale.
+- [x] Fix innings dedup in enrichment bronze_loader — added composite `_innings_key` (`espn_match_id_inning_number`) for proper per-innings dedup, matching the `_player_match_key` pattern.
 
 ### P1 — Quick Wins
-- [ ] Weather code CASE macro in dbt — exact same 30-line CASE statement duplicated in `fact_weather.sql` (hourly + daily). Extract to `macros/weather_description.sql`: `{% macro weather_description(column) %}`.
-- [ ] Remove dead `_get_already_fetched()` in weather_fetcher.py — defined but never called. `_get_pending_matches()` handles delta logic via LEFT JOIN.
-- [ ] Add `make check` target — single command: `lint + test -m unit + format check`. Developers should run same checks as CI before pushing.
-- [ ] Centralize table references — schema + table names scattered across 5 routers + UI pages as f-strings. Extract to a constants module or view layer so SQL injection surface is in one place.
+- [x] Weather code CASE macro in dbt — extracted duplicated 30-line CASE statement into `macros/weather_description.sql`. `fact_weather.sql` now calls `{{ weather_description('column') }}` for both hourly and daily.
+- [x] Remove dead `_get_already_fetched()` in weather_fetcher.py — defined but never called. `_get_pending_matches()` handles delta logic via LEFT JOIN.
+- [x] Add `make check` target — single command: `lint + test -m unit + format check`. Developers should run same checks as CI before pushing.
+- [x] Centralize table references — created `src/tables.py` with all fully-qualified table names (gold + bronze). Updated all 5 API routers and 4 Streamlit pages to import from `src/tables` instead of building f-strings with `settings.gold_schema`. Enrichment files left as-is (will change during DAG restructuring).
 
 ### P2 — API Hardening
 - [ ] API response models with `extra="allow"` — compromise between "no models" (current) and "strict models" (deferred). Define Pydantic models for guaranteed fields, allow extra fields to pass through. Gives useful OpenAPI docs without breaking on schema changes.
-- [ ] Consolidate 3 `query()` functions — `src.database.query` (opens/closes per call), `src.api.database.query` (singleton), `src.ui.data.query` (Streamlit cached). Same signature, different performance. Remove `src.database.query` or make it use a singleton. Having three is a maintenance trap.
+- [x] Consolidate 3 `query()` functions — removed the slow per-call-connection `query()` from `src/database.py`. Only the API singleton (`src/api/database.query`) and Streamlit cached (`src/ui/data.query`) versions remain. Updated unit test.
 
 ### P3 — Docker / DevOps
 - [ ] Docker compose doesn't pin image tag — `image: cricket-analytics:latest` is fragile. If `docker compose up api` runs without `pipeline`, gets stale `:latest`. Consider build hash or document dependency.

@@ -5,24 +5,22 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from src.api.database import DbQuery  # noqa: TC001 — runtime dep for FastAPI DI
-from src.config import settings
+from src.tables import MATCHES, TEAMS
 
 router = APIRouter(prefix="/api/v1/teams", tags=["teams"])
-
-_gold = settings.gold_schema
 
 
 @router.get("")
 def list_teams(db: DbQuery):
-    """List all IPL teams."""
-    return db(f"SELECT * FROM {_gold}.dim_teams ORDER BY team_name")
+    """List all teams."""
+    return db(f"SELECT * FROM {TEAMS} ORDER BY team_name")
 
 
 @router.get("/{team_name}")
 def get_team(team_name: str, db: DbQuery):
     """Get a specific team's details."""
     rows = db(
-        f"SELECT * FROM {_gold}.dim_teams WHERE team_name = $1",
+        f"SELECT * FROM {TEAMS} WHERE team_name = $1",
         [team_name],
     )
     if not rows:
@@ -42,7 +40,7 @@ def get_team_matches(
     if season:
         return db(
             f"""
-            SELECT * FROM {_gold}.dim_matches
+            SELECT * FROM {MATCHES}
             WHERE (team1 = $1 OR team2 = $1) AND season = $2
             ORDER BY match_date
             LIMIT $3 OFFSET $4
@@ -51,7 +49,7 @@ def get_team_matches(
         )
     return db(
         f"""
-        SELECT * FROM {_gold}.dim_matches
+        SELECT * FROM {MATCHES}
         WHERE team1 = $1 OR team2 = $1
         ORDER BY match_date
         LIMIT $2 OFFSET $3

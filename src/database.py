@@ -5,10 +5,7 @@ Provides read-only and read-write connections with consistent
 configuration, schema bootstrapping, and lifecycle management.
 
 Usage:
-    from src.database import get_read_conn, write_conn, query
-
-    # Quick read query
-    rows = query("SELECT * FROM main_gold.dim_matches LIMIT 10")
+    from src.database import get_read_conn, write_conn
 
     # Write connection — context manager guarantees cleanup
     with write_conn() as conn:
@@ -101,22 +98,6 @@ def _bootstrap_bronze_tables(conn: duckdb.DuckDBPyConnection) -> None:
     _ensure_espn_tables(conn)
 
 
-def query(sql: str, params: list | None = None) -> list[dict]:
-    """Execute a read-only SQL query and return results as a list of dicts.
-
-    Opens and closes a connection per call. For hot-path usage (API, UI),
-    prefer the module-level singleton in src.api.database or the
-    Streamlit-cached connection in src.ui.data.
-    """
-    conn = get_read_conn()
-    try:
-        result = conn.execute(sql, params or [])
-        columns = [desc[0] for desc in result.description]
-        return [dict(zip(columns, row, strict=False)) for row in result.fetchall()]
-    finally:
-        conn.close()
-
-
 def append_to_bronze(
     conn: duckdb.DuckDBPyConnection,
     table_name: str,
@@ -180,13 +161,13 @@ def append_to_bronze(
             # Count before insert
             (count_before,) = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
 
-            # Anti-join dedup: only insert rows whose id_column is not already present
+            # Anti-join dedup: only insert rows not already present in target.
+            # Uses LEFT JOIN (NULL-safe) instead of NOT IN (breaks if any ID is NULL).
             conn.execute(
                 f"""INSERT INTO {table_name} ({col_list})
                     SELECT {col_list} FROM {tmp_name} t
-                    WHERE t.{id_column} NOT IN (
-                        SELECT DISTINCT {id_column} FROM {table_name}
-                    )"""
+                    LEFT JOIN {table_name} existing ON t.{id_column} = existing.{id_column}
+                    WHERE existing.{id_column} IS NULL"""
             )
 
             (count_after,) = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
