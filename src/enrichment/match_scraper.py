@@ -64,16 +64,29 @@ async def _fetch_next_data(url: str, browser: Any) -> dict[str, Any]:
 def _extract_player_bio(player: dict[str, Any]) -> dict[str, Any]:
     """Extract biographical fields from an ESPN player object."""
     dob = player.get("dateOfBirth") or {}
+    dod = player.get("dateOfDeath") or {}
     return {
         "date_of_birth_year": dob.get("year"),
         "date_of_birth_month": dob.get("month"),
         "date_of_birth_day": dob.get("date"),
+        "date_of_death_year": dod.get("year") if isinstance(dod, dict) else None,
+        "date_of_death_month": dod.get("month") if isinstance(dod, dict) else None,
+        "date_of_death_day": dod.get("date") if isinstance(dod, dict) else None,
+        "gender": player.get("gender"),
         "batting_styles": json.dumps(player.get("battingStyles") or []),
         "bowling_styles": json.dumps(player.get("bowlingStyles") or []),
         "long_batting_styles": json.dumps(player.get("longBattingStyles") or []),
         "long_bowling_styles": json.dumps(player.get("longBowlingStyles") or []),
         "country_team_id": player.get("countryTeamId"),
         "playing_roles": json.dumps(player.get("playingRoles") or []),
+        "player_role_type_ids": json.dumps(player.get("playerRoleTypeIds") or []),
+        "mobile_name": player.get("mobileName"),
+        "index_name": player.get("indexName"),
+        "batting_name": player.get("battingName"),
+        "fielding_name": player.get("fieldingName"),
+        "slug": player.get("slug"),
+        "image_url": player.get("imageUrl"),
+        "headshot_image_url": player.get("headshotImageUrl"),
     }
 
 
@@ -127,9 +140,6 @@ def _extract_match_data(next_data: dict[str, Any]) -> dict[str, Any]:
                         "player_name": player.get("name"),
                         "player_long_name": player.get("longName"),
                         "is_overseas": p.get("isOverseas"),
-                        "match_role_code": role_code,
-                        "team_name": team_name,
-                        "espn_match_id": espn_match_id,
                     }
                 )
                 player_records.append(bio)
@@ -161,11 +171,58 @@ def _extract_match_data(next_data: dict[str, Any]) -> dict[str, Any]:
     # --- Venue / ground ---
     ground = match_info.get("ground") or {}
     town = ground.get("town") or {}
+    ground_country = ground.get("country") or {}
+    ground_image = ground.get("image") or {}
+
+    # --- Ground dimension record ---
+    ground_record = None
+    ground_id = ground.get("objectId")
+    if ground_id:
+        ground_record = {
+            "espn_ground_id": ground_id,
+            "ground_name": ground.get("name"),
+            "ground_long_name": ground.get("longName"),
+            "ground_small_name": ground.get("smallName"),
+            "ground_slug": ground.get("slug"),
+            "town_name": town.get("name"),
+            "town_area": town.get("area"),
+            "timezone": town.get("timezone"),
+            "country_name": ground_country.get("name"),
+            "country_abbreviation": ground_country.get("abbreviation"),
+            "capacity": ground.get("capacity"),
+            "image_url": ground_image.get("url"),
+        }
 
     # --- Teams match-level ---
     teams = match_info.get("teams") or []
     team1_data = teams[0] if len(teams) > 0 else {}
     team2_data = teams[1] if len(teams) > 1 else {}
+
+    # --- Team dimension records ---
+    team_records: list[dict[str, Any]] = []
+    seen_team_ids: set[int] = set()
+    for td in teams:
+        t = td.get("team") or {}
+        tid = t.get("objectId")
+        if tid and tid not in seen_team_ids:
+            seen_team_ids.add(tid)
+            t_image = t.get("image") or {}
+            t_country = t.get("country") or {}
+            team_records.append(
+                {
+                    "espn_team_id": tid,
+                    "team_name": t.get("name"),
+                    "team_long_name": t.get("longName"),
+                    "team_abbreviation": t.get("abbreviation"),
+                    "team_unofficial_name": t.get("unofficialName"),
+                    "team_slug": t.get("slug"),
+                    "is_country": t.get("isCountry"),
+                    "primary_color": t.get("primaryColor"),
+                    "image_url": t_image.get("url"),
+                    "country_name": t_country.get("name"),
+                    "country_abbreviation": t_country.get("abbreviation"),
+                }
+            )
 
     # --- Replacement players ---
     replacements = match_info.get("replacementPlayers") or []
@@ -336,24 +393,33 @@ def _extract_match_data(next_data: dict[str, Any]) -> dict[str, Any]:
         "sub_class_id": match_info.get("subClassId"),
         # Venue
         "espn_ground_id": ground.get("objectId"),
+        "ground_name": ground.get("name"),
+        "ground_long_name": ground.get("longName"),
         "ground_capacity": ground.get("capacity"),
+        "ground_country_name": ((ground.get("country") or {}).get("name")),
+        "ground_country_abbreviation": ((ground.get("country") or {}).get("abbreviation")),
         "venue_timezone": town.get("timezone"),
+        "ground_image_url": (ground.get("image") or {}).get("url"),
         # Team 1
         "team1_name": teams_enrichment[0]["team_name"] if teams_enrichment else None,
         "team1_espn_id": teams_enrichment[0]["espn_team_id"] if teams_enrichment else None,
+        "team1_abbreviation": ((team1_data.get("team") or {}).get("abbreviation")),
         "team1_captain": team1_captain,
         "team1_keeper": team1_keeper,
         "team1_is_home": team1_data.get("isHome"),
         "team1_points": team1_data.get("points"),
         "team1_primary_color": (team1_data.get("team") or {}).get("primaryColor"),
+        "team1_logo_url": ((team1_data.get("team") or {}).get("image") or {}).get("url"),
         # Team 2
         "team2_name": teams_enrichment[1]["team_name"] if len(teams_enrichment) > 1 else None,
         "team2_espn_id": teams_enrichment[1]["espn_team_id"] if len(teams_enrichment) > 1 else None,
+        "team2_abbreviation": ((team2_data.get("team") or {}).get("abbreviation")),
         "team2_captain": team2_captain,
         "team2_keeper": team2_keeper,
         "team2_is_home": team2_data.get("isHome"),
         "team2_points": team2_data.get("points"),
         "team2_primary_color": (team2_data.get("team") or {}).get("primaryColor"),
+        "team2_logo_url": ((team2_data.get("team") or {}).get("image") or {}).get("url"),
         # Replacements & debut
         "replacement_players_json": json.dumps(replacement_records)
         if replacement_records
@@ -366,6 +432,8 @@ def _extract_match_data(next_data: dict[str, Any]) -> dict[str, Any]:
     return {
         "match": match_record,
         "players": player_records,
+        "teams": team_records,
+        "ground": ground_record,
         "innings": innings_records,
         "balls": ball_records,
     }

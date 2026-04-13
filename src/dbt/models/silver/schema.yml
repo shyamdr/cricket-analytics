@@ -245,3 +245,25 @@ models:
         description: "Dropped catches in this innings (may be null)"
       - name: partnerships_json
         description: "JSON array of partnership details (player runs/balls, total, out player)"
+
+  - name: stg_venue_coordinates
+    description: "Staged venue coordinates from geocoding enrichment. One row per (venue, city) with lat/lng. Only includes successfully geocoded venues."
+    columns:
+      - name: venue
+        description: "Venue name as it appears in match data"
+        tests:
+          - not_null
+      - name: city
+        description: "City where the venue is located"
+      - name: latitude
+        description: "Geocoded latitude"
+      - name: longitude
+        description: "Geocoded longitude"
+      - name: formatted_address
+        description: "Full formatted address from Google Maps Geocoding API"
+      - name: place_id
+        description: "Google Maps place ID for the venue"
+      - name: geocode_status
+        description: "Geocoding result status (always 'ok' in this table — failed geocodes filtered out)"
+      - name: _loaded_at
+        description: "Timestamp when this row was loaded into the silver layer"

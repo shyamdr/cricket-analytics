@@ -34,7 +34,7 @@ espn_venue as (
     group by m.venue, e.espn_ground_id, e.ground_capacity, e.venue_timezone
 ),
 
--- Geocoded coordinates from bronze.venue_coordinates (populated by geocoding enrichment job)
+-- Geocoded coordinates from silver staging (populated by geocoding enrichment job)
 geocoded as (
     select
         venue,
@@ -42,17 +42,20 @@ geocoded as (
         latitude,
         longitude,
         formatted_address,
-        place_id,
-        geocode_status
-    from {{ source('bronze', 'venue_coordinates') }}
-    where geocode_status = 'ok'
+        place_id
+    from {{ ref('stg_venue_coordinates') }}
 ),
 
--- Venue images from standalone image enrichment (keyed by espn_ground_id)
-venue_images as (
-    select entity_id, image_url as venue_image_url
-    from {{ ref('stg_espn_images') }}
-    where entity_type = 'venue'
+-- Venue data from ESPN grounds enrichment
+espn_grounds as (
+    select
+        espn_ground_id,
+        ground_name,
+        ground_long_name,
+        capacity,
+        timezone,
+        image_url as venue_image_url
+    from {{ ref('stg_espn_grounds') }}
 )
 
 select
@@ -75,7 +78,7 @@ select
     ev.ground_capacity,
     ev.venue_timezone,
     -- Venue image
-    vi.venue_image_url
+    eg.venue_image_url
 from venue_stats vs
 left join espn_venue ev
     on vs.venue = ev.venue
@@ -86,6 +89,6 @@ left join {{ ref('venue_name_mappings') }} vnm
 left join geocoded gc
     on vs.venue = gc.venue
     and (vs.city = gc.city or (vs.city is null and gc.city is null))
-left join venue_images vi
+left join espn_grounds eg
     on ev.espn_ground_id is not null
-    and vi.entity_id = cast(ev.espn_ground_id as varchar)
+    and eg.espn_ground_id = ev.espn_ground_id

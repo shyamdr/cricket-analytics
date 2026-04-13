@@ -444,47 +444,33 @@ class WeatherEnrichmentConfig(Config):
 class ImageEnrichmentConfig(Config):
     """Configuration for the espn_image_enrichment asset."""
 
-    players: bool = True
-    teams: bool = True
-    limit: int = 0  # 0 = all pending
-    delay: float = 2.0  # seconds between player page requests
-
 
 @asset(
     group_name="enrichment",
     compute_kind="python",
-    deps=[AssetKey(["bronze_people"])],
+    deps=[AssetKey("espn_match_enrichment")],
     description=(
-        "Scrape ESPN Cricinfo for player headshots, team logos, and venue images. "
-        "Players: hits individual profile pages using key_cricinfo from people.csv. "
-        "Teams/venues: extracts from a single IPL series page. "
-        "Delta-aware — skips already-scraped entities. "
-        "Writes to bronze.espn_images lookup table."
+        "Download player headshots, team logos, and venue images from ESPN Cloudinary CDN. "
+        "Reads URLs from espn_players, espn_teams, espn_grounds. "
+        "Saves PNGs to data/images/. Marks downloaded_at in source tables."
     ),
 )
 def espn_image_enrichment(
     context: AssetExecutionContext, config: ImageEnrichmentConfig
 ) -> MaterializeResult:
-    """Scrape ESPN image URLs for players, teams, and venues."""
-    from src.enrichment.image_scraper import scrape_images
+    """Download ESPN images to local storage."""
+    from src.enrichment.image_downloader import download_images
 
-    counts = scrape_images(
-        players=config.players,
-        teams=config.teams,
-        limit=config.limit,
-        delay=config.delay,
-    )
+    counts = download_images()
 
     context.log.info(
-        f"Image enrichment: {counts['players']} players, "
-        f"{counts['teams']} teams, {counts['venues']} venues"
+        f"Image download: {counts['downloaded']} downloaded, {counts['failed']} failed"
     )
 
     return MaterializeResult(
         metadata={
-            "players": MetadataValue.int(counts["players"]),
-            "teams": MetadataValue.int(counts["teams"]),
-            "venues": MetadataValue.int(counts["venues"]),
+            "downloaded": MetadataValue.int(counts["downloaded"]),
+            "failed": MetadataValue.int(counts["failed"]),
         }
     )
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from dagster import Definitions, FreshnessPolicy, apply_freshness_policy
+from dagster import Definitions, FreshnessPolicy, apply_freshness_policy, multiprocess_executor
 from dagster_dbt import DbtCliResource
 
 from src.orchestration.assets.dbt import DBT_PROJECT_DIR, dbt_analytics_assets
@@ -53,6 +53,10 @@ defs = Definitions(
             profiles_dir=DBT_PROJECT_DIR,
         ),
     },
+    # DuckDB is single-writer — run assets sequentially to avoid file lock conflicts.
+    # The DAG is still designed for parallelism (correct dependencies, independent branches),
+    # so flipping max_concurrency up works if we migrate to Postgres later.
+    executor=multiprocess_executor.configured({"max_concurrent": 1}),
 )
 
 # Apply freshness policy to gold layer assets only.

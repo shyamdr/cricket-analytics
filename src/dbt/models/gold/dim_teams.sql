@@ -20,11 +20,15 @@ team_stats as (
     group by t.team_name
 ),
 
--- Team logos from standalone image enrichment
-team_images as (
-    select entity_id, entity_name, image_url as logo_url
-    from {{ ref('stg_espn_images') }}
-    where entity_type = 'team'
+-- Team data from ESPN enrichment
+espn_teams as (
+    select
+        team_long_name,
+        team_abbreviation,
+        is_country,
+        primary_color,
+        image_url as logo_url
+    from {{ ref('stg_espn_teams') }}
 )
 
 select
@@ -37,10 +41,13 @@ select
     ts.first_match_date,
     ts.last_match_date,
     ts.total_matches,
-    -- Image enrichment
-    ti.logo_url
+    -- ESPN enrichment
+    et.team_abbreviation,
+    et.is_country,
+    et.primary_color,
+    et.logo_url
 from team_stats ts
 left join {{ ref('team_name_mappings') }} tnm
     on ts.team_name = tnm.team_name
-left join team_images ti
-    on ts.team_name = ti.entity_name
+left join espn_teams et
+    on ts.team_name = et.team_long_name

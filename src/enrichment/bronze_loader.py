@@ -11,7 +11,7 @@ import pyarrow as pa
 import structlog
 
 from src.config import settings
-from src.database import append_to_bronze, write_conn
+from src.database import append_to_bronze, upsert_to_bronze, write_conn
 
 logger = structlog.get_logger(__name__)
 
@@ -68,25 +68,67 @@ CREATE TABLE IF NOT EXISTS {schema}.espn_matches (
 
 _ESPN_PLAYERS_DDL = """
 CREATE TABLE IF NOT EXISTS {schema}.espn_players (
+    espn_player_id              BIGINT,
+    player_name                 VARCHAR,
+    player_long_name            VARCHAR,
+    mobile_name                 VARCHAR,
+    index_name                  VARCHAR,
+    batting_name                VARCHAR,
+    fielding_name               VARCHAR,
+    slug                        VARCHAR,
+    gender                      VARCHAR,
     date_of_birth_year          BIGINT,
     date_of_birth_month         BIGINT,
     date_of_birth_day           BIGINT,
+    date_of_death_year          BIGINT,
+    date_of_death_month         BIGINT,
+    date_of_death_day           BIGINT,
     batting_styles              VARCHAR,
     bowling_styles              VARCHAR,
     long_batting_styles         VARCHAR,
     long_bowling_styles         VARCHAR,
     country_team_id             BIGINT,
     playing_roles               VARCHAR,
-    espn_player_id              BIGINT,
-    player_name                 VARCHAR,
-    player_long_name            VARCHAR,
+    player_role_type_ids        VARCHAR,
     is_overseas                 BOOLEAN,
-    match_role_code             VARCHAR,
-    team_name                   VARCHAR,
-    espn_match_id               BIGINT,
     image_url                   VARCHAR,
     headshot_image_url          VARCHAR,
-    _player_match_key           VARCHAR
+    downloaded_at               TIMESTAMP
+)
+"""
+
+_ESPN_TEAMS_DDL = """
+CREATE TABLE IF NOT EXISTS {schema}.espn_teams (
+    espn_team_id                BIGINT,
+    team_name                   VARCHAR,
+    team_long_name              VARCHAR,
+    team_abbreviation           VARCHAR,
+    team_unofficial_name        VARCHAR,
+    team_slug                   VARCHAR,
+    is_country                  BOOLEAN,
+    primary_color               VARCHAR,
+    image_url                   VARCHAR,
+    country_name                VARCHAR,
+    country_abbreviation        VARCHAR,
+    downloaded_at               TIMESTAMP
+)
+"""
+
+_ESPN_GROUNDS_DDL = """
+CREATE TABLE IF NOT EXISTS {schema}.espn_grounds (
+    espn_ground_id              BIGINT,
+    ground_name                 VARCHAR,
+    ground_long_name            VARCHAR,
+    ground_small_name           VARCHAR,
+    ground_slug                 VARCHAR,
+    town_name                   VARCHAR,
+    town_area                   VARCHAR,
+    timezone                    VARCHAR,
+    country_name                VARCHAR,
+    country_abbreviation        VARCHAR,
+    capacity                    VARCHAR,
+    image_url                   VARCHAR,
+    downloaded_at               TIMESTAMP
 )
 """
 
@@ -184,15 +226,12 @@ def _ensure_espn_tables(conn: duckdb.DuckDBPyConnection) -> None:
     schema = settings.bronze_schema
     conn.execute(_ESPN_MATCHES_DDL.format(schema=schema))
     conn.execute(_ESPN_PLAYERS_DDL.format(schema=schema))
+    conn.execute(_ESPN_TEAMS_DDL.format(schema=schema))
+    conn.execute(_ESPN_GROUNDS_DDL.format(schema=schema))
     conn.execute(_ESPN_INNINGS_DDL.format(schema=schema))
     conn.execute(_ESPN_BALL_DATA_DDL.format(schema=schema))
     conn.execute(_VENUE_COORDINATES_DDL.format(schema=schema))
     conn.execute(_WEATHER_DDL.format(schema=schema))
-
-    # Image enrichment table (standalone scraper)
-    from src.enrichment.image_scraper import _ensure_images_table
-
-    _ensure_images_table(conn)
 
     # Migrate existing tables: add new image columns if they don't exist yet.
     # Safe to run repeatedly — ALTER TABLE ADD COLUMN IF NOT EXISTS is idempotent.
@@ -240,19 +279,46 @@ def load_espn_to_bronze(records: list[dict[str, Any]]) -> dict[str, int]:
     """
     if not records:
         logger.info("no_espn_records_to_load")
-        return {"matches": 0, "players": 0, "innings": 0, "balls": 0}
+        return {"matches": 0, "players": 0, "teams": 0, "grounds": 0, "innings": 0, "balls": 0}
 
     # Flatten all sub-records from each match
     match_rows = []
     player_rows = []
+    team_rows = []
+    ground_rows = []
     innings_rows = []
     ball_rows = []
 
+    seen_team_ids: set[int] = set()
+    seen_ground_ids: set[int] = set()
+    seen_player_ids: set[int] = set()
+
     for rec in records:
         match_rows.append(rec["match"])
-        player_rows.extend(rec.get("players") or [])
         innings_rows.extend(rec.get("innings") or [])
         ball_rows.extend(rec.get("balls") or [])
+
+        # Dedup players across matches within this batch
+        for p in rec.get("players") or []:
+            pid = p.get("espn_player_id")
+            if pid and pid not in seen_player_ids:
+                seen_player_ids.add(pid)
+                player_rows.append(p)
+
+        # Dedup teams across matches within this batch
+        for t in rec.get("teams") or []:
+            tid = t.get("espn_team_id")
+            if tid and tid not in seen_team_ids:
+                seen_team_ids.add(tid)
+                team_rows.append(t)
+
+        # Dedup grounds across matches within this batch
+        g = rec.get("ground")
+        if g:
+            gid = g.get("espn_ground_id")
+            if gid and gid not in seen_ground_ids:
+                seen_ground_ids.add(gid)
+                ground_rows.append(g)
 
     counts: dict[str, int] = {}
 
@@ -269,16 +335,29 @@ def load_espn_to_bronze(records: list[dict[str, Any]]) -> dict[str, int]:
             counts["matches"] = 0
 
         if player_rows:
-            # Add composite key for dedup: player appears in multiple matches
-            # but bio data is the same — we want one row per player per match
-            for row in player_rows:
-                row["_player_match_key"] = f"{row['espn_player_id']}_{row['espn_match_id']}"
+            # Upsert by espn_player_id — latest data wins (dimension table)
             table = pa.Table.from_pylist(player_rows)
-            counts["players"] = append_to_bronze(
-                conn, f"{settings.bronze_schema}.espn_players", table, "_player_match_key"
+            counts["players"] = upsert_to_bronze(
+                conn, f"{settings.bronze_schema}.espn_players", table, "espn_player_id"
             )
         else:
             counts["players"] = 0
+
+        if team_rows:
+            table = pa.Table.from_pylist(team_rows)
+            counts["teams"] = upsert_to_bronze(
+                conn, f"{settings.bronze_schema}.espn_teams", table, "espn_team_id"
+            )
+        else:
+            counts["teams"] = 0
+
+        if ground_rows:
+            table = pa.Table.from_pylist(ground_rows)
+            counts["grounds"] = upsert_to_bronze(
+                conn, f"{settings.bronze_schema}.espn_grounds", table, "espn_ground_id"
+            )
+        else:
+            counts["grounds"] = 0
 
         if innings_rows:
             # Composite key for dedup: one row per match per innings

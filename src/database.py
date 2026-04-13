@@ -183,3 +183,80 @@ def append_to_bronze(
         logger.info("no_new_rows", table=table_name)
 
     return new_rows
+
+
+def upsert_to_bronze(
+    conn: duckdb.DuckDBPyConnection,
+    table_name: str,
+    data: pa.Table,
+    id_column: str,
+) -> int:
+    """Upsert a PyArrow table into a bronze DuckDB dimension table.
+
+    For dimension tables (espn_players, espn_teams, espn_grounds) where
+    we want the latest data to always win. Deletes existing rows that
+    match on id_column, then inserts all incoming rows.
+
+    Handles schema evolution same as append_to_bronze.
+
+    Args:
+        conn: An open read-write DuckDB connection.
+        table_name: Fully-qualified table name (e.g. ``bronze.espn_players``).
+        data: PyArrow Table to load.
+        id_column: Primary key column for matching (e.g. ``espn_player_id``).
+
+    Returns:
+        Number of rows upserted (inserted or updated).
+    """
+    if data.num_rows == 0:
+        return 0
+
+    tmp_name = "_tmp_bronze_upsert"
+    conn.register(tmp_name, data)
+
+    try:
+        # Check if target table exists
+        table_exists = False
+        try:
+            conn.execute(f"SELECT 1 FROM {table_name} LIMIT 0")
+            table_exists = True
+        except duckdb.CatalogException:
+            pass
+
+        if not table_exists:
+            conn.execute(f"CREATE TABLE {table_name} AS SELECT * FROM {tmp_name}")
+            upserted = data.num_rows
+        else:
+            # Schema evolution: add any new columns from incoming data
+            existing_cols = {
+                row[0]
+                for row in conn.execute(
+                    f"SELECT column_name FROM information_schema.columns "
+                    f"WHERE table_name = '{table_name.split('.')[-1]}' "
+                    f"AND table_schema = '{table_name.split('.')[0]}'"
+                ).fetchall()
+            }
+            incoming_cols = data.column_names
+            for col in incoming_cols:
+                if col not in existing_cols:
+                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col} VARCHAR")
+
+            # Delete existing rows that will be replaced
+            conn.execute(
+                f"DELETE FROM {table_name} WHERE {id_column} IN "
+                f"(SELECT {id_column} FROM {tmp_name})"
+            )
+
+            # Insert all incoming rows
+            col_list = ", ".join(incoming_cols)
+            conn.execute(
+                f"INSERT INTO {table_name} ({col_list}) SELECT {col_list} FROM {tmp_name}"
+            )
+            upserted = data.num_rows
+    finally:
+        conn.unregister(tmp_name)
+
+    if upserted > 0:
+        logger.info("bronze_upsert", table=table_name, upserted=upserted)
+
+    return upserted

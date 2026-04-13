@@ -21,12 +21,24 @@ sources:
             asset_key: ["bronze_people"]
       - name: espn_matches
         description: "ESPN match-level enrichment data (venue, timing, captains, home team, etc.)"
+        meta:
+          dagster:
+            asset_key: ["espn_match_enrichment"]
       - name: espn_players
         description: "ESPN player biographical data (DOB, batting/bowling styles, playing roles, overseas flag)"
+        meta:
+          dagster:
+            asset_key: ["espn_match_enrichment"]
       - name: espn_innings
         description: "ESPN innings-level data (partnerships, DRS reviews, phase breakdowns, fielding metrics)"
+        meta:
+          dagster:
+            asset_key: ["espn_match_enrichment"]
       - name: espn_ball_data
         description: "ESPN per-ball spatial data (wagon wheel, pitch line/length, shot type, win probability)"
+        meta:
+          dagster:
+            asset_key: ["espn_ball_enrichment"]
       - name: venue_coordinates
         description: "Geocoded venue coordinates (lat/lng, formatted address) from geocoding enrichment job. Populated by the geocode_venues asset — new venues are detected from dim_venues and geocoded automatically."
         meta:
@@ -38,7 +50,17 @@ sources:
           dagster:
             asset_key: ["weather_enrichment"]
       - name: espn_images
-        description: "Image URLs for players, teams, and venues from ESPN Cricinfo. One row per entity. Populated by the espn_image_enrichment Dagster asset."
+        description: "DEPRECATED — replaced by espn_players, espn_teams, espn_grounds dimension tables."
         meta:
           dagster:
             asset_key: ["espn_image_enrichment"]
+      - name: espn_teams
+        description: "ESPN team dimension data (name, abbreviation, logo URL, primary color, country). One row per team."
+        meta:
+          dagster:
+            asset_key: ["espn_match_enrichment"]
+      - name: espn_grounds
+        description: "ESPN ground/venue dimension data (name, town, timezone, capacity, image URL, country). One row per ground."
+        meta:
+          dagster:
+            asset_key: ["espn_match_enrichment"]

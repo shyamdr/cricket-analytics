@@ -36,23 +36,10 @@ people as (
     select * from {{ ref('stg_people') }}
 ),
 
--- ESPN player bio: pick latest appearance per player (most recent match)
--- to get the most up-to-date biographical data
-espn_latest as (
-    select
-        ep.*,
-        row_number() over (
-            partition by ep.espn_player_id
-            order by ep.espn_match_id desc
-        ) as rn
-    from {{ ref('stg_espn_players') }} ep
-),
-
--- Player images from standalone image enrichment
-player_images as (
-    select entity_id, image_url, headshot_url
-    from {{ ref('stg_espn_images') }}
-    where entity_type = 'player'
+-- ESPN player bio: one row per player (dimension table)
+espn_players as (
+    select *
+    from {{ ref('stg_espn_players') }}
 )
 
 select
@@ -73,14 +60,10 @@ select
     el.country_team_id,
     el.is_overseas,
     -- Image URLs (CMS paths — prepend https://img1.hscicdn.com/image/upload/f_auto at display time)
-    pi.image_url,
-    pi.headshot_url as headshot_image_url
+    el.image_url,
+    el.headshot_image_url
 from deduped d
 left join people p on d.player_id = p.player_id
-left join espn_latest el
+left join espn_players el
     on p.key_cricinfo is not null
     and el.espn_player_id = try_cast(p.key_cricinfo as bigint)
-    and el.rn = 1
-left join player_images pi
-    on p.key_cricinfo is not null
-    and pi.entity_id = p.key_cricinfo

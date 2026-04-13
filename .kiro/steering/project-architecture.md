@@ -19,6 +19,7 @@ Two audiences:
 - Professional quality — coding standards, type hints, tests, docs, CI, ADRs, the works
 - Idempotent pipelines — raw data downloaded from source, never stored in git
 - Format-agnostic — all code, validations, and schema design must work across cricket formats (T20, ODI, Test, The Hundred, etc.) and leagues (IPL, BBL, PSL, CPL, etc.). Never hardcode IPL-specific assumptions like "20 overs", "season is 4 digits", "dates start from 2008", or "max batter_runs = 6". The project is cricket-analytics, not IPL-analytics.
+- Data source integrity — ESPN tables (`espn_*`) must ONLY contain data from ESPN. Never mix Cricsheet data into ESPN tables. If ESPN data is unavailable for a field, leave it NULL rather than backfilling from Cricsheet. Incomplete data is acceptable; inconsistent or cross-contaminated data is not.
 
 ## Tech Stack
 | Layer            | Tool                        | Why                                              |

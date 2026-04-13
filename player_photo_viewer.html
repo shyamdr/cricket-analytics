@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Player Photo Viewer — InsideEdge</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e0e0e0;
+      padding: 40px 20px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 2rem;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle {
+      text-align: center;
+      color: #888;
+      font-size: 0.85rem;
+      margin-bottom: 12px;
+    }
+    .controls {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .controls button {
+      background: #2a2d48;
+      color: #ccc;
+      border: 1px solid #3a3d58;
+      padding: 8px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      margin: 0 4px;
+    }
+    .controls button:hover { background: #3a3d58; color: #fff; }
+    .status {
+      text-align: center;
+      color: #666;
+      font-size: 0.8rem;
+      margin-bottom: 32px;
+    }
+    .player-section { max-width: 1400px; margin: 0 auto 56px; }
+    .player-name { font-size: 1.3rem; font-weight: 700; color: #f0f0f0; margin-bottom: 4px; }
+    .player-id { font-size: 0.75rem; color: #666; margin-bottom: 16px; }
+    .player-id a { color: #60a5fa; text-decoration: none; }
+    .variants {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .variant {
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      background-image:
+        linear-gradient(45deg, #1e1e2e 25%, transparent 25%),
+        linear-gradient(-45deg, #1e1e2e 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #1e1e2e 75%),
+        linear-gradient(-45deg, transparent 75%, #1e1e2e 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+      background-color: #2a2a3a;
+      border: 1px solid #2a2d38;
+    }
+    .variant:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+    .variant-label {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 8px 10px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.9));
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #ccc;
+      line-height: 1.3;
+    }
+    .variant-label .code {
+      display: block;
+      font-weight: 400;
+      color: #888;
+      font-size: 0.5rem;
+      margin-top: 2px;
+      font-family: 'SF Mono', Monaco, monospace;
+      word-break: break-all;
+    }
+    .variant img {
+      width: 100%;
+      height: 300px;
+      display: block;
+      object-fit: contain;
+    }
+    .variant img.failed {
+      opacity: 0.15;
+    }
+    .retry-badge {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(239, 68, 68, 0.9);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      display: none;
+      z-index: 2;
+    }
+    .variant img.failed ~ .retry-badge { display: block; }
+    .divider { border: none; border-top: 1px solid #222; margin: 0 auto 56px; max-width: 1400px; }
+  </style>
+</head>
+<body>
+
+<h1>Player Photo Viewer</h1>
+<p class="subtitle">All images use e_background_removal · Staggered loading to avoid CDN throttling</p>
+<div class="controls">
+  <button onclick="retryAllFailed()">↻ Retry All Failed</button>
+</div>
+<div class="status" id="status">Loading images...</div>
+
+<div id="content"></div>
+
+<script>
+const CDN = "https://img1.hscicdn.com/image/upload";
+
+const players = [
+  { name: "SS Iyer (Shreyas Iyer)", id: "642519", headshot: "/lsci/db/PICTURES/CMS/323000/323035.png" },
+  { name: "SP Narine (Sunil Narine)", id: "230558", headshot: "/lsci/db/PICTURES/CMS/320100/320119.png" },
+  { name: "AC Gilchrist (Adam Gilchrist)", id: "5390", headshot: "/lsci/db/PICTURES/CMS/321500/321545.png" },
+  { name: "CA Pujara (Cheteshwar Pujara)", id: "32540", headshot: "/lsci/db/PICTURES/CMS/319900/319932.png" },
+  { name: "AJ Finch (Aaron Finch)", id: "5334", headshot: "/lsci/db/PICTURES/CMS/316500/316533.png" },
+];
+
+const variants = [
+  { label: "1. Card (300×400)", transform: "f_png,e_background_removal,h_400,w_300,c_fill,g_face" },
+  { label: "2. Large Hero (600×800)", transform: "f_png,e_background_removal,c_fill,g_face,w_600,h_800" },
+  { label: "3. Card 2× (600×800)", transform: "f_png,e_background_removal,h_800,w_600,c_fill,g_face" },
+  { label: "4. Hero 2× (1200×1600)", transform: "f_png,e_background_removal,c_fill,g_face,w_1200,h_1600" },
+  { label: "5. Wide 16:9 (1200×675)", transform: "f_png,e_background_removal,c_fill,g_face,w_1200,h_675" },
+  { label: "6. Thumb tight (300×300)", transform: "f_png,e_background_removal,c_thumb,g_face,w_300,h_300" },
+  { label: "7. Thumb HD (600×600)", transform: "f_png,e_background_removal,c_thumb,g_face,w_600,h_600" },
+  { label: "8. Vibrance (300×400)", transform: "f_png,e_background_removal,e_vibrance:40,c_fill,g_face,w_300,h_400" },
+];
+
+// Build the DOM first with placeholder images (no src yet)
+const content = document.getElementById("content");
+const allImages = []; // track all {img, src} for staggered loading
+
+players.forEach((player, idx) => {
+  const section = document.createElement("div");
+  section.className = "player-section";
+
+  let html = `
+    <div class="player-name">${player.name}</div>
+    <div class="player-id">ESPN ID: ${player.id} · <a href="https://www.espncricinfo.com/cricketers/player-${player.id}" target="_blank">ESPN Profile ↗</a></div>
+    <div class="variants">
+  `;
+
+  variants.forEach((v, vi) => {
+    const src = `${CDN}/${v.transform}${player.headshot}`;
+    const imgId = `img-${idx}-${vi}`;
+    html += `
+      <div class="variant">
+        <img id="${imgId}" alt="${player.name} — ${v.label}" data-src="${src}" />
+        <div class="retry-badge" onclick="retryImage('${imgId}')">Click to retry</div>
+        <div class="variant-label">
+          ${v.label}
+          <span class="code">${v.transform}</span>
+        </div>
+      </div>
+    `;
+    allImages.push({ id: imgId, src: src });
+  });
+
+  html += `</div>`;
+  section.innerHTML = html;
+  content.appendChild(section);
+
+  if (idx < players.length - 1) {
+    const hr = document.createElement("hr");
+    hr.className = "divider";
+    content.appendChild(hr);
+  }
+});
+
+// Staggered loading: load images 3 at a time with 800ms gap
+let loaded = 0;
+let failed = 0;
+const statusEl = document.getElementById("status");
+
+function updateStatus() {
+  statusEl.textContent = `Loaded: ${loaded}/${allImages.length}` + (failed > 0 ? ` · Failed: ${failed} (click to retry)` : ``);
+  if (loaded + failed === allImages.length && failed === 0) {
+    statusEl.textContent = `All ${allImages.length} images loaded ✓`;
+    statusEl.style.color = "#4ade80";
+  }
+}
+
+function loadImage(entry) {
+  return new Promise(resolve => {
+    const img = document.getElementById(entry.id);
+    if (!img) { resolve(); return; }
+
+    img.onload = () => {
+      img.classList.remove("failed");
+      loaded++;
+      updateStatus();
+      resolve();
+    };
+    img.onerror = () => {
+      img.classList.add("failed");
+      failed++;
+      updateStatus();
+      resolve();
+    };
+    img.src = entry.src;
+  });
+}
+
+async function loadAllStaggered() {
+  const BATCH = 3;
+  const DELAY = 800;
+
+  for (let i = 0; i < allImages.length; i += BATCH) {
+    const batch = allImages.slice(i, i + BATCH);
+    await Promise.all(batch.map(loadImage));
+    if (i + BATCH < allImages.length) {
+      await new Promise(r => setTimeout(r, DELAY));
+    }
+  }
+}
+
+function retryImage(imgId) {
+  const img = document.getElementById(imgId);
+  if (!img) return;
+  const src = img.dataset.src;
+  img.classList.remove("failed");
+  failed = Math.max(0, failed - 1);
+  // Add cache-buster
+  img.src = src + (src.includes("?") ? "&" : "?") + "retry=" + Date.now();
+  img.onload = () => { loaded++; updateStatus(); };
+  img.onerror = () => { img.classList.add("failed"); failed++; updateStatus(); };
+}
+
+function retryAllFailed() {
+  document.querySelectorAll("img.failed").forEach(img => {
+    retryImage(img.id);
+  });
+}
+
+// Start loading
+loadAllStaggered();
+</script>
+</body>
+</html>

@@ -141,7 +141,7 @@ class Settings(BaseSettings):
     ui_port: int = 8501
 
     # Enrichment
-    enrichment_batch_size: int = 50
+    enrichment_batch_size: int = 10
 
     model_config = {"env_prefix": "CRICKET_"}
 
