@@ -220,7 +220,7 @@ Changes needed:
 - [ ] Consider splitting `dbt build` into `dbt run` for daily_refresh_job and `dbt build` (with tests) for full_pipeline_job — daily refresh doesn't need to run all 49 tests every time.
 
 ### Ingestion Fixes
-- [ ] Fix `full_refresh` flag — currently only applies to first dataset when multiple are specified. `datasets=["ipl", "t20i"]` with `full_refresh=True` drops IPL tables but delta-appends T20I. Should drop all tables once at the start.
+- [x] Fix `full_refresh` flag — RESOLVED by removing full_refresh entirely. For a full rebuild, delete `data/cricket.duckdb` and re-run. Tables are created automatically on first write.
 
 ### API Fixes
 - [x] Fix `by-tournament` endpoint SQL INTERVAL parameter — `INTERVAL '$1 days'` doesn't work with DuckDB parameterized queries. Compute date in Python and pass as date parameter.
@@ -303,15 +303,15 @@ Scope: IPL-only for now. Streamlit is legacy (will be replaced by React web app)
 
 - [x] SQL injection surface in `append_to_bronze` and `upsert_to_bronze` — `src/database.py`: `table_name`, `id_column`, and column names from incoming PyArrow data are interpolated directly into SQL via f-strings. Column names originate from parsed Cricsheet JSON → `pa.Table.from_pylist` → `append_to_bronze` → raw SQL. A malicious or malformed key in a Cricsheet JSON file could inject SQL. Fix: quote all identifiers with double quotes (e.g., `f'"{col}"'`). Also validate `id_column` against a safe identifier regex before use.
 
-- [ ] `full_refresh` flag only applies to first dataset (STILL UNFIXED) — already tracked in "Pending — Pipeline Deep Review > Ingestion Fixes" but remains open. In `run_ingestion()` and the Dagster `bronze_matches` asset, `full_refresh` is set to `False` after the first dataset iteration. `datasets=["ipl", "t20i"]` with `full_refresh=True` drops IPL tables but delta-appends T20I. Fix: move the DROP TABLE logic out of `load_matches_to_bronze` into the caller — drop all tables once before the dataset loop, then load each dataset with `full_refresh=False`.
+- [x] `full_refresh` flag only applies to first dataset (STILL UNFIXED) — RESOLVED by removing full_refresh entirely. For a full rebuild, delete `data/cricket.duckdb` and re-run the pipeline. Tables are created automatically on first write. Removed from: `load_matches_to_bronze`, `run_ingestion`, `IngestionConfig`, `--full-refresh` CLI flag, and `daily_refresh_job` config.
 
 ### HIGH — Architectural Issues
 
 - [ ] `append_to_bronze` dedup for deliveries uses `match_id` only — if a match row was inserted but deliveries were only partially loaded (crash mid-batch before COMMIT), the next run sees the match_id in bronze.matches and skips all its deliveries. The atomic transaction mitigates this, but the dedup key for deliveries should ideally be a composite `(match_id, innings, over_num, ball_num)`. Currently `append_to_bronze` only supports a single `id_column` parameter. Fix: either extend `append_to_bronze` to accept composite keys, or add a separate dedup mechanism for deliveries.
 
-- [ ] `_ensure_bronze_tables` called on every `get_write_conn()` — every write connection runs ~10 DDL statements (CREATE TABLE IF NOT EXISTS for all Cricsheet + ESPN + weather + geocoding tables) plus the `_migrate_image_columns` migration. For enrichment pipelines that open/close connections frequently via `write_conn()`, this is wasteful. Fix: add a module-level `_tables_bootstrapped = False` flag, set it to `True` after first bootstrap, skip on subsequent calls within the same process.
+- [x] `_ensure_bronze_tables` called on every `get_write_conn()` — added `_bronze_bootstrapped` module-level guard flag. First call runs full bootstrap (~12 DDL statements). Subsequent calls skip it. Eliminates redundant DDL overhead on every write connection open.
 
-- [ ] Inconsistent logging: `structlog` vs stdlib `logging` — `ball_scraper.py` and `run_ball_scraper.py` use stdlib `logging.getLogger()`. Everything else uses `structlog.get_logger()`. `run_ball_scraper.py` even reconfigures structlog to route through stdlib at startup. Fix: standardize on structlog everywhere. Remove the stdlib logger usage in `ball_scraper.py` and `run_ball_scraper.py`.
+- [x] Inconsistent logging: `structlog` vs stdlib `logging` — replaced `logging.getLogger` with `structlog.get_logger` in `ball_scraper.py` and `run_ball_scraper.py`. Converted all printf-style messages to structlog keyword style. Removed global structlog reconfiguration in `run_ball_scraper.main()`.
 
 - [ ] `src/orchestration/assets/__init__.py` is stale — exports `espn_match_enrichment` and `espn_image_enrichment` but not `espn_ball_enrichment`, `geocode_venue_coordinates`, or `weather_enrichment`. The parent `__init__.py` imports directly from the module so nothing breaks, but the stale `__init__.py` is misleading. Fix: update exports or remove the selective `__all__` and let the parent handle imports.
 
