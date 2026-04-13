@@ -63,20 +63,29 @@ def get_read_conn() -> duckdb.DuckDBPyConnection:
     return duckdb.connect(str(settings.duckdb_path), read_only=True)
 
 
+# Guard flag: bronze tables only need bootstrapping once per process.
+# CREATE TABLE IF NOT EXISTS is idempotent, so skipping repeat calls
+# is safe and avoids ~12 redundant DDL statements per write connection.
+_bronze_bootstrapped = False
+
+
 def get_write_conn() -> duckdb.DuckDBPyConnection:
     """Get a read-write DuckDB connection.
 
-    Creates the data directory, bronze schema, and all bronze tables
-    (Cricsheet + ESPN) if they don't exist. Safe to call repeatedly.
-    Use for ingestion, enrichment writes, and any DDL operations.
+    On the first call in a process, creates the data directory, bronze
+    schema, and all bronze tables (Cricsheet + ESPN) if they don't exist.
+    Subsequent calls skip the bootstrap (tables already exist).
 
     PREFER ``write_conn()`` context manager over this function —
     it guarantees the connection is closed even on exceptions.
     """
+    global _bronze_bootstrapped
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     conn = duckdb.connect(str(settings.duckdb_path))
-    conn.execute(f"CREATE SCHEMA IF NOT EXISTS {settings.bronze_schema}")
-    _bootstrap_bronze_tables(conn)
+    if not _bronze_bootstrapped:
+        conn.execute(f"CREATE SCHEMA IF NOT EXISTS {settings.bronze_schema}")
+        _bootstrap_bronze_tables(conn)
+        _bronze_bootstrapped = True
     return conn
 
 
