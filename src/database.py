@@ -19,6 +19,7 @@ Usage:
 
 from __future__ import annotations
 
+import re
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
@@ -33,6 +34,24 @@ if TYPE_CHECKING:
 from src.config import settings
 
 logger = structlog.get_logger(__name__)
+
+# Safe SQL identifier pattern — same as schema validation in config.py
+_SAFE_IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+
+def _validate_identifier(name: str, label: str = "identifier") -> None:
+    """Reject identifiers that aren't safe for SQL interpolation.
+
+    Raises ValueError if the name contains characters outside
+    ``[a-zA-Z0-9_]`` or doesn't start with a letter/underscore.
+    """
+    if not _SAFE_IDENTIFIER_RE.match(name):
+        raise ValueError(f"Unsafe SQL {label}: {name!r}")
+
+
+def _q(name: str) -> str:
+    """Double-quote a SQL identifier to handle reserved words and special chars."""
+    return f'"{name}"'
 
 
 def get_read_conn() -> duckdb.DuckDBPyConnection:
@@ -113,6 +132,9 @@ def append_to_bronze(
     the target table, they are added via ALTER TABLE. Column matching is
     done by name, not position, so column order doesn't matter.
 
+    All column names are double-quoted in generated SQL to prevent
+    injection and handle reserved words or special characters safely.
+
     Args:
         conn: An open read-write DuckDB connection.
         table_name: Fully-qualified table name (e.g. ``bronze.matches``).
@@ -124,6 +146,8 @@ def append_to_bronze(
     """
     if data.num_rows == 0:
         return 0
+
+    _validate_identifier(id_column, "id_column")
 
     tmp_name = "_tmp_bronze_load"
     conn.register(tmp_name, data)
@@ -153,12 +177,13 @@ def append_to_bronze(
             incoming_cols = data.column_names
             for col in incoming_cols:
                 if col not in existing_cols:
-                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col} VARCHAR")
+                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {_q(col)} VARCHAR")
 
             # Use explicit column list so order doesn't matter
-            col_list = ", ".join(incoming_cols)
+            col_list = ", ".join(_q(c) for c in incoming_cols)
             # Prefixed column list for SELECT from the tmp table (avoids ambiguity in JOIN)
-            t_col_list = ", ".join(f"t.{c}" for c in incoming_cols)
+            t_col_list = ", ".join(f"t.{_q(c)}" for c in incoming_cols)
+            qid = _q(id_column)
 
             # Count before insert
             (count_before,) = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
@@ -168,8 +193,8 @@ def append_to_bronze(
             conn.execute(
                 f"""INSERT INTO {table_name} ({col_list})
                     SELECT {t_col_list} FROM {tmp_name} t
-                    LEFT JOIN {table_name} existing ON t.{id_column} = existing.{id_column}
-                    WHERE existing.{id_column} IS NULL"""
+                    LEFT JOIN {table_name} existing ON t.{qid} = existing.{qid}
+                    WHERE existing.{qid} IS NULL"""
             )
 
             (count_after,) = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
@@ -198,6 +223,7 @@ def upsert_to_bronze(
     match on id_column, then inserts all incoming rows.
 
     Handles schema evolution same as append_to_bronze.
+    All column names are double-quoted in generated SQL.
 
     Args:
         conn: An open read-write DuckDB connection.
@@ -210,6 +236,8 @@ def upsert_to_bronze(
     """
     if data.num_rows == 0:
         return 0
+
+    _validate_identifier(id_column, "id_column")
 
     tmp_name = "_tmp_bronze_upsert"
     conn.register(tmp_name, data)
@@ -239,17 +267,19 @@ def upsert_to_bronze(
             incoming_cols = data.column_names
             for col in incoming_cols:
                 if col not in existing_cols:
-                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col} VARCHAR")
+                    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {_q(col)} VARCHAR")
+
+            qid = _q(id_column)
 
             # Delete existing rows that will be replaced
-            conn.execute(
-                f"DELETE FROM {table_name} WHERE {id_column} IN "
-                f"(SELECT {id_column} FROM {tmp_name})"
-            )
+            conn.execute(f"DELETE FROM {table_name} WHERE {qid} IN (SELECT {qid} FROM {tmp_name})")
 
             # Insert all incoming rows
-            col_list = ", ".join(incoming_cols)
-            conn.execute(f"INSERT INTO {table_name} ({col_list}) SELECT {col_list} FROM {tmp_name}")
+            col_list = ", ".join(_q(c) for c in incoming_cols)
+            src_col_list = ", ".join(_q(c) for c in incoming_cols)
+            conn.execute(
+                f"INSERT INTO {table_name} ({col_list}) SELECT {src_col_list} FROM {tmp_name}"
+            )
             upserted = data.num_rows
     finally:
         conn.unregister(tmp_name)
