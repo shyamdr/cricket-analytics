@@ -27,7 +27,7 @@ daily_refresh_job = define_asset_job(
     ),
     config=RunConfig(
         ops={
-            "bronze_matches": IngestionConfig(datasets=["recent_7"], full_refresh=False),
+            "bronze_matches": IngestionConfig(datasets=["recent_7"]),
         }
     ),
 )

@@ -20,7 +20,6 @@ class IngestionConfig(Config):
     """Configuration for the bronze_matches asset."""
 
     datasets: list[str] = Field(default_factory=lambda: _DEFAULT_DATASETS)
-    full_refresh: bool = False
 
 
 @asset(
@@ -35,18 +34,13 @@ def bronze_matches(context: AssetExecutionContext, config: IngestionConfig) -> M
     """Download match data and load into bronze layer (delta-aware)."""
     total_new = 0
     datasets_summary: dict[str, int] = {}
-    is_first = True
 
     for ds_key in config.datasets:
         ds_info = CRICSHEET_DATASETS.get(ds_key, {})
         context.log.info(f"Ingesting dataset: {ds_key} ({ds_info.get('name', ds_key)})")
 
         matches_dir = download_dataset(ds_key)
-
-        # Only full_refresh on the first dataset
-        refresh = config.full_refresh and is_first
-        new_count = load_matches_to_bronze(matches_dir, full_refresh=refresh)
-        is_first = False
+        new_count = load_matches_to_bronze(matches_dir)
 
         total_new += new_count
         datasets_summary[ds_key] = new_count

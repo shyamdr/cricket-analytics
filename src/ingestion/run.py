@@ -49,7 +49,6 @@ def run_ingestion(
     profile: str | None = None,
     enabled_only: bool = False,
     recent: bool = False,
-    full_refresh: bool = False,
     skip_people: bool = False,
 ) -> None:
     """Run the ingestion pipeline for one or more datasets.
@@ -61,12 +60,14 @@ def run_ingestion(
       4. --profile flag → named profile from YAML
       5. default → default_profile from YAML (typically "standard")
 
+    For a full rebuild, delete ``data/cricket.duckdb`` and re-run —
+    tables are created automatically on first write.
+
     Args:
         datasets: Explicit list of dataset keys (e.g. ['ipl', 't20i']).
         profile: Named profile from config/datasets.yml.
         enabled_only: If True, ingest all datasets with enabled: true.
         recent: If True, use Cricsheet's recently_added_7 for delta.
-        full_refresh: If True, drop and rebuild bronze tables.
         skip_people: If True, skip people.csv download.
     """
     if recent:
@@ -80,16 +81,14 @@ def run_ingestion(
     else:
         datasets_to_ingest = get_default_datasets()
 
-    logger.info("ingestion_started", datasets=datasets_to_ingest, full_refresh=full_refresh)
+    logger.info("ingestion_started", datasets=datasets_to_ingest)
 
     total_new = 0
     for ds_key in datasets_to_ingest:
         logger.info("ingesting_dataset", dataset=ds_key)
         matches_dir = download_dataset(ds_key)
-        new_count = load_matches_to_bronze(matches_dir, full_refresh=full_refresh)
+        new_count = load_matches_to_bronze(matches_dir)
         total_new += new_count
-        # Only full_refresh on the first dataset if multiple
-        full_refresh = False
 
     # People registry — always refresh (it's a small CSV, ~1MB)
     if not skip_people:
@@ -142,11 +141,6 @@ def main() -> None:
         help="Delta mode: ingest recently added matches (last 7 days).",
     )
     parser.add_argument(
-        "--full-refresh",
-        action="store_true",
-        help="Drop and rebuild bronze tables from scratch.",
-    )
-    parser.add_argument(
         "--skip-people",
         action="store_true",
         help="Skip people.csv download.",
@@ -168,7 +162,6 @@ def main() -> None:
         profile=args.profile,
         enabled_only=args.enabled,
         recent=args.recent,
-        full_refresh=args.full_refresh,
         skip_people=args.skip_people,
     )
 

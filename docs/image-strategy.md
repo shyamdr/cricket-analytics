@@ -572,3 +572,83 @@ Quality degrades on extreme upscaling but `c_fill,g_face` at 300×400 looks acce
 6. **Blocked effects:** grayscale, sepia, brightness, circular crop (`r_max`) — ESPN's Cloudinary config rejects these
 7. **Working effects:** sharpen, contrast, vibrance, blur, background_removal
 8. **Always use `img1.hscicdn.com`** — `p.imgci.com` returns 403
+
+## Self-Hosted Image Display (CSS + OpenCV)
+
+### Face Crop (replaces ESPN's `c_thumb,g_face`)
+
+ESPN uses Cloudinary's AI face detection for cropping. We replicate this locally:
+
+1. **OpenCV Haar cascade** (`haarcascade_frontalface_default.xml`) detects face bounding box
+2. Expand crop region to ~2.2× the face size (centered on face)
+3. Compute CSS `position: absolute` offsets to place the face in a fixed-size container
+4. At display time: `overflow: hidden` container + scaled/positioned `<img>`
+
+```python
+# OpenCV face detection (run once at build time, store coordinates)
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+fx, fy, fw, fh = faces[0]
+
+# Compute CSS values for a 300×300 display box
+crop_size = int(max(fw, fh) * 2.2)
+cx, cy = fx + fw // 2, fy + fh // 2
+scale = 300 / crop_size
+scaled_w, scaled_h = w * scale, h * scale
+offset_x, offset_y = cx * scale - 150, cy * scale - 150
+```
+
+```html
+<!-- CSS face crop (no JS face detection at runtime) -->
+<div style="width:300px; height:300px; overflow:hidden; position:relative;">
+  <img src="players/642519.png"
+       style="width:{scaled_w}px; height:{scaled_h}px;
+              position:absolute; left:-{offset_x}px; top:-{offset_y}px;" />
+</div>
+```
+
+**Fallback for small images (< 300px scaled):** If the source image is too small to zoom into
+(e.g., 160×136 cutouts), skip the face crop and display with `object-fit: contain` instead.
+
+### CSS Effects (replaces ESPN Cloudinary effects)
+
+These CSS filters work on all browsers and replicate effects ESPN's Cloudinary blocks:
+
+| Effect | CSS | Notes |
+|--------|-----|-------|
+| Vibrance | `filter: saturate(1.4) contrast(1.1)` | ESPN blocks `e_vibrance` sometimes |
+| Grayscale | `filter: grayscale(1)` | ESPN blocks `e_grayscale` — CSS does it fine |
+| Sepia | `filter: sepia(0.8)` | ESPN blocks `e_sepia` — CSS does it fine |
+| Circular crop | `border-radius: 50%` | ESPN blocks `r_max` — CSS trivial |
+| Wide banner | `object-fit: cover; height: 150px` | No ESPN equivalent needed |
+
+### Small Image Enhancement (for 160×136 source images)
+
+~40 players only have tiny cutout images (160×136). When displayed at 300×300, they look pixelated.
+CSS-only enhancement that smooths pixels while preserving detail:
+
+```html
+<!-- SVG sharpen filter (define once in page) -->
+<svg style="position:absolute; width:0; height:0;">
+  <filter id="sharpen">
+    <feConvolveMatrix order="3" kernelMatrix="0 -0.5 0 -0.5 3 -0.5 0 -0.5 0" />
+  </filter>
+</svg>
+
+<!-- Apply to small images -->
+<img src="players/26829.png"
+     style="filter: blur(0.5px) contrast(1.1) saturate(1.1) url(#sharpen);" />
+```
+
+Pipeline: `blur(0.5px)` smooths jagged pixels → `contrast(1.1) saturate(1.1)` restores punch →
+SVG `feConvolveMatrix` sharpen kernel brings back edge detail. Net effect: noticeably smoother
+than raw upscale, though not as good as AI upscaling.
+
+### Image Source Size Distribution
+
+| Source type | Dimensions | Count | Quality at 300×300 |
+|-------------|-----------|-------|-------------------|
+| `headshotImageUrl` (.png) | 600×436 | ~50% of players | Excellent — face crop works perfectly |
+| `imageUrl` (.1/.2/.5.png) | 160×136 | ~45% of players | Acceptable — use enhancement filter |
+| No image | — | ~5% of players | Use initials avatar fallback |
+

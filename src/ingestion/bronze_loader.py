@@ -257,17 +257,18 @@ def _parse_deliveries(
 _BATCH_SIZE = 1000  # files per batch — keeps memory bounded for large datasets
 
 
-def load_matches_to_bronze(matches_dir: Path, full_refresh: bool = False) -> int:
+def load_matches_to_bronze(matches_dir: Path) -> int:
     """Parse match JSONs and load into bronze.matches and bronze.deliveries.
 
     Processes files in batches of ``_BATCH_SIZE`` to bound memory usage.
     Each batch is written atomically (BEGIN/COMMIT). Delta-aware: only
-    inserts matches not already in bronze. Use full_refresh=True to drop
-    and rebuild.
+    inserts matches not already in bronze.
+
+    For a full rebuild, delete ``data/cricket.duckdb`` and re-run the
+    pipeline — tables are created automatically on first write.
 
     Args:
         matches_dir: Directory containing Cricsheet JSON files.
-        full_refresh: If True, drops and recreates tables.
 
     Returns:
         Number of new matches loaded.
@@ -278,10 +279,6 @@ def load_matches_to_bronze(matches_dir: Path, full_refresh: bool = False) -> int
 
         json_files = sorted(matches_dir.glob("*.json"))
         logger.info("scanning_json_files", file_count=len(json_files))
-
-        if full_refresh:
-            conn.execute(f"DROP TABLE IF EXISTS {matches_table_name}")
-            conn.execute(f"DROP TABLE IF EXISTS {deliveries_table_name}")
 
         # Ensure tables exist with correct schema (idempotent)
         _ensure_bronze_tables(conn)

@@ -40,8 +40,8 @@
   - [ ] Wire to existing FastAPI API (may need new/adjusted endpoints)
   - [ ] Deploy: Vercel (frontend) + Railway/Render (API with baked-in DuckDB)
   - [ ] Goal: live URL on the internet
-- [~] Auction data pipeline — Wikipedia scraper built, bronze/silver/gold models working. See "Pending — Next Up" for details.
-- [ ] Streamlit UI improvements — DEPRIORITIZED. Streamlit stays as internal data exploration tool. Next.js is the public-facing UI.
+- [~] Auction data pipeline — HALTED at 2013. Manual curation too tedious. See "Pending — Next Up" for details.
+- [ ] Streamlit UI — LEGACY. Will be replaced by React web app. No further investment.
 
 ## Recently Completed
 - [x] Config-driven dataset management — created config/datasets.yml as single source of truth for all dataset and enrichment configuration. 21 Cricsheet datasets (IPL, T20I, BBL, PSL, CPL, SA20, LPL, ILT20, BPL, NPL, MLC, MSL, SSM, NTB, ODI, Test, T20I Women, ODI Women, Test Women, WBBL, WPL) with per-dataset enrichment toggles (espn_match, espn_ball, weather, geocoding). Named profiles (minimal, standard, t20_all, everything). CLI supports --profile, --enabled, --dataset, --list. All consumers (CLI, Makefile, Dagster, Docker) read from YAML. Added pyyaml to core dependencies. URLs verified via HTTP HEAD against cricsheet.org.
@@ -292,6 +292,78 @@ Gaps between "it works" and "a team can operate and evolve it."
 ### Parked
 - [ ] Delete old data/ folder from parent Projects directory .git issue
 - [ ] NL query interface
+
+## Pending — Senior Code Review (April 2026, Week 2)
+Full line-by-line review of every file in the project. Findings organized by severity.
+Scope: IPL-only for now. Streamlit is legacy (will be replaced by React web app). Next.js frontend review deferred to next session.
+
+### CRITICAL — Fix These First
+
+- [x] Connection leak in `load_matches_to_bronze` — `src/ingestion/bronze_loader.py` uses `conn = get_write_conn()` with manual `conn.close()` at the end. If an exception occurs between the batch loop and `conn.close()` (e.g., in the final COUNT queries), the connection leaks. The `write_conn()` context manager was built specifically for this but isn't used here. Same issue in `load_people_to_bronze`. Fix: replace `conn = get_write_conn()` + manual `conn.close()` with `with write_conn() as conn:` in both functions.
+
+- [x] SQL injection surface in `append_to_bronze` and `upsert_to_bronze` — `src/database.py`: `table_name`, `id_column`, and column names from incoming PyArrow data are interpolated directly into SQL via f-strings. Column names originate from parsed Cricsheet JSON → `pa.Table.from_pylist` → `append_to_bronze` → raw SQL. A malicious or malformed key in a Cricsheet JSON file could inject SQL. Fix: quote all identifiers with double quotes (e.g., `f'"{col}"'`). Also validate `id_column` against a safe identifier regex before use.
+
+- [ ] `full_refresh` flag only applies to first dataset (STILL UNFIXED) — already tracked in "Pending — Pipeline Deep Review > Ingestion Fixes" but remains open. In `run_ingestion()` and the Dagster `bronze_matches` asset, `full_refresh` is set to `False` after the first dataset iteration. `datasets=["ipl", "t20i"]` with `full_refresh=True` drops IPL tables but delta-appends T20I. Fix: move the DROP TABLE logic out of `load_matches_to_bronze` into the caller — drop all tables once before the dataset loop, then load each dataset with `full_refresh=False`.
+
+### HIGH — Architectural Issues
+
+- [ ] `append_to_bronze` dedup for deliveries uses `match_id` only — if a match row was inserted but deliveries were only partially loaded (crash mid-batch before COMMIT), the next run sees the match_id in bronze.matches and skips all its deliveries. The atomic transaction mitigates this, but the dedup key for deliveries should ideally be a composite `(match_id, innings, over_num, ball_num)`. Currently `append_to_bronze` only supports a single `id_column` parameter. Fix: either extend `append_to_bronze` to accept composite keys, or add a separate dedup mechanism for deliveries.
+
+- [ ] `_ensure_bronze_tables` called on every `get_write_conn()` — every write connection runs ~10 DDL statements (CREATE TABLE IF NOT EXISTS for all Cricsheet + ESPN + weather + geocoding tables) plus the `_migrate_image_columns` migration. For enrichment pipelines that open/close connections frequently via `write_conn()`, this is wasteful. Fix: add a module-level `_tables_bootstrapped = False` flag, set it to `True` after first bootstrap, skip on subsequent calls within the same process.
+
+- [ ] Inconsistent logging: `structlog` vs stdlib `logging` — `ball_scraper.py` and `run_ball_scraper.py` use stdlib `logging.getLogger()`. Everything else uses `structlog.get_logger()`. `run_ball_scraper.py` even reconfigures structlog to route through stdlib at startup. Fix: standardize on structlog everywhere. Remove the stdlib logger usage in `ball_scraper.py` and `run_ball_scraper.py`.
+
+- [ ] `src/orchestration/assets/__init__.py` is stale — exports `espn_match_enrichment` and `espn_image_enrichment` but not `espn_ball_enrichment`, `geocode_venue_coordinates`, or `weather_enrichment`. The parent `__init__.py` imports directly from the module so nothing breaks, but the stale `__init__.py` is misleading. Fix: update exports or remove the selective `__all__` and let the parent handle imports.
+
+### MEDIUM — Code Quality
+
+- [ ] Type annotations use `callable` (lowercase) instead of `Callable` — `match_scraper.py` and `ball_scraper.py` use `callable` as a type hint for `on_batch` and `on_status` parameters. This is the builtin `callable()` function, not `typing.Callable`. Works at runtime but is semantically wrong and mypy flags it. Fix: use `Callable[[list[dict]], None] | None` from `collections.abc`.
+
+- [ ] Duplicated query patterns in `run_match_scraper.py` and `run_ball_scraper.py` — both files have nearly identical functions: `get_matches_for_season`, `get_all_matches`, `get_already_scraped`. The SQL is copy-pasted with minor variations. Fix: extract shared query functions into `src/enrichment/queries.py` and import from both CLI modules.
+
+- [ ] `weather_fetcher.py` has manual retry loop instead of using `@retry` decorator — `_fetch_weather` implements its own for-loop retry with exponential backoff, duplicating the logic in `src/utils.retry()`. Fix: replace the manual loop with `@retry(max_attempts=3, base_delay=1.0, exceptions=(httpx.TimeoutException, httpx.ConnectError, OSError))`.
+
+- [ ] `weather_fetcher.py` module-level `httpx.Client` never closed — `_http_client = httpx.Client(...)` is created at import time and never closed. Fine for CLI but leaks in test contexts and long-running processes. Fix: lazy initialization with a module-level getter, or pass the client as a parameter.
+
+- [ ] `image_downloader.py` uses async without concurrency — `download_images()` defines an inner `async def _run()` that uses `httpx.AsyncClient` but downloads images sequentially with `await`. No concurrency benefit. Fix: either use synchronous `httpx.Client` (simpler), or use `asyncio.Semaphore` + `asyncio.gather` for actual concurrent downloads (faster).
+
+- [ ] `geocode_venue_coordinates` Dagster asset is a 150-line monolith — the asset function in `enrichment.py` does geocoding, alias detection, CSV writing, and DB writes all inline. Fix: move the geocoding orchestration logic into `src/enrichment/geocoder.py` (which already has the core functions). The Dagster asset should just call a high-level function and report metadata.
+
+- [ ] `_migrate_image_columns` silently swallows all exceptions — `src/enrichment/bronze_loader.py` uses `contextlib.suppress(Exception)` around ALTER TABLE and UPDATE statements. If the backfill UPDATE fails due to a real bug (e.g., malformed JSON), it's silently ignored. Fix: catch specific exceptions (e.g., `duckdb.CatalogException`) and log warnings for unexpected ones.
+
+- [ ] CORS regex too permissive — `src/api/app.py` uses `allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:3000"` which matches ANY Vercel deployment, not just InsideEdge. Fix: tighten to `r"https://insideedge(-[a-z0-9]+)?\.vercel\.app|http://localhost:3000"` to allow preview deploys but not arbitrary Vercel apps.
+
+### LOW — Polish & Repo Hygiene
+
+- [ ] `.env` file in repo root — verify it's in `.gitignore`. If it contains the Google Maps API key, it's a security issue. Check and add to `.gitignore` if missing.
+
+- [ ] `player_photo_viewer.html` in repo root — one-off utility file cluttering the root. Move to `scripts/` or `docs/` or delete.
+
+- [ ] `cricsheet-website-data-format.txt` in repo root — reference file that duplicates info already in steering files. Move to `docs/` or remove.
+
+- [ ] `scripts/scrape_espn_squads.py` — appears to be a one-time scrape script for the squad seed CSVs. If no longer needed, document its purpose in a comment header or remove. If kept, add a docstring explaining it's a one-time utility.
+
+- [ ] `data/espn_raw_sample.json` — sample data file in the `.gitignored` data directory. If it's meant to be committed (for reference), move to `docs/` or `tests/fixtures/`. If not, ensure it's gitignored.
+
+- [ ] `src/dbt/target/` has 17+ Dagster run artifact directories — `dbt_analytics_assets-*` directories accumulating. Verify `src/dbt/target/` is in `.gitignore` (it should be — dbt target is generated, never committed).
+
+- [ ] No `__all__` exports in core modules — `src/database.py`, `src/config.py`, `src/tables.py` don't define `__all__`. For a portfolio project, explicit exports signal intentional API design. Low priority but good practice.
+
+- [ ] `Dockerfile` installs `[all]` including playwright, streamlit, dagster — the pipeline Dockerfile doesn't need playwright, streamlit, or dagster for `make all`. Fix: create a `[pipeline]` optional dependency group with just `[dbt]`, or use `pip install -e ".[dbt]"` in the Dockerfile.
+
+- [ ] `espn_squads.csv` and `espn_squads_backup_2008_to_2013.csv` dbt seeds not referenced by any model — these seed files exist in `src/dbt/seeds/` but no dbt model references them. They're backup data from the halted auction pipeline. Either remove from seeds (move to `docs/` or `data/`) or add a comment in `dbt_project.yml` explaining they're parked.
+
+### dbt-Specific
+
+- [ ] Silver `_loaded_at` uses `current_timestamp` — every dbt run updates `_loaded_at` for ALL rows (full table rebuild). This is correct for table materialization but breaks audit trail if silver ever moves to incremental. Document this as a known limitation or use a conditional `_loaded_at` pattern.
+
+- [ ] `source_exists` macro fallback schemas will drift — 6 ESPN silver models each have ~30 lines of typed NULL columns in the `WHERE false` fallback block. These must stay in sync with the real query above. Any column added to the real query but not the fallback (or vice versa) causes silent schema mismatches. Fix (future): extract column definitions into a shared macro or YAML config that generates both the real SELECT and the fallback.
+
+### Decisions / Clarifications Recorded
+- Auction data pipeline: HALTED at 2013. Manual curation effort too high. `espn_squads_backup_2008_to_2013.csv` is the backup. Not worth pursuing further unless a reliable automated source is found.
+- Streamlit UI: LEGACY. Will be replaced by React web app. No further investment.
+- Default profile: `minimal` (IPL only) is intentional for current scope. Will expand to other leagues later.
+- `render.yaml` uses `--profile minimal` — correct for now since only IPL data exists. Update when expanding to more leagues.
 
 ## Technical Notes
 - Python 3.13.2 on macOS (company laptop, Homebrew Python)

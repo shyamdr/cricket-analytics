@@ -134,6 +134,13 @@
 
 <div id="content"></div>
 
+<!-- SVG sharpen filter for small images -->
+<svg style="position:absolute; width:0; height:0;">
+  <filter id="sharpen">
+    <feConvolveMatrix order="3" kernelMatrix="0 -0.5 0 -0.5 3 -0.5 0 -0.5 0" />
+  </filter>
+</svg>
+
 <script>
 const CDN = "https://img1.hscicdn.com/image/upload";
 
@@ -264,6 +271,74 @@ function retryAllFailed() {
 
 // Start loading
 loadAllStaggered();
+
+// =========================================================================
+// SECTION 2: Side-by-side — ESPN CDN vs Local PNG with face-aware CSS crop
+// Face positions pre-computed via OpenCV (embedded below)
+// =========================================================================
+
+const compareSection = document.createElement("div");
+compareSection.style.maxWidth = "1400px";
+compareSection.style.margin = "0 auto";
+compareSection.innerHTML = `
+  <hr class="divider" style="margin-top:64px">
+  <h1 style="margin-top:48px">ESPN CDN vs Self-Hosted</h1>
+  <p class="subtitle">300×300 face crop — ESPN Cloudinary AI vs Local PNG + OpenCV face position + CSS</p>
+`;
+content.after(compareSection);
+
+// Face crop computed by OpenCV: scale image up, offset to center on face
+const comparePlayers = [
+  { name: "Shreyas Iyer", id: "642519", headshot: "/lsci/db/PICTURES/CMS/323000/323035.png", scaleW: 528, scaleH: 384, offX: 114, offY: 3 },
+  { name: "Sunil Narine", id: "230558", headshot: "/lsci/db/PICTURES/CMS/320100/320119.png", scaleW: 516, scaleH: 375, offX: 96, offY: -3 },
+  { name: "Adam Gilchrist", id: "5390", headshot: "/lsci/db/PICTURES/CMS/321500/321545.png", scaleW: 533, scaleH: 387, offX: 122, offY: 7 },
+  { name: "Cheteshwar Pujara", id: "32540", headshot: "/lsci/db/PICTURES/CMS/319900/319932.png", scaleW: 539, scaleH: 392, offX: 116, offY: -5 },
+  { name: "Aaron Finch", id: "5334", headshot: "/lsci/db/PICTURES/CMS/316500/316533.png", scaleW: 431, scaleH: 313, offX: 71, offY: -32 },
+  { name: "Lakshmipathy Balaji", id: "26829", headshot: "/lsci/db/PICTURES/CMS/304200/304209.5.png", scaleW: 281, scaleH: 239, offX: -36, offY: -27 },
+  { name: "Mithun Manhas", id: "31001", headshot: "/lsci/db/PICTURES/CMS/390800/390812.2.png", scaleW: 264, scaleH: 224, offX: -10, offY: -28 },
+];
+
+comparePlayers.forEach((player, idx) => {
+  const espnSrc = `${CDN}/f_png,e_background_removal,c_thumb,g_face,w_300,h_300${player.headshot}`;
+  const localSrc = `data/images/players/${player.id}.png`;
+
+  const row = document.createElement("div");
+  row.className = "player-section";
+  row.innerHTML = `
+    <div class="player-name">${player.name}</div>
+    <div style="display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap;">
+      <div class="variant" style="width:300px;">
+        <img src="${espnSrc}" style="width:300px; height:300px; object-fit:contain;" loading="lazy" />
+        <div class="variant-label">ESPN CDN<span class="code">c_thumb,g_face,w_300,h_300</span></div>
+      </div>
+      <div class="variant" style="width:300px; height:300px; overflow:hidden; position:relative;">
+        <img src="${localSrc}" style="${
+          player.scaleW >= 300
+            ? `width:${player.scaleW}px; height:${player.scaleH}px; position:absolute; left:-${player.offX}px; top:-${player.offY}px;`
+            : `width:300px; height:300px; object-fit:contain;`
+        }" loading="lazy" />
+        <div class="variant-label">Local Thumb<span class="code">OpenCV face detect + CSS position</span></div>
+      </div>
+      ${player.scaleW < 300 ? `
+      <div class="variant" style="width:300px;">
+        <img src="${localSrc}" style="width:300px; height:300px; object-fit:contain; filter: blur(0.5px) contrast(1.1) saturate(1.1) url(#sharpen);" loading="lazy" />
+        <div class="variant-label">Local Enhanced<span class="code">blur(0.8px) + contrast(1.15) + saturate(1.1)</span></div>
+      </div>
+      ` : ''}
+      <div class="variant" style="width:300px;">
+        <img src="${localSrc}" style="width:300px; height:300px; object-fit:contain;" loading="lazy" />
+        <div class="variant-label">Local Original<span class="code">data/images/players/${player.id}.png</span></div>
+      </div>
+    </div>
+  `;
+  compareSection.appendChild(row);
+
+  if (idx < comparePlayers.length - 1) {
+    const hr = document.createElement("hr");
+    hr.className = "divider";
+    compareSection.appendChild(hr);
+  }
+});
 </script>
 </body>
 </html>
