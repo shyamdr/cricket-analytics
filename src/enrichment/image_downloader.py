@@ -54,16 +54,18 @@ def _get_all_pending() -> list[dict[str, Any]]:
         for r in rows:
             espn_id, name = r[0], r[1]
             if not (PLAYERS_DIR / f"{espn_id}.png").exists():
-                pending.append({
-                    "entity_type": "player",
-                    "id": espn_id,
-                    "name": name,
-                    "cms_path": r[2] or r[3],
-                    "transform": PLAYER_TRANSFORM,
-                    "dir": PLAYERS_DIR,
-                    "table": f"{settings.bronze_schema}.espn_players",
-                    "id_col": "espn_player_id",
-                })
+                pending.append(
+                    {
+                        "entity_type": "player",
+                        "id": espn_id,
+                        "name": name,
+                        "cms_path": r[2] or r[3],
+                        "transform": PLAYER_TRANSFORM,
+                        "dir": PLAYERS_DIR,
+                        "table": f"{settings.bronze_schema}.espn_players",
+                        "id_col": "espn_player_id",
+                    }
+                )
 
         # Teams
         rows = conn.execute(
@@ -76,16 +78,18 @@ def _get_all_pending() -> list[dict[str, Any]]:
         for r in rows:
             espn_id, name = r[0], r[1]
             if not (TEAMS_DIR / f"{espn_id}.png").exists():
-                pending.append({
-                    "entity_type": "team",
-                    "id": espn_id,
-                    "name": name,
-                    "cms_path": r[2],
-                    "transform": TEAM_TRANSFORM,
-                    "dir": TEAMS_DIR,
-                    "table": f"{settings.bronze_schema}.espn_teams",
-                    "id_col": "espn_team_id",
-                })
+                pending.append(
+                    {
+                        "entity_type": "team",
+                        "id": espn_id,
+                        "name": name,
+                        "cms_path": r[2],
+                        "transform": TEAM_TRANSFORM,
+                        "dir": TEAMS_DIR,
+                        "table": f"{settings.bronze_schema}.espn_teams",
+                        "id_col": "espn_team_id",
+                    }
+                )
 
         # Grounds — skipped for now (URLs stored but not downloaded)
         # rows = conn.execute(

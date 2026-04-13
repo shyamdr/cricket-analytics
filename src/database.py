@@ -249,9 +249,7 @@ def upsert_to_bronze(
 
             # Insert all incoming rows
             col_list = ", ".join(incoming_cols)
-            conn.execute(
-                f"INSERT INTO {table_name} ({col_list}) SELECT {col_list} FROM {tmp_name}"
-            )
+            conn.execute(f"INSERT INTO {table_name} ({col_list}) SELECT {col_list} FROM {tmp_name}")
             upserted = data.num_rows
     finally:
         conn.unregister(tmp_name)
