@@ -21,7 +21,7 @@ import pyarrow as pa
 import structlog
 
 from src.config import settings
-from src.database import append_to_bronze, get_write_conn
+from src.database import append_to_bronze, write_conn
 
 logger = structlog.get_logger(__name__)
 
@@ -272,94 +272,97 @@ def load_matches_to_bronze(matches_dir: Path, full_refresh: bool = False) -> int
     Returns:
         Number of new matches loaded.
     """
-    conn = get_write_conn()
-    matches_table_name = f"{settings.bronze_schema}.matches"
-    deliveries_table_name = f"{settings.bronze_schema}.deliveries"
+    with write_conn() as conn:
+        matches_table_name = f"{settings.bronze_schema}.matches"
+        deliveries_table_name = f"{settings.bronze_schema}.deliveries"
 
-    json_files = sorted(matches_dir.glob("*.json"))
-    logger.info("scanning_json_files", file_count=len(json_files))
+        json_files = sorted(matches_dir.glob("*.json"))
+        logger.info("scanning_json_files", file_count=len(json_files))
 
-    if full_refresh:
-        conn.execute(f"DROP TABLE IF EXISTS {matches_table_name}")
-        conn.execute(f"DROP TABLE IF EXISTS {deliveries_table_name}")
+        if full_refresh:
+            conn.execute(f"DROP TABLE IF EXISTS {matches_table_name}")
+            conn.execute(f"DROP TABLE IF EXISTS {deliveries_table_name}")
 
-    # Ensure tables exist with correct schema (idempotent)
-    _ensure_bronze_tables(conn)
+        # Ensure tables exist with correct schema (idempotent)
+        _ensure_bronze_tables(conn)
 
-    if not json_files:
-        logger.info("no_json_files_found")
-        conn.close()
-        return 0
+        if not json_files:
+            logger.info("no_json_files_found")
+            return 0
 
-    total_new = 0
-    failed_files: list[str] = []
-    num_batches = (len(json_files) + _BATCH_SIZE - 1) // _BATCH_SIZE
-    run_id = str(uuid.uuid4())
-    loaded_at = datetime.now(UTC).isoformat()
+        total_new = 0
+        failed_files: list[str] = []
+        num_batches = (len(json_files) + _BATCH_SIZE - 1) // _BATCH_SIZE
+        run_id = str(uuid.uuid4())
+        loaded_at = datetime.now(UTC).isoformat()
 
-    for batch_idx in range(num_batches):
-        start = batch_idx * _BATCH_SIZE
-        batch_files = json_files[start : start + _BATCH_SIZE]
+        for batch_idx in range(num_batches):
+            start = batch_idx * _BATCH_SIZE
+            batch_files = json_files[start : start + _BATCH_SIZE]
 
-        batch_matches: list[dict[str, Any]] = []
-        batch_deliveries: list[dict[str, Any]] = []
+            batch_matches: list[dict[str, Any]] = []
+            batch_deliveries: list[dict[str, Any]] = []
 
-        for json_file in batch_files:
-            match_id = json_file.stem
+            for json_file in batch_files:
+                match_id = json_file.stem
+                try:
+                    with open(json_file) as f:
+                        data = json.load(f)
+                    audit = {
+                        "source_file": json_file.name,
+                        "loaded_at": loaded_at,
+                        "run_id": run_id,
+                    }
+                    batch_matches.append(_parse_match_info(match_id, data, **audit))
+                    batch_deliveries.extend(_parse_deliveries(match_id, data, **audit))
+                except Exception as exc:
+                    failed_files.append(json_file.name)
+                    logger.warning("parse_failed", file=json_file.name, error=str(exc))
+
+            if not batch_matches:
+                continue
+
+            matches_pa = pa.Table.from_pylist(batch_matches)
+            deliveries_pa = pa.Table.from_pylist(batch_deliveries) if batch_deliveries else None
+
+            # Atomic write: both matches + deliveries succeed or neither does
+            conn.execute("BEGIN TRANSACTION")
             try:
-                with open(json_file) as f:
-                    data = json.load(f)
-                audit = {"source_file": json_file.name, "loaded_at": loaded_at, "run_id": run_id}
-                batch_matches.append(_parse_match_info(match_id, data, **audit))
-                batch_deliveries.extend(_parse_deliveries(match_id, data, **audit))
-            except Exception as exc:
-                failed_files.append(json_file.name)
-                logger.warning("parse_failed", file=json_file.name, error=str(exc))
+                new_matches = append_to_bronze(conn, matches_table_name, matches_pa, "match_id")
 
-        if not batch_matches:
-            continue
+                if deliveries_pa is not None and new_matches > 0:
+                    append_to_bronze(conn, deliveries_table_name, deliveries_pa, "match_id")
 
-        matches_pa = pa.Table.from_pylist(batch_matches)
-        deliveries_pa = pa.Table.from_pylist(batch_deliveries) if batch_deliveries else None
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
 
-        # Atomic write: both matches + deliveries succeed or neither does
-        conn.execute("BEGIN TRANSACTION")
-        try:
-            new_matches = append_to_bronze(conn, matches_table_name, matches_pa, "match_id")
+            total_new += new_matches
+            if num_batches > 1:
+                logger.info(
+                    "batch_complete",
+                    batch=batch_idx + 1,
+                    of=num_batches,
+                    new_matches=new_matches,
+                )
 
-            if deliveries_pa is not None and new_matches > 0:
-                append_to_bronze(conn, deliveries_table_name, deliveries_pa, "match_id")
+        total_matches = conn.execute(f"SELECT COUNT(*) FROM {matches_table_name}").fetchone()[0]
+        total_deliveries = conn.execute(f"SELECT COUNT(*) FROM {deliveries_table_name}").fetchone()[
+            0
+        ]
 
-            conn.execute("COMMIT")
-        except Exception:
-            conn.execute("ROLLBACK")
-            conn.close()
-            raise
+        logger.info(
+            "bronze_load_complete",
+            new_matches=total_new,
+            total_matches=total_matches,
+            total_deliveries=total_deliveries,
+            failed_files=len(failed_files),
+        )
+        if failed_files:
+            logger.warning("failed_files_summary", files=failed_files)
 
-        total_new += new_matches
-        if num_batches > 1:
-            logger.info(
-                "batch_complete",
-                batch=batch_idx + 1,
-                of=num_batches,
-                new_matches=new_matches,
-            )
-
-    total_matches = conn.execute(f"SELECT COUNT(*) FROM {matches_table_name}").fetchone()[0]
-    total_deliveries = conn.execute(f"SELECT COUNT(*) FROM {deliveries_table_name}").fetchone()[0]
-
-    logger.info(
-        "bronze_load_complete",
-        new_matches=total_new,
-        total_matches=total_matches,
-        total_deliveries=total_deliveries,
-        failed_files=len(failed_files),
-    )
-    if failed_files:
-        logger.warning("failed_files_summary", files=failed_files)
-
-    conn.close()
-    return total_new
+        return total_new
 
 
 def load_people_to_bronze(people_csv: Path) -> int:
@@ -368,50 +371,46 @@ def load_people_to_bronze(people_csv: Path) -> int:
     Pattern: load into _people_staging → validate → drop old → rename.
     If the CSV is malformed or empty, the existing people table survives.
     """
-    conn = get_write_conn()
-    schema = settings.bronze_schema
-    staging = f"{schema}._people_staging"
-    target = f"{schema}.people"
+    with write_conn() as conn:
+        schema = settings.bronze_schema
+        staging = f"{schema}._people_staging"
+        target = f"{schema}.people"
 
-    logger.info("loading_people_to_bronze", path=str(people_csv))
+        logger.info("loading_people_to_bronze", path=str(people_csv))
 
-    # Load into staging table (outside transaction — DuckDB CREATE AS
-    # with read_csv_auto needs to read the file)
-    conn.execute(f"DROP TABLE IF EXISTS {staging}")
-    conn.execute(f"""
-        CREATE TABLE {staging} AS
-        SELECT * FROM read_csv_auto('{people_csv}', header=true)
-    """)
-
-    # Validate staging data before swapping
-    (staging_count,) = conn.execute(f"SELECT COUNT(*) FROM {staging}").fetchone()
-    if staging_count == 0:
+        # Load into staging table (outside transaction — DuckDB CREATE AS
+        # with read_csv_auto needs to read the file)
         conn.execute(f"DROP TABLE IF EXISTS {staging}")
-        conn.close()
-        raise ValueError(f"people.csv loaded 0 rows from {people_csv} — refusing to swap")
+        conn.execute(f"""
+            CREATE TABLE {staging} AS
+            SELECT * FROM read_csv_auto('{people_csv}', header=true)
+        """)
 
-    (has_identifier,) = conn.execute(f"""
-        SELECT COUNT(*) FROM information_schema.columns
-        WHERE table_schema = '{schema}' AND table_name = '_people_staging'
-        AND column_name = 'identifier'
-    """).fetchone()
-    if has_identifier == 0:
-        conn.execute(f"DROP TABLE IF EXISTS {staging}")
-        conn.close()
-        raise ValueError("people.csv missing 'identifier' column — refusing to swap")
+        # Validate staging data before swapping
+        (staging_count,) = conn.execute(f"SELECT COUNT(*) FROM {staging}").fetchone()
+        if staging_count == 0:
+            conn.execute(f"DROP TABLE IF EXISTS {staging}")
+            raise ValueError(f"people.csv loaded 0 rows from {people_csv} — refusing to swap")
 
-    # Atomic swap: drop old + rename staging
-    conn.execute("BEGIN TRANSACTION")
-    try:
-        conn.execute(f"DROP TABLE IF EXISTS {target}")
-        conn.execute(f"ALTER TABLE {staging} RENAME TO people")
-        conn.execute("COMMIT")
-    except Exception:
-        conn.execute("ROLLBACK")
-        conn.execute(f"DROP TABLE IF EXISTS {staging}")
-        conn.close()
-        raise
+        (has_identifier,) = conn.execute(f"""
+            SELECT COUNT(*) FROM information_schema.columns
+            WHERE table_schema = '{schema}' AND table_name = '_people_staging'
+            AND column_name = 'identifier'
+        """).fetchone()
+        if has_identifier == 0:
+            conn.execute(f"DROP TABLE IF EXISTS {staging}")
+            raise ValueError("people.csv missing 'identifier' column — refusing to swap")
 
-    logger.info("people_load_complete", count=staging_count)
-    conn.close()
-    return staging_count
+        # Atomic swap: drop old + rename staging
+        conn.execute("BEGIN TRANSACTION")
+        try:
+            conn.execute(f"DROP TABLE IF EXISTS {target}")
+            conn.execute(f"ALTER TABLE {staging} RENAME TO people")
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            conn.execute(f"DROP TABLE IF EXISTS {staging}")
+            raise
+
+        logger.info("people_load_complete", count=staging_count)
+        return staging_count

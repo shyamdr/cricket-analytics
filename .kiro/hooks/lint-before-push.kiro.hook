@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "Lint & Format Check",
+  "description": "Runs ruff check and ruff format --check on src/ and tests/ after every agent stop, so CI lint failures are caught before pushing to main.",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": ".venv/bin/ruff check src/ tests/ && .venv/bin/ruff format --check src/ tests/",
+    "timeout": 30
+  }
+}

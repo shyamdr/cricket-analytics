@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "name": "Auto-fix Lint on Write",
+  "description": "After writing any Python file, reminds the agent to run ruff check and ruff format to fix any lint/format issues before the user pushes.",
+  "version": "1",
+  "when": {
+    "type": "postToolUse",
+    "toolTypes": [
+      "write"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "You just wrote or modified a Python file. Run `.venv/bin/ruff check --fix src/ tests/` and `.venv/bin/ruff format src/ tests/` to auto-fix any lint or formatting issues. Do this silently — no need to explain to the user unless there were issues that couldn't be auto-fixed."
+  },
+  "workspaceFolderName": "cricket-analytics",
+  "shortName": "fix-lint-on-write"
+}
