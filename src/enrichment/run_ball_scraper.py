@@ -20,16 +20,16 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import logging
 
 import duckdb
+import structlog
 
 from src.config import settings
 from src.database import get_read_conn
 from src.enrichment.ball_scraper import scrape_ball_data
 from src.enrichment.series_resolver import SeriesResolver
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def _load_ball_records_to_bronze(records: list[dict]) -> int:
@@ -201,19 +201,19 @@ def run_ball_scraper(
         pending = pending[:limit]
 
     logger.info(
-        "Ball scraper: to_scrape=%d, already_done=%d, total=%d",
-        len(pending),
-        len(already_scraped),
-        len(all_matches),
+        "ball_scraper_plan",
+        to_scrape=len(pending),
+        already_done=len(already_scraped),
+        total=len(all_matches),
     )
 
     if dry_run or not pending:
         for m in pending:
-            logger.info("  would scrape: match_id=%s, date=%s", m["match_id"], m["match_date"])
+            logger.info("would_scrape", match_id=m["match_id"], date=m["match_date"])
         return
 
     resolver = SeriesResolver()
-    logger.info("Starting — %d matches, %.1fs delay between matches", len(pending), delay)
+    logger.info("ball_scraper_starting", matches=len(pending), delay=delay)
 
     total_loaded = 0
     batches_written = 0
@@ -224,10 +224,10 @@ def run_ball_scraper(
         total_loaded += loaded
         batches_written += 1
         logger.info(
-            "batch %d saved | balls_in_batch=%d | total_saved=%d",
-            batches_written,
-            loaded,
-            total_loaded,
+            "batch_saved",
+            batch=batches_written,
+            balls_in_batch=loaded,
+            total_saved=total_loaded,
         )
 
     results = scrape_ball_data(
@@ -237,31 +237,10 @@ def run_ball_scraper(
         on_batch=persist_batch,
         on_status=_record_scrape_status,
     )
-    logger.info("Done — balls_scraped=%d, saved_to_db=%d", len(results), total_loaded)
+    logger.info("ball_scraper_complete", balls_scraped=len(results), saved_to_db=total_loaded)
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)-5s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    # Route structlog through stdlib so everything has the same format.
-    # Suppresses noisy structlog key=value output from series_resolver, database, etc.
-    import structlog
-
-    structlog.configure(
-        wrapper_class=structlog.stdlib.BoundLogger,
-        logger_factory=structlog.stdlib.LoggerFactory(),
-        processors=[
-            structlog.stdlib.add_log_level,
-            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
-        ],
-    )
-    # Silence chatty modules — only show warnings and above
-    logging.getLogger("src.enrichment.series_resolver").setLevel(logging.WARNING)
-    logging.getLogger("src.database").setLevel(logging.WARNING)
-
     parser = argparse.ArgumentParser(description="ESPN ball-by-ball data scraper")
     parser.add_argument("--season", type=str, help="Season to scrape (e.g. 2024)")
     parser.add_argument("--matches", type=str, help="Comma-separated match IDs to re-scrape")
