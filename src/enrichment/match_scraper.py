@@ -9,7 +9,10 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 import structlog
 from playwright.async_api import async_playwright
@@ -443,7 +446,7 @@ async def scrape_matches_async(
     matches: list[dict[str, str]],
     resolver: SeriesResolver | None = None,
     delay_seconds: float = 4.0,
-    on_batch: callable | None = None,
+    on_batch: Callable | None = None,
     batch_size: int | None = None,
 ) -> list[dict[str, Any]]:
     """Scrape ESPN scorecard data for a list of matches.
@@ -554,7 +557,7 @@ def scrape_matches(
     matches: list[dict[str, str]],
     resolver: SeriesResolver | None = None,
     delay_seconds: float = 4.0,
-    on_batch: callable | None = None,
+    on_batch: Callable | None = None,
     batch_size: int | None = None,
 ) -> list[dict[str, Any]]:
     """Synchronous wrapper around scrape_matches_async."""

@@ -21,14 +21,25 @@ import structlog
 
 from src.config import settings
 from src.database import append_to_bronze, get_read_conn
+from src.utils import retry
 
 logger = structlog.get_logger(__name__)
 
 _ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 
-# Persistent HTTP client — reuses TLS session across calls, avoids
-# repeated SSL handshakes that cause timeout failures.
-_http_client = httpx.Client(timeout=15, http2=False)
+# Lazy-initialized HTTP client — reuses TLS session across calls, avoids
+# repeated SSL handshakes that cause timeout failures. Created on first
+# use, not at import time, so tests and short-lived processes don't leak.
+_http_client: httpx.Client | None = None
+
+
+def _get_http_client() -> httpx.Client:
+    """Get or create the persistent HTTP client."""
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.Client(timeout=15, http2=False)
+    return _http_client
+
 
 # Hourly variables to fetch — all stored in bronze, subset surfaced in gold
 _HOURLY_VARS = ",".join(
@@ -85,23 +96,25 @@ _DAILY_VARS = ",".join(
 )
 
 
+@retry(
+    max_attempts=4, base_delay=1.0, exceptions=(httpx.TimeoutException, httpx.ConnectError, OSError)
+)
 def _fetch_weather(
     latitude: float,
     longitude: float,
     date: str,
     timezone: str = "Asia/Kolkata",
-    max_retries: int = 3,
 ) -> dict[str, Any]:
     """Fetch one day of hourly + daily weather from Open-Meteo.
 
-    Retries on timeout/connection errors with exponential backoff.
+    Retries on timeout/connection errors with exponential backoff
+    via the @retry decorator.
 
     Args:
         latitude: Venue latitude.
         longitude: Venue longitude.
         date: Match date in YYYY-MM-DD format.
         timezone: IANA timezone for the venue (default: Asia/Kolkata for IPL).
-        max_retries: Number of retry attempts on transient failures.
 
     Returns:
         Raw API response dict.
@@ -115,26 +128,9 @@ def _fetch_weather(
         "daily": _DAILY_VARS,
         "timezone": timezone,
     }
-    for attempt in range(max_retries + 1):
-        try:
-            resp = _http_client.get(_ARCHIVE_URL, params=params)
-            resp.raise_for_status()
-            return resp.json()
-        except (httpx.TimeoutException, httpx.ConnectError, OSError) as exc:
-            if attempt == max_retries:
-                raise
-            wait = min(attempt + 1, 3)
-            logger.warning(
-                "weather_retry",
-                attempt=attempt + 1,
-                max_retries=max_retries,
-                wait=wait,
-                error=str(exc),
-            )
-            time.sleep(wait)
-    # unreachable but keeps type checker happy
-    msg = "max retries exceeded"
-    raise RuntimeError(msg)
+    resp = _get_http_client().get(_ARCHIVE_URL, params=params)
+    resp.raise_for_status()
+    return resp.json()
 
 
 def _get_pending_matches(limit: int = 0) -> list[dict[str, Any]]:

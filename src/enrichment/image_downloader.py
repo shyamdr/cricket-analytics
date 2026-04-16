@@ -10,7 +10,7 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
+import time
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +19,6 @@ import structlog
 
 from src.config import settings
 from src.database import get_read_conn, write_conn
-from src.utils import run_async
 
 logger = structlog.get_logger(__name__)
 
@@ -132,52 +131,47 @@ def download_images() -> dict[str, int]:
     failed = 0
     successful: list[dict[str, Any]] = []
 
-    async def _run() -> None:
-        nonlocal downloaded, failed
+    with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+        for i, rec in enumerate(pending):
+            target = rec["dir"] / f"{rec['id']}.png"
+            url = f"{ESPN_CDN}/{rec['transform']}{rec['cms_path']}"
 
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            for i, rec in enumerate(pending):
-                target = rec["dir"] / f"{rec['id']}.png"
-                url = f"{ESPN_CDN}/{rec['transform']}{rec['cms_path']}"
-
-                try:
-                    resp = await client.get(url)
-                    if resp.status_code == 200 and len(resp.content) > 100:
-                        target.write_bytes(resp.content)
-                        downloaded += 1
-                        successful.append(rec)
-                        logger.info(
-                            "image_downloaded",
-                            entity_type=rec["entity_type"],
-                            name=rec["name"],
-                            espn_id=rec["id"],
-                            size_kb=round(len(resp.content) / 1024, 1),
-                            progress=f"{i + 1}/{total}",
-                        )
-                    else:
-                        failed += 1
-                        logger.warning(
-                            "image_download_failed",
-                            entity_type=rec["entity_type"],
-                            name=rec["name"],
-                            espn_id=rec["id"],
-                            status=resp.status_code,
-                            progress=f"{i + 1}/{total}",
-                        )
-                except Exception as e:
-                    failed += 1
-                    logger.error(
-                        "image_download_error",
+            try:
+                resp = client.get(url)
+                if resp.status_code == 200 and len(resp.content) > 100:
+                    target.write_bytes(resp.content)
+                    downloaded += 1
+                    successful.append(rec)
+                    logger.info(
+                        "image_downloaded",
                         entity_type=rec["entity_type"],
                         name=rec["name"],
                         espn_id=rec["id"],
-                        error=str(e),
+                        size_kb=round(len(resp.content) / 1024, 1),
                         progress=f"{i + 1}/{total}",
                     )
+                else:
+                    failed += 1
+                    logger.warning(
+                        "image_download_failed",
+                        entity_type=rec["entity_type"],
+                        name=rec["name"],
+                        espn_id=rec["id"],
+                        status=resp.status_code,
+                        progress=f"{i + 1}/{total}",
+                    )
+            except Exception as e:
+                failed += 1
+                logger.error(
+                    "image_download_error",
+                    entity_type=rec["entity_type"],
+                    name=rec["name"],
+                    espn_id=rec["id"],
+                    error=str(e),
+                    progress=f"{i + 1}/{total}",
+                )
 
-                await asyncio.sleep(0.3)
-
-    run_async(_run())
+            time.sleep(0.3)
 
     # Mark only what we just downloaded
     _mark_downloaded(successful)

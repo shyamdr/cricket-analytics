@@ -49,7 +49,10 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 import structlog
 from playwright.async_api import Response, Route, async_playwright
@@ -517,8 +520,8 @@ async def scrape_ball_data_async(
     matches: list[dict[str, str]],
     resolver: SeriesResolver | None = None,
     delay_seconds: float = 4.0,
-    on_batch: callable | None = None,
-    on_status: callable | None = None,
+    on_batch: Callable | None = None,
+    on_status: Callable | None = None,
     batch_size: int = 10,
 ) -> list[dict[str, Any]]:
     """Scrape ball-by-ball data for a list of matches.
@@ -670,8 +673,8 @@ def scrape_ball_data(
     matches: list[dict[str, str]],
     resolver: SeriesResolver | None = None,
     delay_seconds: float = 4.0,
-    on_batch: callable | None = None,
-    on_status: callable | None = None,
+    on_batch: Callable | None = None,
+    on_status: Callable | None = None,
     batch_size: int = 10,
 ) -> list[dict[str, Any]]:
     """Synchronous wrapper around scrape_ball_data_async."""

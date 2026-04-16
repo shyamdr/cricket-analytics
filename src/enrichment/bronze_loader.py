@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    import duckdb
-
+import duckdb
 import pyarrow as pa
 import structlog
 
@@ -240,8 +238,6 @@ def _ensure_espn_tables(conn: duckdb.DuckDBPyConnection) -> None:
 
 def _migrate_image_columns(conn: duckdb.DuckDBPyConnection, schema: str) -> None:
     """Add image URL columns to existing ESPN tables (backward-compatible migration)."""
-    import contextlib
-
     migrations = [
         (f"{schema}.espn_players", "image_url", "VARCHAR"),
         (f"{schema}.espn_players", "headshot_image_url", "VARCHAR"),
@@ -252,12 +248,16 @@ def _migrate_image_columns(conn: duckdb.DuckDBPyConnection, schema: str) -> None
         (f"{schema}.espn_matches", "team2_long_name", "VARCHAR"),
     ]
     for table, column, dtype in migrations:
-        with contextlib.suppress(Exception):
+        try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {dtype}")
+        except duckdb.CatalogException:
+            pass  # Table doesn't exist yet — will be created by DDL above
+        except Exception:
+            logger.warning("migration_failed", table=table, column=column)
 
     # Backfill team long names from teams_enrichment_json for existing rows
     # that were scraped before the long_name columns were added.
-    with contextlib.suppress(Exception):
+    try:
         conn.execute(f"""
             UPDATE {schema}.espn_matches
             SET team1_long_name = json_extract_string(teams_enrichment_json::json, '$[0].team_long_name'),
@@ -265,6 +265,10 @@ def _migrate_image_columns(conn: duckdb.DuckDBPyConnection, schema: str) -> None
             WHERE team1_long_name IS NULL
               AND teams_enrichment_json IS NOT NULL
         """)
+    except duckdb.CatalogException:
+        pass  # Table doesn't exist yet
+    except Exception:
+        logger.warning("backfill_team_long_names_failed")
 
 
 def load_espn_to_bronze(records: list[dict[str, Any]]) -> dict[str, int]:
