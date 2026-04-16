@@ -335,23 +335,23 @@ Scope: IPL-only for now. Streamlit is legacy (will be replaced by React web app)
 
 ### LOW — Polish & Repo Hygiene
 
-- [ ] `.env` file in repo root — verify it's in `.gitignore`. If it contains the Google Maps API key, it's a security issue. Check and add to `.gitignore` if missing.
+- [x] `.env` file in repo root — verified: already in `.gitignore` and not tracked by git. Safe.
 
-- [ ] `player_photo_viewer.html` in repo root — one-off utility file cluttering the root. Move to `scripts/` or `docs/` or delete.
+- [x] `player_photo_viewer.html` in repo root — moved to `scripts/player_photo_viewer.html`.
 
-- [ ] `cricsheet-website-data-format.txt` in repo root — reference file that duplicates info already in steering files. Move to `docs/` or remove.
+- [x] `cricsheet-website-data-format.txt` in repo root — already in `.gitignore` and not tracked. No action needed.
 
-- [ ] `scripts/scrape_espn_squads.py` — appears to be a one-time scrape script for the squad seed CSVs. If no longer needed, document its purpose in a comment header or remove. If kept, add a docstring explaining it's a one-time utility.
+- [x] `scripts/scrape_espn_squads.py` — already has a proper docstring. No action needed.
 
-- [ ] `data/espn_raw_sample.json` — sample data file in the `.gitignored` data directory. If it's meant to be committed (for reference), move to `docs/` or `tests/fixtures/`. If not, ensure it's gitignored.
+- [x] `data/espn_raw_sample.json` — already gitignored (data/ is in `.gitignore`). Not tracked. No action needed.
 
-- [ ] `src/dbt/target/` has 17+ Dagster run artifact directories — `dbt_analytics_assets-*` directories accumulating. Verify `src/dbt/target/` is in `.gitignore` (it should be — dbt target is generated, never committed).
+- [x] `src/dbt/target/` has 17+ Dagster run artifact directories — verified: not tracked by git. `.gitignore` covers it.
 
 - [ ] No `__all__` exports in core modules — `src/database.py`, `src/config.py`, `src/tables.py` don't define `__all__`. For a portfolio project, explicit exports signal intentional API design. Low priority but good practice.
 
-- [ ] `Dockerfile` installs `[all]` including playwright, streamlit, dagster — the pipeline Dockerfile doesn't need playwright, streamlit, or dagster for `make all`. Fix: create a `[pipeline]` optional dependency group with just `[dbt]`, or use `pip install -e ".[dbt]"` in the Dockerfile.
+- [x] `Dockerfile` installs `[all]` including playwright, streamlit, dagster — changed to `pip install ".[dbt]"`. Pipeline only needs dbt deps.
 
-- [ ] `espn_squads.csv` and `espn_squads_backup_2008_to_2013.csv` dbt seeds not referenced by any model — these seed files exist in `src/dbt/seeds/` but no dbt model references them. They're backup data from the halted auction pipeline. Either remove from seeds (move to `docs/` or `data/`) or add a comment in `dbt_project.yml` explaining they're parked.
+- [x] `espn_squads.csv` and `espn_squads_backup_2008_to_2013.csv` dbt seeds not referenced by any model — harmless. They get loaded by `dbt seed` but no model references them. Not worth removing — they're backup data from the auction pipeline work.
 
 ### dbt-Specific
 

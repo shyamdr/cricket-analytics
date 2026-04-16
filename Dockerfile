@@ -8,10 +8,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     make \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python deps (non-editable for Docker)
+# Install Python deps (dbt only — pipeline doesn't need playwright, streamlit, dagster)
 COPY pyproject.toml .
 COPY src/ src/
-RUN pip install --no-cache-dir ".[all]"
+RUN pip install --no-cache-dir ".[dbt]"
 
 # Copy remaining project files
 COPY Makefile .
