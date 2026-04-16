@@ -317,21 +317,21 @@ Scope: IPL-only for now. Streamlit is legacy (will be replaced by React web app)
 
 ### MEDIUM — Code Quality
 
-- [ ] Type annotations use `callable` (lowercase) instead of `Callable` — `match_scraper.py` and `ball_scraper.py` use `callable` as a type hint for `on_batch` and `on_status` parameters. This is the builtin `callable()` function, not `typing.Callable`. Works at runtime but is semantically wrong and mypy flags it. Fix: use `Callable[[list[dict]], None] | None` from `collections.abc`.
+- [x] Type annotations use `callable` (lowercase) instead of `Callable` — replaced with `Callable` from `collections.abc` (in TYPE_CHECKING block) in match_scraper.py and ball_scraper.py.
 
-- [ ] Duplicated query patterns in `run_match_scraper.py` and `run_ball_scraper.py` — both files have nearly identical functions: `get_matches_for_season`, `get_all_matches`, `get_already_scraped`. The SQL is copy-pasted with minor variations. Fix: extract shared query functions into `src/enrichment/queries.py` and import from both CLI modules.
+- [x] Duplicated query patterns in `run_match_scraper.py` and `run_ball_scraper.py` — extracted `get_matches_for_season`, `get_all_matches`, `get_matches_by_ids` into `src/enrichment/queries.py`. Both CLI modules and Dagster enrichment asset now import from the shared module.
 
-- [ ] `weather_fetcher.py` has manual retry loop instead of using `@retry` decorator — `_fetch_weather` implements its own for-loop retry with exponential backoff, duplicating the logic in `src/utils.retry()`. Fix: replace the manual loop with `@retry(max_attempts=3, base_delay=1.0, exceptions=(httpx.TimeoutException, httpx.ConnectError, OSError))`.
+- [x] `weather_fetcher.py` has manual retry loop instead of using `@retry` decorator — replaced manual for-loop with `@retry(max_attempts=4, base_delay=1.0, exceptions=(httpx.TimeoutException, httpx.ConnectError, OSError))`.
 
-- [ ] `weather_fetcher.py` module-level `httpx.Client` never closed — `_http_client = httpx.Client(...)` is created at import time and never closed. Fine for CLI but leaks in test contexts and long-running processes. Fix: lazy initialization with a module-level getter, or pass the client as a parameter.
+- [x] `weather_fetcher.py` module-level `httpx.Client` never closed — replaced with lazy-initialized `_get_http_client()` getter. Client created on first use, not at import time.
 
-- [ ] `image_downloader.py` uses async without concurrency — `download_images()` defines an inner `async def _run()` that uses `httpx.AsyncClient` but downloads images sequentially with `await`. No concurrency benefit. Fix: either use synchronous `httpx.Client` (simpler), or use `asyncio.Semaphore` + `asyncio.gather` for actual concurrent downloads (faster).
+- [x] `image_downloader.py` uses async without concurrency — replaced `httpx.AsyncClient` + `run_async()` with synchronous `httpx.Client`. The async code had no concurrency (sequential await in a loop), so async was pure overhead.
 
-- [ ] `geocode_venue_coordinates` Dagster asset is a 150-line monolith — the asset function in `enrichment.py` does geocoding, alias detection, CSV writing, and DB writes all inline. Fix: move the geocoding orchestration logic into `src/enrichment/geocoder.py` (which already has the core functions). The Dagster asset should just call a high-level function and report metadata.
+- [ ] `geocode_venue_coordinates` Dagster asset is a 150-line monolith — the asset function in `enrichment.py` does geocoding, alias detection, CSV writing, and DB writes all inline. Fix: move the geocoding orchestration logic into `src/enrichment/geocoder.py` (which already has the core functions). The Dagster asset should just call a high-level function and report metadata. DEFERRED — not a correctness issue, tackle when touching geocoder code next.
 
-- [ ] `_migrate_image_columns` silently swallows all exceptions — `src/enrichment/bronze_loader.py` uses `contextlib.suppress(Exception)` around ALTER TABLE and UPDATE statements. If the backfill UPDATE fails due to a real bug (e.g., malformed JSON), it's silently ignored. Fix: catch specific exceptions (e.g., `duckdb.CatalogException`) and log warnings for unexpected ones.
+- [x] `_migrate_image_columns` silently swallows all exceptions — replaced `contextlib.suppress(Exception)` with specific `duckdb.CatalogException` catches + `logger.warning` for unexpected errors.
 
-- [ ] CORS regex too permissive — `src/api/app.py` uses `allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:3000"` which matches ANY Vercel deployment, not just InsideEdge. Fix: tighten to `r"https://insideedge(-[a-z0-9]+)?\.vercel\.app|http://localhost:3000"` to allow preview deploys but not arbitrary Vercel apps.
+- [x] CORS regex too permissive — tightened from `https://.*\.vercel\.app` to `https://insideedge(-[a-z0-9]+)?\.vercel\.app`.
 
 ### LOW — Polish & Repo Hygiene
 
