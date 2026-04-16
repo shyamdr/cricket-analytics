@@ -14,11 +14,8 @@ from dagster import AssetExecutionContext, AssetKey, Config, MaterializeResult, 
 
 from src.enrichment.bronze_loader import load_espn_to_bronze
 from src.enrichment.match_scraper import scrape_matches
-from src.enrichment.run_match_scraper import (
-    get_all_matches,
-    get_already_scraped,
-    get_matches_for_season,
-)
+from src.enrichment.queries import get_all_matches, get_matches_for_season
+from src.enrichment.run_match_scraper import get_already_scraped
 from src.enrichment.series_resolver import SeriesResolver
 
 
@@ -141,11 +138,11 @@ def espn_ball_enrichment(
 ) -> MaterializeResult:
     """Scrape ESPN ball-by-ball data for matches not yet scraped."""
     from src.enrichment.ball_scraper import scrape_ball_data
+    from src.enrichment.queries import get_all_matches as get_all
+    from src.enrichment.queries import get_matches_for_season as get_season
     from src.enrichment.run_ball_scraper import (
         _ensure_status_table,
-        _get_all_matches,
         _get_already_scraped_match_ids,
-        _get_matches_for_season,
         _load_ball_records_to_bronze,
         _record_scrape_status,
     )
@@ -153,11 +150,11 @@ def espn_ball_enrichment(
     _ensure_status_table()
 
     if config.all_seasons:
-        all_matches = _get_all_matches()
+        all_matches = get_all()
     elif config.season:
-        all_matches = _get_matches_for_season(config.season)
+        all_matches = get_season(config.season)
     else:
-        all_matches = _get_all_matches()
+        all_matches = get_all()
 
     already_scraped = _get_already_scraped_match_ids()
     pending = [m for m in all_matches if m["match_id"] not in already_scraped]

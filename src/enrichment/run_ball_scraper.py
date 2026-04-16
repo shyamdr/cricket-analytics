@@ -27,6 +27,7 @@ import structlog
 from src.config import settings
 from src.database import get_read_conn
 from src.enrichment.ball_scraper import scrape_ball_data
+from src.enrichment.queries import get_all_matches, get_matches_by_ids, get_matches_for_season
 from src.enrichment.series_resolver import SeriesResolver
 
 logger = structlog.get_logger(__name__)
@@ -45,72 +46,6 @@ def _load_ball_records_to_bronze(records: list[dict]) -> int:
         return append_to_bronze(
             conn, f"{settings.bronze_schema}.espn_ball_data", table, "espn_ball_id"
         )
-
-
-def _get_matches_for_season(
-    season: str, conn: duckdb.DuckDBPyConnection | None = None
-) -> list[dict[str, str]]:
-    """Get all matches for a season — including no-result (rain-abandoned).
-
-    Rain-abandoned matches can still have partial or full innings of ball
-    data on ESPN, so we don't exclude them.
-    """
-    close_after = conn is None
-    if conn is None:
-        conn = get_read_conn()
-    rows = conn.execute(
-        f"""SELECT match_id,
-                   CAST(date AS DATE) as match_date,
-                   CAST(EXTRACT(YEAR FROM CAST(date AS DATE)) AS VARCHAR) as season
-           FROM {settings.bronze_schema}.matches
-           WHERE CAST(EXTRACT(YEAR FROM CAST(date AS DATE)) AS VARCHAR) = ?
-           ORDER BY date""",
-        [season],
-    ).fetchall()
-    if close_after:
-        conn.close()
-    return [{"match_id": r[0], "match_date": str(r[1]), "season": r[2]} for r in rows]
-
-
-def _get_all_matches(
-    conn: duckdb.DuckDBPyConnection | None = None,
-) -> list[dict[str, str]]:
-    """Get all matches across all seasons."""
-    close_after = conn is None
-    if conn is None:
-        conn = get_read_conn()
-    rows = conn.execute(
-        f"""SELECT match_id,
-                   CAST(date AS DATE) as match_date,
-                   CAST(EXTRACT(YEAR FROM CAST(date AS DATE)) AS VARCHAR) as season
-           FROM {settings.bronze_schema}.matches
-           ORDER BY date""",
-    ).fetchall()
-    if close_after:
-        conn.close()
-    return [{"match_id": r[0], "match_date": str(r[1]), "season": r[2]} for r in rows]
-
-
-def _get_matches_by_ids(
-    match_ids: list[str], conn: duckdb.DuckDBPyConnection | None = None
-) -> list[dict[str, str]]:
-    """Get specific matches by their Cricsheet match IDs."""
-    close_after = conn is None
-    if conn is None:
-        conn = get_read_conn()
-    placeholders = ",".join(["?"] * len(match_ids))
-    rows = conn.execute(
-        f"""SELECT match_id,
-                   CAST(date AS DATE) as match_date,
-                   CAST(EXTRACT(YEAR FROM CAST(date AS DATE)) AS VARCHAR) as season
-           FROM {settings.bronze_schema}.matches
-           WHERE match_id IN ({placeholders})
-           ORDER BY date""",
-        match_ids,
-    ).fetchall()
-    if close_after:
-        conn.close()
-    return [{"match_id": r[0], "match_date": str(r[1]), "season": r[2]} for r in rows]
 
 
 def _get_already_scraped_match_ids(
@@ -183,11 +118,11 @@ def run_ball_scraper(
     conn = get_read_conn()
     try:
         if match_ids:
-            all_matches = _get_matches_by_ids(match_ids, conn)
+            all_matches = get_matches_by_ids(match_ids, conn)
         elif all_seasons:
-            all_matches = _get_all_matches(conn)
+            all_matches = get_all_matches(conn)
         elif season:
-            all_matches = _get_matches_for_season(season, conn)
+            all_matches = get_matches_for_season(season, conn)
         else:
             conn.close()
             return

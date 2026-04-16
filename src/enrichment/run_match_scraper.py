@@ -25,55 +25,10 @@ from src.config import settings
 from src.database import get_read_conn
 from src.enrichment.bronze_loader import load_espn_to_bronze
 from src.enrichment.match_scraper import scrape_matches
+from src.enrichment.queries import get_all_matches, get_matches_for_season
 from src.enrichment.series_resolver import SeriesResolver
 
 logger = structlog.get_logger(__name__)
-
-
-def get_matches_for_season(
-    season: str, conn: duckdb.DuckDBPyConnection | None = None
-) -> list[dict[str, str]]:
-    """Query DuckDB for all matches in a given season with dates.
-
-    Reads from bronze (not gold) to avoid circular dependency in the DAG.
-    Bronze has 'date' (string) and 'season' (raw Cricsheet string).
-    We derive the calendar year from the date for consistent season matching.
-    """
-    close_after = conn is None
-    if conn is None:
-        conn = get_read_conn()
-    rows = conn.execute(
-        f"""SELECT match_id,
-                   CAST(date AS DATE) as match_date,
-                   CAST(EXTRACT(YEAR FROM CAST(date AS DATE)) AS VARCHAR) as season
-           FROM {settings.bronze_schema}.matches
-           WHERE CAST(EXTRACT(YEAR FROM CAST(date AS DATE)) AS VARCHAR) = ?
-           ORDER BY date""",
-        [season],
-    ).fetchall()
-    if close_after:
-        conn.close()
-    return [{"match_id": r[0], "match_date": str(r[1]), "season": r[2]} for r in rows]
-
-
-def get_all_matches(conn: duckdb.DuckDBPyConnection | None = None) -> list[dict[str, str]]:
-    """Query DuckDB for all matches across all seasons.
-
-    Reads from bronze (not gold) to avoid circular dependency in the DAG.
-    """
-    close_after = conn is None
-    if conn is None:
-        conn = get_read_conn()
-    rows = conn.execute(
-        f"""SELECT match_id,
-                   CAST(date AS DATE) as match_date,
-                   CAST(EXTRACT(YEAR FROM CAST(date AS DATE)) AS VARCHAR) as season
-           FROM {settings.bronze_schema}.matches
-           ORDER BY date""",
-    ).fetchall()
-    if close_after:
-        conn.close()
-    return [{"match_id": r[0], "match_date": str(r[1]), "season": r[2]} for r in rows]
 
 
 def get_already_scraped(conn: duckdb.DuckDBPyConnection | None = None) -> set[str]:
