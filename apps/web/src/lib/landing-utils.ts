@@ -15,6 +15,11 @@ export interface Innings {
 export interface RecentMatch extends Match {
   innings: Innings[];
   floodlit: string | null;
+  toss_winner: string | null;
+  toss_decision: string | null;
+  player_of_match: string | null;
+  team1_captain: string | null;
+  team2_captain: string | null;
 }
 
 // ---------------------------------------------------------------------------
