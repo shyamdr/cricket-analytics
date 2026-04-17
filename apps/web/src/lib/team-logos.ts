@@ -71,13 +71,14 @@ function getMeta(teamName: string): TeamMeta | null {
 }
 
 /**
- * Returns the local static path for a team's logo: /teams/{espn_team_id}.png
- * Logo files are copied to public/teams/ from data/images/teams/.
+ * Returns the URL for a team's logo via the API image endpoint.
+ * In dev, Next.js rewrites /api/* to the FastAPI backend.
+ * In prod, NEXT_PUBLIC_API_URL points to the deployed API.
  */
 export function getTeamLogoUrl(teamName: string): string | null {
   const meta = getMeta(teamName);
   if (!meta?.espnTeamId) return null;
-  return `/teams/${meta.espnTeamId}.png`;
+  return `${API}/api/v1/images/teams/${meta.espnTeamId}.png`;
 }
 
 export function getTeamColor(teamName: string): string {

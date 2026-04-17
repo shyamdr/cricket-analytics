@@ -24,10 +24,10 @@ Key constraints:
 **Hybrid approach: static for team logos, API-served for player images.**
 
 ### Team logos (14 files, ~1MB total)
-- Copied to `apps/web/public/teams/{espn_id}.png`
-- Committed to git
-- Served directly by Next.js / Vercel CDN
-- Zero API dependency — logos load even when API is sleeping
+- Served through FastAPI endpoint: `GET /api/v1/images/teams/{espn_id}.png`
+- Same endpoint as player images — consistent approach
+- Not committed to git (stays in gitignored `data/images/` directory)
+- Frontend uses `<img>` tags with API URLs
 
 ### Player images (500+ files, ~100MB total)
 - Served through FastAPI endpoint: `GET /api/v1/images/players/{espn_id}.png`

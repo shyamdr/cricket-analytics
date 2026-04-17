@@ -55,3 +55,4 @@ cricsheet-website-data-format.txt
 apps/web/node_modules/
 apps/web/.next/
 apps/web/.env.local
+apps/web/public/teams/

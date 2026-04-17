@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { MapPin, Calendar, ArrowRight, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +14,6 @@ import {
   getTeamLogoUrl,
   getTeamColor,
   getTeamGradientColor,
-  getTeamAbbreviation,
   checkLogoClash,
   analyzeLogoClashAsync,
 } from "@/lib/team-logos";
@@ -168,7 +166,7 @@ export function MatchSpotlight({ matches }: MatchSpotlightProps) {
               <div className="flex items-center justify-center gap-5 lg:gap-6 px-4 lg:px-6 py-3 lg:py-0 relative">
                 {team1Logo ? (
                   <div className="h-[110px] w-[110px] lg:h-[140px] lg:w-[140px] p-2.5 lg:p-3 flex items-center justify-center">
-                    <Image src={team1Logo} alt={team1Name} width={140} height={140} className="object-contain max-h-full max-w-full" />
+                    <img src={team1Logo} alt={team1Name} className="object-contain max-h-full max-w-full" />
                   </div>
                 ) : (
                   <div className="h-[110px] w-[110px] lg:h-[140px] lg:w-[140px] rounded-full bg-white/20 flex items-center justify-center text-2xl font-semibold text-white">
@@ -190,7 +188,7 @@ export function MatchSpotlight({ matches }: MatchSpotlightProps) {
 
                 {team2Logo ? (
                   <div className="h-[110px] w-[110px] lg:h-[140px] lg:w-[140px] p-2.5 lg:p-3 flex items-center justify-center">
-                    <Image src={team2Logo} alt={team2Name} width={140} height={140} className="object-contain max-h-full max-w-full" />
+                    <img src={team2Logo} alt={team2Name} className="object-contain max-h-full max-w-full" />
                   </div>
                 ) : (
                   <div className="h-[110px] w-[110px] lg:h-[140px] lg:w-[140px] rounded-full bg-white/20 flex items-center justify-center text-2xl font-semibold text-white">
