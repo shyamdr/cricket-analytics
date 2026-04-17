@@ -128,7 +128,7 @@ models:
         description: "Whether the player is an overseas (non-domestic) player (from ESPN, based on most recent match)"
 
   - name: dim_teams
-    description: "Team dimension — one row per team name with franchise mapping and match date range."
+    description: "Team dimension — one row per team name with franchise mapping, match date range, and brand colors."
     columns:
       - name: team_name
         description: "Team name as it appeared in match data (historical names preserved)"
@@ -143,6 +143,16 @@ models:
         description: "Date of the team's most recent match in the dataset"
       - name: total_matches
         description: "Total number of matches played by this team"
+      - name: team_abbreviation
+        description: "Short abbreviation (e.g. CSK, MI, RCB) from ESPN enrichment"
+      - name: is_country
+        description: "Whether this is a national team (true) or franchise/club (false)"
+      - name: primary_color
+        description: "Primary brand color hex from curated seed CSV (falls back to ESPN color if seed missing)"
+      - name: brand_color_alt
+        description: "Alternate brand color hex — used when logo clashes with primary color background"
+      - name: logo_url
+        description: "ESPN CDN path for team logo image"
 
   - name: dim_venues
     description: "Venue dimension — one row per unique venue+city combination, enriched with ESPN ground data."

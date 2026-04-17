@@ -74,7 +74,9 @@ def recent_matches_with_scores(
         SELECT
             m.match_id, m.season, m.match_date, m.city, m.venue,
             m.team1, m.team2, m.outcome_winner, m.match_result_type,
-            m.winning_margin, m.event_name, m.event_stage, m.floodlit
+            m.winning_margin, m.event_name, m.event_stage, m.floodlit,
+            m.toss_winner, m.toss_decision, m.player_of_match,
+            m.team1_captain, m.team2_captain
         FROM {MATCHES} m
         ORDER BY m.match_date DESC
         LIMIT $1

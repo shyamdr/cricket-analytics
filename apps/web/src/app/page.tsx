@@ -9,6 +9,7 @@ import { TopPerformers } from "@/components/home/top-performers";
 import { ExploreCards } from "@/components/home/explore-cards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLatestSeason } from "@/lib/landing-utils";
+import { fetchTeamMeta } from "@/lib/team-logos";
 import type { RecentMatch } from "@/lib/landing-utils";
 import type { BattingStats, BowlingStats, SeasonCount } from "@/lib/types";
 
@@ -26,7 +27,7 @@ export default function Home() {
     const slowTimer = setTimeout(() => setSlowApi(true), 10_000);
 
     async function loadData() {
-      // Batch 1: matches + seasons in parallel
+      // Batch 1: matches + seasons + team metadata in parallel
       const [matchData, seasonData] = await Promise.all([
         fetch(`${API}/api/v1/matches/recent?limit=20`)
           .then((r) => (r.ok ? r.json() : []))
@@ -34,6 +35,7 @@ export default function Home() {
         fetch(`${API}/api/v1/matches/seasons`)
           .then((r) => (r.ok ? r.json() : []))
           .catch(() => [] as SeasonCount[]),
+        fetchTeamMeta(),
       ]);
 
       setMatches(matchData);
@@ -104,7 +106,7 @@ export default function Home() {
       <MatchTicker matches={matches} />
 
       {/* Section 1: Match Spotlight */}
-      <MatchSpotlight match={matches[0] ?? null} />
+      <MatchSpotlight matches={matches} />
 
       {/* Section 2: Season Summary */}
       <div className="animate-section-2">

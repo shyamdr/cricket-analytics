@@ -24,6 +24,7 @@ team_stats as (
 espn_teams as (
     select
         team_long_name,
+        espn_team_id,
         team_abbreviation,
         is_country,
         primary_color,
@@ -41,13 +42,18 @@ select
     ts.first_match_date,
     ts.last_match_date,
     ts.total_matches,
-    -- ESPN enrichment
-    et.team_abbreviation,
+    -- ESPN enrichment (fallback to seed for teams not in ESPN)
+    coalesce(et.espn_team_id, tbc.espn_team_id) as espn_team_id,
+    coalesce(et.team_abbreviation, tbc.team_name) as team_abbreviation,
     et.is_country,
-    et.primary_color,
+    -- Brand colors from curated seed (ESPN colors are unreliable)
+    coalesce(tbc.brand_color, et.primary_color) as primary_color,
+    tbc.brand_color_alt,
     et.logo_url
 from team_stats ts
 left join {{ ref('team_name_mappings') }} tnm
     on ts.team_name = tnm.team_name
 left join espn_teams et
     on ts.team_name = et.team_long_name
+left join {{ ref('team_brand_colors') }} tbc
+    on ts.team_name = tbc.team_name
