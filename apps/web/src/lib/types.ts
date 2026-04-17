@@ -11,8 +11,8 @@ export interface Match {
   venue: string;
   team1: string;
   team2: string;
-  toss_winner: string;
-  toss_decision: string;
+  toss_winner: string | null;
+  toss_decision: string | null;
   outcome_winner: string | null;
   outcome_by_runs: number | null;
   outcome_by_wickets: number | null;
