@@ -231,9 +231,7 @@ def espn_ball_enrichment(
         batch_size=10,
     )
 
-    context.log.info(
-        f"Ball data complete: {len(results)} balls, {total_ball_comm} ball commentary"
-    )
+    context.log.info(f"Ball data complete: {len(results)} balls, {total_ball_comm} ball commentary")
 
     return MaterializeResult(
         metadata={

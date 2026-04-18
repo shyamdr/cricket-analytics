@@ -156,15 +156,17 @@ def _extract_ball_commentary(comments: list[dict]) -> list[dict[str, Any]]:
 
         # Pre-ball editorial
         pre_items = c.get("commentPreTextItems") or []
-        pre_text = " ".join(
-            item.get("html") or item.get("text") or "" for item in pre_items
-        ).strip() or None
+        pre_text = (
+            " ".join(item.get("html") or item.get("text") or "" for item in pre_items).strip()
+            or None
+        )
 
         # Post-ball editorial
         post_items = c.get("commentPostTextItems") or []
-        post_text = " ".join(
-            item.get("html") or item.get("text") or "" for item in post_items
-        ).strip() or None
+        post_text = (
+            " ".join(item.get("html") or item.get("text") or "" for item in post_items).strip()
+            or None
+        )
 
         # Smart stats (contextual stats ESPN shows — typically empty in archive)
         smart_stats_raw = c.get("smartStats") or []
@@ -190,11 +192,21 @@ def _extract_ball_commentary(comments: list[dict]) -> list[dict[str, Any]]:
         over_raw = c.get("over")
         over_summary = json.dumps(over_raw) if over_raw else None
 
-        if not any([
-            main_text, title, pre_text, post_text, smart_stats,
-            batsman_stat_text, bowler_stat_text, dismissal_text, events,
-            comment_images, over_summary,
-        ]):
+        if not any(
+            [
+                main_text,
+                title,
+                pre_text,
+                post_text,
+                smart_stats,
+                batsman_stat_text,
+                bowler_stat_text,
+                dismissal_text,
+                events,
+                comment_images,
+                over_summary,
+            ]
+        ):
             continue
 
         entries.append(
@@ -217,7 +229,6 @@ def _extract_ball_commentary(comments: list[dict]) -> list[dict[str, Any]]:
             }
         )
     return entries
-
 
 
 async def _bounce_scroll(page: Any) -> None:
@@ -598,7 +609,6 @@ async def _scrape_single_match(
     remaining = [i for i in regular_innings if i not in all_balls]
     # Sort: default innings first (no switch needed) if not yet scraped
     remaining.sort(key=lambda i: (i != default_inning, i))
-
 
     all_ball_comm: list[dict] = list(first_ball_comm)
 

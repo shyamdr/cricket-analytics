@@ -43,12 +43,14 @@ def get_news(limit: int = Query(10, ge=1, le=30)):
         if not title:
             continue
 
-        results.append({
-            "title": title,
-            "description": description,
-            "link": link,
-            "image": image or None,
-            "pub_date": pub_date or None,
-        })
+        results.append(
+            {
+                "title": title,
+                "description": description,
+                "link": link,
+                "image": image or None,
+                "pub_date": pub_date or None,
+            }
+        )
 
     return results
