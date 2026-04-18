@@ -45,15 +45,33 @@ Raw (Cricsheet JSON/CSV)
       → Gold (aggregated, analytics-ready — dbt)
 ```
 
-### Gold Layer Models
+### Silver Layer Models (12)
+**Cricsheet:**
+- `stg_matches` — match-level facts from Cricsheet
+- `stg_deliveries` — ball-by-ball from Cricsheet (with `_is_valid_extras` and `_is_valid_total` quality flags)
+- `stg_people` — people registry from Cricsheet
+
+**ESPN enrichment (wrapped in `source_exists` macro so models work even if ESPN tables are empty):**
+- `stg_espn_matches` — captain, keeper, toss time, day/night, venue metadata
+- `stg_espn_players` — player bios (DOB, role, batting style)
+- `stg_espn_innings` — innings-level ESPN data
+- `stg_espn_ball_data` — ball-by-ball with shot-level spatial data (wagon_x/y, pitch_line/length, shot_control, shot_type)
+- `stg_espn_teams`, `stg_espn_grounds` — reference data from ESPN
+
+**Other enrichment:**
+- `stg_weather_hourly`, `stg_weather_daily` — Open-Meteo weather
+- `stg_venue_coordinates` — geocoded venue lat/lng
+
+### Gold Layer Models (9)
 - `dim_players` — player profiles, linked to people.csv identifiers
-- `dim_teams` — team info with historical name changes
-- `dim_venues` — venues and cities
-- `dim_matches` — match-level facts (date, season, toss, outcome, venue, event stage)
-- `fact_deliveries` — core grain: one row per legal ball bowled
+- `dim_teams` — team info with historical name changes (from `team_name_mappings` seed CSV)
+- `dim_venues` — venues and cities (with geocoded coordinates)
+- `dim_matches` — match-level facts (date, season, toss, outcome, venue, event stage, match_result_type, winning_margin)
+- `fact_deliveries` — core grain: one row per legal ball bowled (incremental materialization)
 - `fact_batting_innings` — per-batter-per-match aggregates (runs, balls, SR, 4s, 6s, etc.)
 - `fact_bowling_innings` — per-bowler-per-match aggregates (overs, runs, wickets, econ, etc.)
 - `fact_match_summary` — team-level match aggregates
+- `fact_weather` — weather facts per match (hourly + daily aggregates, with `weather_description` macro for code→text mapping)
 
 ## Project Structure (Monorepo)
 Single GitHub repo, multiple independently deployable apps. Monorepo chosen because:
@@ -68,23 +86,30 @@ cricket-analytics/
 ├── .github/workflows/          # CI/CD (lint, test, dbt test, deploy)
 ├── .kiro/steering/             # project context (persists across sessions)
 ├── apps/
-│   └── web/                    # Next.js frontend (deploys to Vercel)
+│   └── web/                    # Next.js 16 frontend (deploys to Vercel) — has nested .git
 ├── config/                     # datasets.yml — dataset & enrichment configuration
-├── docs/                       # ADRs, data dictionary, architecture diagrams
+├── docs/                       # ADRs (001 DuckDB, 002 image serving), data dictionary, enrichment strategy
+├── scripts/                    # utility scripts (player photo viewer, ESPN squad scraper, audit tools)
 ├── src/
 │   ├── ingestion/              # raw data loaders (download + load into DuckDB bronze)
-│   ├── enrichment/             # data enrichment (ESPN scraper, weather, geocoding)
-│   ├── dbt/                    # dbt project (bronze → silver → gold)
-│   ├── orchestration/          # Dagster definitions (assets, jobs, schedules)
-│   ├── api/                    # FastAPI serving layer (deploys to Railway/Render)
+│   ├── enrichment/             # data enrichment (ESPN match + ball scrapers, weather, geocoding, images, series resolver)
+│   ├── dbt/                    # dbt project (bronze → silver → gold); seeds, macros, singular tests
+│   ├── orchestration/          # Dagster definitions (assets, 3 jobs, 1 schedule)
+│   ├── api/                    # FastAPI serving layer — 9 routers (deploys to Render)
 │   ├── ui/                     # Streamlit app (legacy, internal use)
-│   └── ml/                     # ML models (win probability, batting quality)
-├── tests/                      # pytest (unit + integration)
-├── data/                       # .gitignored — local DuckDB files + downloaded raw data
-├── Makefile                    # dev commands (setup, ingest, transform, test, lint, run)
-├── Dockerfile
-├── docker-compose.yml
-├── pyproject.toml              # single source for Python deps + tool config
+│   ├── ml/                     # ML models (scaffolded, not implemented)
+│   ├── config.py               # pydantic-settings config
+│   ├── database.py             # centralized DuckDB connection management
+│   ├── tables.py               # fully-qualified table name constants
+│   └── utils.py                # retry decorators, run_async helper
+├── tests/                      # pytest: unit (61) + integration (44) + smoke (12) = 117
+├── data/                       # .gitignored — DuckDB file + raw downloads + cached images
+├── Makefile                    # dev commands (setup, ingest, transform, test, lint, web, enrich, etc.)
+├── Dockerfile                  # generic image (CI, local pipeline)
+├── Dockerfile.api              # Render-specific: ingest + dbt + uvicorn in one image
+├── docker-compose.yml          # local dev stack (pipeline + api + ui)
+├── render.yaml                 # Render Blueprint for API auto-deploy
+├── pyproject.toml              # Python deps + tool config (ruff, pytest markers)
 ├── .pre-commit-config.yaml
 ├── .gitignore
 └── README.md
@@ -175,13 +200,22 @@ make setup          # install deps, create virtualenv
 make ingest         # ingest datasets (default profile from config/datasets.yml)
 make ingest PROFILE=minimal   # IPL only
 make ingest PROFILE=t20_all   # all T20 leagues
-make transform      # dbt run (bronze → silver → gold)
-make test           # pytest + dbt test
+make transform      # dbt seed + run (bronze → silver → gold)
+make test           # pytest (all tests)
+make dbt-test       # dbt tests only
+make dbt-docs       # generate + serve dbt docs
 make lint           # ruff check + ruff format check
+make format         # auto-format code
+make check          # lint + unit tests (run before pushing)
 make enrich         # ESPN enrichment (optional: make enrich SEASON=2024)
 make all            # setup + ingest + transform
+make dagster        # start Dagster webserver
 make api            # start FastAPI server
-make ui             # start Streamlit app
+make ui             # start Streamlit app (legacy)
+make web            # start Next.js dev server
+make web-setup      # install Next.js dependencies
+make web-build      # build Next.js for production
+make clean          # remove generated data and build artifacts
 ```
 
 ## Public GitHub Repo
@@ -197,12 +231,14 @@ make ui             # start Streamlit app
 
 ## Product Roadmap
 
-### Phase 1: Public Website with Historical Data (current focus)
-- Next.js frontend in `apps/web/` with Tailwind CSS
-- Pages: home (recent matches), match detail (scorecard + stats), player profile, team page
-- Served by existing FastAPI API (may need new/adjusted endpoints for frontend needs)
-- Deploy: Vercel (frontend) + Railway/Render (API with baked-in DuckDB)
-- Goal: get a URL live on the internet that anyone can visit
+### Phase 1: Public Website with Historical Data — COMPLETE
+- Next.js 16 + React 19 + Tailwind 4 + shadcn/ui in `apps/web/`
+- Pages: home, about, matches list + detail, players list + profile, teams list + detail, venues list, 404
+- Home components: MatchSpotlight, MatchTicker, LatestResults, TopPerformers, PointsTable, NewsFeed, SeasonSummary, ExploreCards
+- Dark/light theme toggle
+- Served by FastAPI on Render with 9 routers (players, teams, matches, batting, bowling, standings, images, news)
+- Deployed: Vercel (frontend) + Render (API with baked-in DuckDB)
+- Live at https://insideedge.vercel.app
 
 ### Phase 2: Live Match Data
 - ESPN Playwright poller — intercept `hs-consumer-api` commentary responses during live matches

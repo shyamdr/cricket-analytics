@@ -5,26 +5,136 @@
 - Alternative considered: **SixthStump** — "Beyond what you see on the field." (revisit if rebranding)
 - Both are strong. InsideEdge = polished, analytical. SixthStump = bold, memorable, distinctive.
 
+## Current State Snapshot (April 2026)
+Everything below is actually built, tested, and running. Use this as ground truth for what exists.
+
+### Frontend (Next.js — deployed)
+- Stack: Next.js 16, React 19, TypeScript 5, Tailwind CSS 4, shadcn/ui, Base UI, Lucide icons
+- Pages: home, about, matches list + detail, players list + profile, teams list + detail, venues list, 404
+- Deploy: Vercel at https://insideedge.vercel.app (auto from main)
+- Env var: `NEXT_PUBLIC_API_URL` points to Render API
+- Note: `apps/web/` has nested `.git` folder
+
+### Backend (FastAPI — deployed on Render)
+- 9 routers (all under `/api/v1`):
+  - `players.py` — list/get player, batting/bowling stats
+  - `teams.py` — list/get team, team matches
+  - `matches.py` — list/get match, seasons, venues, recent matches with scores, by-tournament, summary, batting, bowling
+  - `batting.py` — top run scorers, career batting stats, season breakdown
+  - `bowling.py` — top wicket takers, career bowling stats, season breakdown
+  - `standings.py` — points table by season
+  - `images.py` — serves cached player/team/ground/venue images from `data/images/`
+  - `news.py` — proxies ESPN Cricinfo RSS feed
+- DI: `get_query_fn()` via `Depends()` in `src/api/database.py`; tests override via `app.dependency_overrides`
+- Table name constants live in `src/tables.py` — routers import from there, not from `settings.gold_schema` f-strings
+- Deploy: Render at https://insideedge-api.onrender.com (spins down after 15 min idle; first request ~30s)
+
+### Data Platform
+- DuckDB: `data/cricket.duckdb` (~427 MB) — IPL + T20I bronze data loaded
+- Schemas: `bronze.*`, `main_silver.*`, `main_gold.*`
+- Bronze tables: matches (39 cols with audit: _loaded_at, _source_file, _run_id), deliveries (33 cols with audit), people, espn_matches, espn_players, espn_innings, espn_ball_data, espn_teams, espn_grounds, weather, venue_coordinates
+- dbt: 21 models total
+  - Silver (12): stg_matches, stg_deliveries, stg_people, stg_espn_matches, stg_espn_players, stg_espn_innings, stg_espn_ball_data, stg_espn_teams, stg_espn_grounds, stg_weather_hourly, stg_weather_daily, stg_venue_coordinates
+  - Gold (9): dim_matches, dim_players, dim_teams, dim_venues, fact_deliveries (incremental), fact_batting_innings, fact_bowling_innings, fact_match_summary, fact_weather
+- dbt tests: 59 (53 generic in schema.yml + 6 singular SQL in tests/)
+- dbt seeds (5): espn_squads.csv, espn_squads_backup_2008_to_2013.csv, team_brand_colors.csv, team_name_mappings.csv, venue_name_mappings.csv
+- dbt macros: source_exists.sql (fallback for optional ESPN sources), weather_description.sql (extracted CASE macro)
+
+### Dagster Orchestration
+- Assets (5 enrichment + ingestion + dbt):
+  - `bronze_matches`, `bronze_people` (ingestion)
+  - dbt assets (21 models, wired via source meta asset_key mapping)
+  - `espn_match_enrichment`, `espn_ball_enrichment`, `geocode_venue_coordinates`, `espn_image_enrichment`, `weather_enrichment`
+- Jobs (3): `full_pipeline`, `daily_refresh`, `enrichment_backfill`
+- Schedule (1): `daily_refresh_schedule` at 06:00 UTC
+- FreshnessPolicy on gold assets (1-week warn, 30-day fail)
+
+### Test Suite (117 pytest tests + 59 dbt tests)
+- Unit (61): test_config.py (6), test_database.py (8), test_ingestion.py (26), test_enrichment.py (21)
+- Integration (44): test_api.py (25), test_data_quality.py (19)
+- Smoke (12): test_smoke.py
+- Markers registered in pyproject.toml: unit, integration, smoke
+
+### Deployment Files
+- `Dockerfile` — generic image for CI/local pipeline
+- `Dockerfile.api` — Render-specific; runs ingest + dbt seed + dbt run during build, then uvicorn
+- `render.yaml` — Render Blueprint (Python 3.11, `--profile minimal`)
+- `docker-compose.yml` — local dev (pipeline + api + ui services)
+- `.github/workflows/ci.yml` — lint (3.11) + unit-tests (3.11 + 3.13) + integration-tests (3.11 + 3.13)
+
+### Enrichment Modules (src/enrichment/)
+- `match_scraper.py`, `run_match_scraper.py` — ESPN match metadata (captain, keeper, roles, timing)
+- `ball_scraper.py`, `run_ball_scraper.py` — ESPN ball-by-ball commentary (wagon wheel, shot type)
+- `series_resolver.py` — maps Cricsheet match_id → ESPN series_id
+- `weather_fetcher.py` — Open-Meteo historical weather
+- `geocoder.py` — OpenStreetMap Nominatim venue lat/lng
+- `image_downloader.py` — ESPN player/team/ground images (sync httpx, not async)
+- `bronze_loader.py` — shared PyArrow→DuckDB loader
+- `queries.py` — shared query functions (get_matches_for_season, get_all_matches, get_matches_by_ids)
+
+### Images (served by API, cached on disk)
+- `data/images/grounds/` — venue/ground images
+- `data/images/players/`, `data/images/teams/`, `data/images/logo/`, `data/images/venues/`
+- `/api/v1/images/{type}/{id}` serves them
+
+### Docs (docs/)
+- ADRs: 001-duckdb-as-storage, 002-image-serving-strategy, 003-monorepo-with-nested-frontend-git, 004-natural-keys-over-surrogate-keys, 005-format-agnostic-schema-design
+- `architecture.md` — Mermaid diagrams (system, medallion, Dagster, request path, deployment topology)
+- Other: data-enrichment-strategy, espn-ball-data-scraping, espn-json-field-reference, image-strategy, open-meteo-weather-api-reference, auction-data-research, auction-seed-process, ui-design-notes
+- Root: `CONTRIBUTING.md` (setup, workflow, code style, where-to-add-things, git conventions, CI)
+
+### Scripts (scripts/)
+- `player_photo_viewer.html` — manual HTML viewer for ESPN player image IDs
+- `scrape_espn_squads.py` — auction pipeline (halted at 2013)
+- Note: `scripts/audit_espn_ball_response.py` has been referenced as an active editor file but isn't currently on disk — likely an unsaved buffer or work-in-progress audit tool
+
+### Workspace Root
+- `cricsheet-website-data-format.txt` — Cricsheet field reference, gitignored, not tracked
+- `.env` — gitignored, not tracked
+
+### Steering Files (`.kiro/steering/`)
+- `project-architecture.md` — vision, tech stack, medallion layers, project structure, roadmap
+- `progress.md` — this file; current state snapshot + completed/pending/decisions log
+- `cricsheet-data-reference.md` — Cricsheet JSON/CSV data format cheat sheet (static reference)
+- `api-endpoints-reference.md` — all 9 API routers with endpoint tables and conventions
+- `dbt-models-reference.md` — all 21 dbt models with grains, columns, and rationale
+
 ## Completed
 - [x] Git repo setup (local + GitHub remote via HTTPS)
 - [x] Local git config: user=shyamdr, email=shyamdrangapure@gmail.com
 - [x] Project scaffolding: full directory structure, pyproject.toml, Makefile, Dockerfile, docker-compose, CI, pre-commit
 - [x] Ingestion pipeline: downloads from Cricsheet, parses JSON/CSV, loads into DuckDB bronze via PyArrow
-- [x] dbt project: 3 silver models (stg_matches, stg_deliveries, stg_people), 8 gold models (4 dims + 4 facts)
-- [x] 20 dbt data quality tests — all passing
-- [x] End-to-end verified: 1169 matches, 278K deliveries, 927 players, 19 teams, 63 venues
+- [x] dbt project: 12 silver models + 9 gold models (expanded from 3+8)
+- [x] 59 dbt tests (53 generic + 6 singular) — all passing
+- [x] End-to-end verified: 1169 IPL matches, 278K deliveries, 927 players, 19 teams, 63 venues
 - [x] ADR-001: DuckDB as storage engine
+- [x] ADR-002: Image serving strategy (API serves cached images from data/images/)
+- [x] ADR-003: Monorepo with nested frontend git repo
+- [x] ADR-004: Natural keys over surrogate keys
+- [x] ADR-005: Format-agnostic schema design
+- [x] CONTRIBUTING.md (setup, code style, where to add things, git/CI conventions)
+- [x] Architecture diagrams (docs/architecture.md — Mermaid for system, medallion, Dagster, request path, deployment)
 - [x] README with architecture, quick start, commands
 - [x] Steering files for cross-session context
 - [x] Pushed to GitHub: https://github.com/shyamdr/cricket-analytics
-- [x] Dagster orchestration (wire ingestion + dbt as assets)
-- [x] FastAPI endpoints (5 routers: players, teams, matches, batting, bowling)
-- [x] Streamlit UI (home, player stats, team analytics, match explorer, trends)
+- [x] Dagster orchestration — bronze + dbt + 5 enrichment assets, 3 jobs, 1 schedule
+- [x] FastAPI endpoints — 9 routers: players, teams, matches, batting, bowling, standings, images, news
+- [x] Streamlit UI (legacy) — home, player stats, team analytics, match explorer, trends
+- [x] Next.js frontend — full Phase 1 deployed to Vercel (https://insideedge.vercel.app)
+- [x] FastAPI deployed to Render (https://insideedge-api.onrender.com) with baked-in DuckDB
 - [x] Fix: season normalization bug — '2020/21' was merging with '2021' (120 matches → correctly split into 60+60)
 - [x] Format-agnostic season derivation — replaced hardcoded CASE/split_part logic with `EXTRACT(YEAR FROM match_date)`. Eliminates IPL-specific '2020/21' special case. Works correctly for BBL (split-year seasons span Dec-Feb) and all other leagues. Original Cricsheet season preserved as `season_raw` in silver layer.
+- [x] ESPN match enrichment pipeline (captain, keeper, player roles, toss time, day/night)
+- [x] ESPN ball-by-ball enrichment pipeline (wagon wheel, shot type, shot control)
+- [x] Weather enrichment pipeline (Open-Meteo, hourly + daily) — fact_weather gold model
+- [x] Venue geocoding pipeline (OpenStreetMap Nominatim)
+- [x] ESPN image scraping pipeline — player, team, ground images cached on disk, served via `/api/v1/images/`
+- [x] News feed endpoint — proxies ESPN Cricinfo RSS
+- [x] Standings endpoint — points table by season
+- [x] Table name constants centralized in `src/tables.py` — routers and UI import from there
 
-## Verified Data (gold layer, post-season-fix)
-- dim_matches: 1,169 rows (18 seasons: 2008–2025, including 2020 COVID UAE bubble) — IPL only, pre-T20I expansion
+## Verified Data (gold layer, IPL only — pre-T20I gold aggregation)
+- dim_matches: 1,169 rows (18 seasons: 2008–2025, including 2020 COVID UAE bubble)
 - dim_players: 927 rows
 - dim_teams: 19 rows
 - dim_venues: 63 rows
@@ -32,16 +142,21 @@
 - fact_batting_innings: 17,638 rows
 - fact_bowling_innings: 13,846 rows
 - fact_match_summary: 2,333 rows
+- Note: T20I bronze data has been ingested, but the default render.yaml + CI pipelines currently build with `--profile minimal` (IPL only). Gold row counts above are IPL-only.
+- DuckDB file size: ~427 MB (after IPL + T20I ingestion and enrichment)
 
 ## In Progress
-- [~] Phase 1: Next.js Frontend — public-facing website replacing Streamlit for end users
-  - [ ] Next.js project setup in `apps/web/` with Tailwind CSS
-  - [ ] Core pages: home, match detail, player profile, team page
-  - [ ] Wire to existing FastAPI API (may need new/adjusted endpoints)
-  - [ ] Deploy: Vercel (frontend) + Railway/Render (API with baked-in DuckDB)
-  - [ ] Goal: live URL on the internet
+- [x] Phase 1: Next.js Frontend — COMPLETE and deployed to https://insideedge.vercel.app
+  - Built in `apps/web/` with Next.js 16, React 19, TypeScript, Tailwind CSS 4, shadcn/ui, Base UI, Lucide icons
+  - Pages built: home (`/`), about (`/about`), matches list (`/matches`), match detail (`/matches/[matchId]`), players list (`/players`), player profile (`/players/[playerName]`), teams list (`/teams`), team detail (`/teams/[teamName]`), venues list (`/venues`), 404
+  - Home components: MatchSpotlight, MatchTicker, LatestResults, TopPerformers, PointsTable, NewsFeed, SeasonSummary, ExploreCards
+  - Shared components: Navbar, ThemeProvider, ThemeToggle (dark/light mode), Loading
+  - `src/lib/`: `api.ts` (API client), `landing-utils.ts`, `team-logos.ts`, `types.ts`, `utils.ts`
+  - Configured via `NEXT_PUBLIC_API_URL` env var (points to Render API)
+  - Deploy: Vercel auto-deploys from main
+  - The `apps/web/` directory has its own `.git` folder (nested git repo) — keep in mind when doing git operations
 - [~] Auction data pipeline — HALTED at 2013. Manual curation too tedious. See "Pending — Next Up" for details.
-- [ ] Streamlit UI — LEGACY. Will be replaced by React web app. No further investment.
+- [x] Streamlit UI — LEGACY, no further investment. 4 pages still present (Player Stats, Team Analytics, Match Explorer, Trends) for internal exploration.
 
 ## Recently Completed
 - [x] Config-driven dataset management — created config/datasets.yml as single source of truth for all dataset and enrichment configuration. 21 Cricsheet datasets (IPL, T20I, BBL, PSL, CPL, SA20, LPL, ILT20, BPL, NPL, MLC, MSL, SSM, NTB, ODI, Test, T20I Women, ODI Women, Test Women, WBBL, WPL) with per-dataset enrichment toggles (espn_match, espn_ball, weather, geocoding). Named profiles (minimal, standard, t20_all, everything). CLI supports --profile, --enabled, --dataset, --list. All consumers (CLI, Makefile, Dagster, Docker) read from YAML. Added pyyaml to core dependencies. URLs verified via HTTP HEAD against cricsheet.org.
@@ -265,8 +380,8 @@ Gaps between "it works" and "a team can operate and evolve it."
 - [ ] Data quality metrics as first-class output — `_is_valid_extras` and `_is_valid_total` are passive columns. No way to answer "how many invalid deliveries last Tuesday?" Fix: `_data_quality` table in DuckDB, dbt models append row per run with invalid counts, null rates, row count deltas.
 
 ### Team-Readiness / Documentation
-- [ ] No CONTRIBUTING.md — how does another engineer set up, run tests, add a feature?
-- [ ] No architecture diagram — README has text flow but no visual. Generate from dbt lineage graph.
+- [x] CONTRIBUTING.md — setup, test commands, code style, where-to-add-things, git conventions, CI, deployment. Points to steering files and ADRs for deeper context.
+- [x] Architecture diagram — `docs/architecture.md` with Mermaid diagrams (system overview, medallion flow, Dagster asset graph, request path, deployment topology)
 - [ ] No runbook — "how do I add a new league?" "how do I backfill enrichment for season X?" "what do I do when ESPN scraping breaks?" 5-6 common workflows documented.
 - [ ] Naming inconsistencies across source systems — `over_num`/`ball_num` (Cricsheet) vs `over_number`/`ball_number` (ESPN), `match_date` (gold) vs `date` (bronze), `innings` vs `inning_number`. Silver layer should normalize ESPN names to match Cricsheet convention.
 
@@ -361,18 +476,21 @@ Scope: IPL-only for now. Streamlit is legacy (will be replaced by React web app)
 
 ### Decisions / Clarifications Recorded
 - Auction data pipeline: HALTED at 2013. Manual curation effort too high. `espn_squads_backup_2008_to_2013.csv` is the backup. Not worth pursuing further unless a reliable automated source is found.
-- Streamlit UI: LEGACY. Will be replaced by React web app. No further investment.
-- Default profile: `minimal` (IPL only) is intentional for current scope. Will expand to other leagues later.
-- `render.yaml` uses `--profile minimal` — correct for now since only IPL data exists. Update when expanding to more leagues.
+- Streamlit UI: LEGACY, now superseded by the deployed Next.js frontend. Kept for internal data exploration, not public use. No further investment.
+- Default profile: `minimal` (IPL only) is intentional for current scope. T20I bronze is loaded but gold models are still IPL-only in production. Will expand to other leagues later.
+- `render.yaml` uses `--profile minimal` — correct for now since only IPL is in gold. Update when expanding to more leagues.
+- `apps/web/` has its own nested `.git` folder (separate git repo inside the monorepo). Be aware when doing git operations from repo root — changes inside apps/web/ don't show up in `git status` at the root.
 
 ## Technical Notes
 - Python 3.13.2 on macOS (company laptop, Homebrew Python)
+- pyproject.toml requires-python >=3.11; CI matrix tests 3.11 and 3.13
 - Must use .venv (system pip blocked by PEP 668)
 - DuckDB schemas: bronze.*, main_silver.*, main_gold.* (dbt prefixes with "main_")
 - dbt profiles.yml uses relative path ../../data/cricket.duckdb
 - Commit convention: conventional commits (feat:, fix:, docs:, refactor:, etc.) with detailed descriptions
 - Season derivation: `EXTRACT(YEAR FROM match_date)` — format-agnostic, no hardcoded special cases. `season_raw` preserved in silver for reference.
 - Formatting: ruff format (black-compatible, single tool for lint + format)
+- No `full_refresh` flag in ingestion: for a full rebuild, delete `data/cricket.duckdb` and re-run. Tables auto-create on first write.
 
 ## Git Standards
 - Clear commit titles with conventional commit prefixes

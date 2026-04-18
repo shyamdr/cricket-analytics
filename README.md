@@ -92,17 +92,27 @@ Data is not stored in git — it's downloaded and rebuilt by the pipeline.
 
 ```
 cricket-analytics/
+├── apps/web/           # Next.js frontend (deploys to Vercel)
 ├── config/             # datasets.yml — what to ingest and enrich
+├── docs/               # ADRs, architecture diagrams, enrichment strategy
 ├── src/
 │   ├── ingestion/      # download + load raw data into DuckDB
+│   ├── enrichment/     # ESPN, weather, geocoding, image scrapers
 │   ├── dbt/            # bronze → silver → gold transformations
 │   ├── orchestration/  # Dagster assets and jobs
 │   ├── api/            # FastAPI serving layer
-│   ├── ui/             # Streamlit app
+│   ├── ui/             # Streamlit app (legacy, internal)
 │   └── ml/             # future ML models
 ├── tests/              # pytest (unit + integration + smoke)
 └── data/               # .gitignored — DuckDB + raw downloads
 ```
+
+## Documentation
+
+- [Architecture diagrams](docs/architecture.md) — visual system overview
+- [ADRs](docs/adr/) — architectural decision records
+- [Contributing](CONTRIBUTING.md) — setup, workflow, conventions
+- [Data enrichment strategy](docs/data-enrichment-strategy.md) — ESPN, weather, geocoding plans
 
 ## License
 
