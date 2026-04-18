@@ -8,6 +8,27 @@ update it here — one place, not 20 files.
 
 from src.config import settings
 
+__all__ = [
+    "BATTING_INNINGS",
+    "BOWLING_INNINGS",
+    "BRONZE_DELIVERIES",
+    "BRONZE_ESPN_BALL_DATA",
+    "BRONZE_ESPN_INNINGS",
+    "BRONZE_ESPN_MATCHES",
+    "BRONZE_ESPN_PLAYERS",
+    "BRONZE_MATCHES",
+    "BRONZE_PEOPLE",
+    "BRONZE_VENUE_COORDS",
+    "BRONZE_WEATHER",
+    "DELIVERIES",
+    "MATCHES",
+    "MATCH_SUMMARY",
+    "PLAYERS",
+    "TEAMS",
+    "VENUES",
+    "WEATHER",
+]
+
 # Gold layer (analytics-ready)
 MATCHES = f"{settings.gold_schema}.dim_matches"
 PLAYERS = f"{settings.gold_schema}.dim_players"

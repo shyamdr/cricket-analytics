@@ -33,6 +33,14 @@ if TYPE_CHECKING:
 
 from src.config import settings
 
+__all__ = [
+    "append_to_bronze",
+    "get_read_conn",
+    "get_write_conn",
+    "upsert_to_bronze",
+    "write_conn",
+]
+
 logger = structlog.get_logger(__name__)
 
 # Safe SQL identifier pattern — same as schema validation in config.py

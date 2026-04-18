@@ -462,7 +462,7 @@ Scope: IPL-only for now. Streamlit is legacy (will be replaced by React web app)
 
 - [x] `src/dbt/target/` has 17+ Dagster run artifact directories — verified: not tracked by git. `.gitignore` covers it.
 
-- [ ] No `__all__` exports in core modules — `src/database.py`, `src/config.py`, `src/tables.py` don't define `__all__`. For a portfolio project, explicit exports signal intentional API design. Low priority but good practice.
+- [x] No `__all__` exports in core modules — added `__all__` to src/database.py (5 symbols), src/config.py (8 symbols), src/tables.py (18 symbols). Excludes private helpers and non-re-exported imports. Signals intentional public API for each module.
 
 - [x] `Dockerfile` installs `[all]` including playwright, streamlit, dagster — changed to `pip install ".[dbt]"`. Pipeline only needs dbt deps.
 

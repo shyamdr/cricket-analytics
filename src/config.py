@@ -15,6 +15,17 @@ import yaml
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
+__all__ = [
+    "CRICSHEET_DATASETS",
+    "Settings",
+    "datasets_config",
+    "get_dataset_config",
+    "get_default_datasets",
+    "get_enabled_datasets",
+    "get_profile_datasets",
+    "settings",
+]
+
 # ---------------------------------------------------------------------------
 # Dataset configuration — loaded from config/datasets.yml
 # ---------------------------------------------------------------------------
