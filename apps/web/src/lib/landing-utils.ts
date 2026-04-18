@@ -12,12 +12,31 @@ export interface Innings {
   overs_played: number;
 }
 
+export interface TopBatter {
+  match_id: string;
+  innings: number;
+  batter: string;
+  runs_scored: number;
+  balls_faced: number;
+}
+
+export interface TopBowler {
+  match_id: string;
+  innings: number;
+  bowler: string;
+  wickets: number;
+  runs_conceded: number;
+  overs_bowled: number;
+}
+
 export interface RecentMatch extends Match {
   innings: Innings[];
   floodlit: string | null;
   player_of_match: string | null;
   team1_captain: string | null;
   team2_captain: string | null;
+  top_batters: TopBatter[];
+  top_bowlers: TopBowler[];
 }
 
 // ---------------------------------------------------------------------------

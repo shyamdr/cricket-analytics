@@ -38,7 +38,7 @@
   --chart-5: oklch(0.50 0.15 300);
 }
 
-/* Dark theme (future toggle support) */
+/* Dark theme */
 .dark {
   --background: oklch(0.13 0.005 260);
   --foreground: oklch(0.93 0 0);
@@ -150,7 +150,6 @@
   }
   html {
     @apply font-sans;
-    color-scheme: light;
   }
 
   /* Smooth transitions on interactive elements */
@@ -169,11 +168,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: oklch(0.82 0 0);
+    background: var(--border);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.72 0 0);
+    background: var(--muted-foreground);
   }
 
   /* Selection color */

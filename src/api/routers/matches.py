@@ -103,8 +103,49 @@ def recent_matches_with_scores(
     for s in summaries:
         summary_map.setdefault(s["match_id"], []).append(s)
 
+    # Top 2 batters and bowlers per innings per match
+    top_batters = db(
+        f"""
+        SELECT match_id, innings, batter, runs_scored, balls_faced
+        FROM (
+            SELECT match_id, innings, batter, runs_scored, balls_faced,
+                   ROW_NUMBER() OVER (PARTITION BY match_id, innings ORDER BY runs_scored DESC, balls_faced ASC) as rn
+            FROM {BATTING_INNINGS}
+            WHERE match_id IN ({placeholders})
+        ) ranked
+        WHERE rn <= 2
+        ORDER BY match_id, innings, rn
+        """,
+        match_ids,
+    )
+
+    top_bowlers = db(
+        f"""
+        SELECT match_id, innings, bowler, wickets, runs_conceded, overs_bowled
+        FROM (
+            SELECT match_id, innings, bowler, wickets, runs_conceded, overs_bowled,
+                   ROW_NUMBER() OVER (PARTITION BY match_id, innings ORDER BY wickets DESC, runs_conceded ASC) as rn
+            FROM {BOWLING_INNINGS}
+            WHERE match_id IN ({placeholders})
+        ) ranked
+        WHERE rn <= 2
+        ORDER BY match_id, innings, rn
+        """,
+        match_ids,
+    )
+
+    batter_map: dict[str, list] = {}
+    for b in top_batters:
+        batter_map.setdefault(b["match_id"], []).append(b)
+
+    bowler_map: dict[str, list] = {}
+    for b in top_bowlers:
+        bowler_map.setdefault(b["match_id"], []).append(b)
+
     for m in matches:
         m["innings"] = summary_map.get(m["match_id"], [])
+        m["top_batters"] = batter_map.get(m["match_id"], [])
+        m["top_bowlers"] = bowler_map.get(m["match_id"], [])
 
     return matches
 

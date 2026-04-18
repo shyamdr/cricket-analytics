@@ -25,14 +25,23 @@ interface MatchSpotlightProps {
 export function MatchSpotlight({ matches }: MatchSpotlightProps) {
   const [index, setIndex] = useState(0);
   const [clashMap, setClashMap] = useState<Record<string, boolean>>({});
+  const [transitioning, setTransitioning] = useState(false);
+  const [slideDir, setSlideDir] = useState<"left" | "right">("left");
 
-  const prev = useCallback(() => {
-    setIndex((i) => (i === 0 ? matches.length - 1 : i - 1));
+  const navigate = useCallback((dir: "left" | "right") => {
+    setSlideDir(dir);
+    setTransitioning(true);
+    setTimeout(() => {
+      setIndex((i) => {
+        if (dir === "left") return i === matches.length - 1 ? 0 : i + 1;
+        return i === 0 ? matches.length - 1 : i - 1;
+      });
+      setTransitioning(false);
+    }, 200);
   }, [matches.length]);
 
-  const next = useCallback(() => {
-    setIndex((i) => (i === matches.length - 1 ? 0 : i + 1));
-  }, [matches.length]);
+  const prev = useCallback(() => navigate("right"), [navigate]);
+  const next = useCallback(() => navigate("left"), [navigate]);
 
   const match = matches[index];
 
@@ -123,7 +132,15 @@ export function MatchSpotlight({ matches }: MatchSpotlightProps) {
 
         <Card className="overflow-hidden">
           <CardContent className="p-0">
-            <div className="flex flex-col lg:flex-row items-stretch relative overflow-hidden">
+            <div
+              className="flex flex-col lg:flex-row items-stretch relative overflow-hidden min-h-[160px] lg:min-h-[180px] transition-all duration-200 ease-out"
+              style={{
+                opacity: transitioning ? 0 : 1,
+                transform: transitioning
+                  ? `translateX(${slideDir === "left" ? "-30px" : "30px"})`
+                  : "translateX(0)",
+              }}
+            >
 
               {/* Team 1 gradient — stops before center to leave a gap */}
               <div
@@ -144,34 +161,27 @@ export function MatchSpotlight({ matches }: MatchSpotlightProps) {
               {/* Center divider — diamond VS handles the separation */}
 
               {/* Team 1 side */}
-              <div className="flex-1 p-5 lg:p-6 flex flex-col items-center justify-center gap-1 relative overflow-hidden">
-                <span className="text-lg lg:text-xl text-center text-foreground relative">
-                  {team1Name}
-                </span>
-                <span className="text-3xl lg:text-4xl font-mono tabular-nums text-foreground relative">
-                  {inn1 ? `${inn1.total_runs}/${inn1.total_wickets}` : "-"}
-                </span>
-                {inn1 && (
-                  <span className="text-xs text-muted-foreground font-mono relative">({inn1.overs_played} overs)</span>
-                )}
-                {isTeam1Winner && match.player_of_match && (
-                  <span className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1 relative">
-                    <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
-                    {match.player_of_match}
+              <div className="flex-1 py-6 pl-4 pr-20 lg:pr-24 grid grid-cols-[180px] justify-end items-center relative overflow-hidden">
+                <div className="flex flex-col items-center">
+                  <Link href={`/teams/${encodeURIComponent(team1Name)}`} className="text-base lg:text-lg text-center text-foreground whitespace-nowrap hover:text-primary transition-colors">{team1Name}</Link>
+                  <span className="text-2xl lg:text-3xl font-mono tabular-nums text-foreground">{inn1 ? `${inn1.total_runs}/${inn1.total_wickets}` : "-"}</span>
+                  <span className="text-xs text-muted-foreground font-mono h-5">{inn1 ? `(${inn1.overs_played} ov)` : "\u00A0"}</span>
+                  <span className="text-xs text-muted-foreground flex items-center gap-1 h-5">
+                    {isTeam1Winner && match.player_of_match ? (<><Star className="h-2.5 w-2.5 text-amber-500 fill-amber-500" /><Link href={`/players/${encodeURIComponent(match.player_of_match)}`} className="hover:text-primary transition-colors">{match.player_of_match}</Link></>) : "\u00A0"}
                   </span>
-                )}
+                </div>
               </div>
 
               {/* Center — logo 1 | VS | logo 2 */}
-              <div className="flex items-center justify-center gap-5 lg:gap-6 px-4 lg:px-6 py-3 lg:py-0 relative">
+              <div className="flex items-center justify-center gap-6 lg:gap-8 px-4 lg:px-6 py-3 lg:py-0 relative">
                 {team1Logo ? (
-                  <div className="h-[110px] w-[110px] lg:h-[140px] lg:w-[140px] p-2.5 lg:p-3 flex items-center justify-center">
-                    <img src={team1Logo} alt={team1Name} className="object-contain max-h-full max-w-full" />
-                  </div>
+                  <Link href={`/teams/${encodeURIComponent(team1Name)}`} className="h-[130px] w-[130px] lg:h-[160px] lg:w-[160px] p-2.5 lg:p-3 flex items-center justify-center transition-transform duration-200 hover:scale-110 hover:drop-shadow-lg relative overflow-visible">
+                    <img src={team1Logo} alt={team1Name} className="object-contain max-h-full max-w-full relative" />
+                  </Link>
                 ) : (
-                  <div className="h-[110px] w-[110px] lg:h-[140px] lg:w-[140px] rounded-full bg-white/20 flex items-center justify-center text-2xl font-semibold text-white">
+                  <Link href={`/teams/${encodeURIComponent(team1Name)}`} className="h-[130px] w-[130px] lg:h-[160px] lg:w-[160px] rounded-full bg-white/20 flex items-center justify-center text-2xl font-semibold text-white transition-transform duration-200 hover:scale-110 hover:drop-shadow-lg relative overflow-visible">
                     {team1Name.slice(0, 2).toUpperCase()}
-                  </div>
+                  </Link>
                 )}
 
                 <div className="flex flex-col items-center justify-center">
@@ -187,33 +197,26 @@ export function MatchSpotlight({ matches }: MatchSpotlightProps) {
                 </div>
 
                 {team2Logo ? (
-                  <div className="h-[110px] w-[110px] lg:h-[140px] lg:w-[140px] p-2.5 lg:p-3 flex items-center justify-center">
-                    <img src={team2Logo} alt={team2Name} className="object-contain max-h-full max-w-full" />
-                  </div>
+                  <Link href={`/teams/${encodeURIComponent(team2Name)}`} className="h-[130px] w-[130px] lg:h-[160px] lg:w-[160px] p-2.5 lg:p-3 flex items-center justify-center transition-transform duration-200 hover:scale-110 hover:drop-shadow-lg relative overflow-visible">
+                    <img src={team2Logo} alt={team2Name} className="object-contain max-h-full max-w-full relative" />
+                  </Link>
                 ) : (
-                  <div className="h-[110px] w-[110px] lg:h-[140px] lg:w-[140px] rounded-full bg-white/20 flex items-center justify-center text-2xl font-semibold text-white">
+                  <Link href={`/teams/${encodeURIComponent(team2Name)}`} className="h-[130px] w-[130px] lg:h-[160px] lg:w-[160px] rounded-full bg-white/20 flex items-center justify-center text-2xl font-semibold text-white transition-transform duration-200 hover:scale-110 hover:drop-shadow-lg relative overflow-visible">
                     {team2Name.slice(0, 2).toUpperCase()}
-                  </div>
+                  </Link>
                 )}
               </div>
 
               {/* Team 2 side */}
-              <div className="flex-1 p-5 lg:p-6 flex flex-col items-center justify-center gap-1 relative overflow-hidden">
-                <span className="text-lg lg:text-xl text-center text-foreground relative">
-                  {team2Name}
-                </span>
-                <span className="text-3xl lg:text-4xl font-mono tabular-nums text-foreground relative">
-                  {inn2 ? `${inn2.total_runs}/${inn2.total_wickets}` : "-"}
-                </span>
-                {inn2 && (
-                  <span className="text-xs text-muted-foreground font-mono relative">({inn2.overs_played} overs)</span>
-                )}
-                {isTeam2Winner && match.player_of_match && (
-                  <span className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1 relative">
-                    <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
-                    {match.player_of_match}
+              <div className="flex-1 py-6 pr-4 pl-20 lg:pl-24 grid grid-cols-[180px] justify-start items-center relative overflow-hidden">
+                <div className="flex flex-col items-center">
+                  <Link href={`/teams/${encodeURIComponent(team2Name)}`} className="text-base lg:text-lg text-center text-foreground whitespace-nowrap hover:text-primary transition-colors">{team2Name}</Link>
+                  <span className="text-2xl lg:text-3xl font-mono tabular-nums text-foreground">{inn2 ? `${inn2.total_runs}/${inn2.total_wickets}` : "-"}</span>
+                  <span className="text-xs text-muted-foreground font-mono h-5">{inn2 ? `(${inn2.overs_played} ov)` : "\u00A0"}</span>
+                  <span className="text-xs text-muted-foreground flex items-center gap-1 h-5">
+                    {isTeam2Winner && match.player_of_match ? (<><Star className="h-2.5 w-2.5 text-amber-500 fill-amber-500" /><Link href={`/players/${encodeURIComponent(match.player_of_match)}`} className="hover:text-primary transition-colors">{match.player_of_match}</Link></>) : "\u00A0"}
                   </span>
-                )}
+                </div>
               </div>
             </div>
 
@@ -221,10 +224,12 @@ export function MatchSpotlight({ matches }: MatchSpotlightProps) {
             <div className="border-t border-border px-6 lg:px-8 py-3 flex flex-col sm:flex-row items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-3">
                 {match.event_name && (
-                  <Badge variant="secondary">
-                    {match.event_name}
-                    {match.event_stage ? ` · ${match.event_stage}` : ""}
-                  </Badge>
+                  <Link href={`/matches?season=${match.season}`}>
+                    <Badge variant="secondary" className="hover:bg-secondary/80 transition-colors cursor-pointer">
+                      {match.event_name}
+                      {match.event_stage ? ` · ${match.event_stage}` : ""}
+                    </Badge>
+                  </Link>
                 )}
                 {result && (
                   <span className="text-sm font-semibold text-primary">{result}</span>
@@ -236,11 +241,11 @@ export function MatchSpotlight({ matches }: MatchSpotlightProps) {
               <div className="flex items-center gap-4">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   {(match.venue || match.city) && (
-                    <span className="flex items-center gap-1">
+                    <Link href={`/venues`} className="flex items-center gap-1 hover:text-primary transition-colors">
                       <MapPin className="h-3 w-3" />
                       {match.venue?.split(",")[0]}
                       {match.city ? `, ${match.city}` : ""}
-                    </span>
+                    </Link>
                   )}
                   {formattedDate && (
                     <span className="flex items-center gap-1">

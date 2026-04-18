@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MatchTicker } from "@/components/home/match-ticker";
 import { MatchSpotlight } from "@/components/home/match-spotlight";
 import { SeasonSummary } from "@/components/home/season-summary";
-import { LatestResults } from "@/components/home/latest-results";
+import { NewsFeed } from "@/components/home/news-feed";
 import { TopPerformers } from "@/components/home/top-performers";
 import { ExploreCards } from "@/components/home/explore-cards";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -71,9 +70,6 @@ export default function Home() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        {/* Ticker skeleton */}
-        <Skeleton className="w-full h-24" />
-
         {/* Spotlight skeleton */}
         <div className="w-full px-6 lg:px-10 py-6">
           <Skeleton className="w-full h-48 rounded-lg" />
@@ -102,9 +98,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Match Ticker — full width below navbar */}
-      <MatchTicker matches={matches} />
-
       {/* Section 1: Match Spotlight */}
       <MatchSpotlight matches={matches} />
 
@@ -128,10 +121,10 @@ export default function Home() {
 
       {/* Section 3: Two-column — results + top performers */}
       <div className="w-full px-6 lg:px-10 py-8 grid grid-cols-1 lg:grid-cols-5 gap-6 animate-section-3">
-        <div className="lg:col-span-3">
-          <LatestResults matches={matches.slice(0, 6)} />
-        </div>
         <div className="lg:col-span-2">
+          <NewsFeed />
+        </div>
+        <div className="lg:col-span-3">
           <TopPerformers
             batters={batters}
             bowlers={bowlers}

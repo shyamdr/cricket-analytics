@@ -72,13 +72,14 @@ function getMeta(teamName: string): TeamMeta | null {
 
 /**
  * Returns the URL for a team's logo via the API image endpoint.
- * In dev, Next.js rewrites /api/* to the FastAPI backend.
- * In prod, NEXT_PUBLIC_API_URL points to the deployed API.
+ * Uses a relative path so Next.js rewrite proxy handles it in dev,
+ * keeping it same-origin for canvas pixel analysis.
+ * In production, NEXT_PUBLIC_API_URL is baked into the path.
  */
 export function getTeamLogoUrl(teamName: string): string | null {
   const meta = getMeta(teamName);
   if (!meta?.espnTeamId) return null;
-  return `${API}/api/v1/images/teams/${meta.espnTeamId}.png`;
+  return `/api/v1/images/teams/${meta.espnTeamId}.png`;
 }
 
 export function getTeamColor(teamName: string): string {
@@ -123,7 +124,6 @@ export function analyzeLogoClashAsync(imgSrc: string, bgHex: string): Promise<bo
 
   return new Promise((resolve) => {
     const img = new window.Image();
-    img.crossOrigin = "anonymous";
     img.onload = () => {
       const canvas = document.createElement("canvas");
       const size = 40;
