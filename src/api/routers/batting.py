@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 
 from src.api.database import DbQuery  # noqa: TC001 — runtime dep for FastAPI DI
-from src.tables import BATTING_INNINGS
+from src.tables import BATTING_INNINGS, PLAYERS
 
 router = APIRouter(prefix="/api/v1/batting", tags=["batting"])
 
@@ -20,24 +20,32 @@ def top_run_scorers(
     if season:
         return db(
             f"""
-            SELECT batter, COUNT(*) as innings,
-                   SUM(runs_scored) as total_runs,
-                   ROUND(AVG(strike_rate), 2) as avg_strike_rate,
-                   SUM(fours) as total_fours, SUM(sixes) as total_sixes
-            FROM {BATTING_INNINGS}
-            WHERE season = $1
-            GROUP BY batter ORDER BY total_runs DESC LIMIT $2
+            SELECT b.batter,
+                   (ARRAY_AGG(b.batting_team ORDER BY b.match_date DESC))[1] as team,
+                   p.espn_player_id,
+                   COUNT(*) as innings,
+                   SUM(b.runs_scored) as total_runs,
+                   ROUND(AVG(b.strike_rate), 2) as avg_strike_rate,
+                   SUM(b.fours) as total_fours, SUM(b.sixes) as total_sixes
+            FROM {BATTING_INNINGS} b
+            LEFT JOIN {PLAYERS} p ON b.batter = p.player_name
+            WHERE b.season = $1
+            GROUP BY b.batter, p.espn_player_id ORDER BY total_runs DESC LIMIT $2
             """,
             [season, limit],
         )
     return db(
         f"""
-        SELECT batter, COUNT(*) as innings,
-               SUM(runs_scored) as total_runs,
-               ROUND(AVG(strike_rate), 2) as avg_strike_rate,
-               SUM(fours) as total_fours, SUM(sixes) as total_sixes
-        FROM {BATTING_INNINGS}
-        GROUP BY batter ORDER BY total_runs DESC LIMIT $1
+        SELECT b.batter,
+               (ARRAY_AGG(b.batting_team ORDER BY b.match_date DESC))[1] as team,
+               p.espn_player_id,
+               COUNT(*) as innings,
+               SUM(b.runs_scored) as total_runs,
+               ROUND(AVG(b.strike_rate), 2) as avg_strike_rate,
+               SUM(b.fours) as total_fours, SUM(b.sixes) as total_sixes
+        FROM {BATTING_INNINGS} b
+        LEFT JOIN {PLAYERS} p ON b.batter = p.player_name
+        GROUP BY b.batter, p.espn_player_id ORDER BY total_runs DESC LIMIT $1
         """,
         [limit],
     )

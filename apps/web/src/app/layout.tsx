@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Activity } from "lucide-react";
+import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Navbar } from "@/components/navbar";
@@ -26,8 +26,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <footer className="py-6 px-6 lg:px-10">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5">
-                <Activity className="h-3.5 w-3.5 text-primary" />
-                <span className="font-medium text-foreground">InsideEdge</span>
+                <span className="relative h-7 w-[110px]">
+                  <Image src="/logo/design_light.png" alt="InsideEdge" fill className="object-contain object-left dark:hidden" />
+                  <Image src="/logo/design_dark.png" alt="InsideEdge" fill className="object-contain object-left hidden dark:block" />
+                </span>
                 <span>· Deep cricket analytics</span>
               </div>
               <div className="flex items-center gap-3">
@@ -41,6 +43,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <span>·</span>
                 <a href="https://github.com/shyamdr/cricket-analytics" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
                   GitHub
+                </a>
+                <span>·</span>
+                <a href="/about" className="text-primary hover:underline">
+                  About
                 </a>
               </div>
             </div>

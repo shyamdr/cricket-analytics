@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 
 from src.api.database import DbQuery  # noqa: TC001 — runtime dep for FastAPI DI
-from src.tables import BOWLING_INNINGS
+from src.tables import BOWLING_INNINGS, MATCHES, PLAYERS
 
 router = APIRouter(prefix="/api/v1/bowling", tags=["bowling"])
 
@@ -20,24 +20,40 @@ def top_wicket_takers(
     if season:
         return db(
             f"""
-            SELECT bowler, COUNT(*) as innings,
-                   SUM(wickets) as total_wickets,
-                   ROUND(AVG(economy_rate), 2) as avg_economy,
-                   ROUND(SUM(runs_conceded) * 1.0 / NULLIF(SUM(wickets), 0), 2) as bowling_avg
-            FROM {BOWLING_INNINGS}
-            WHERE season = $1
-            GROUP BY bowler ORDER BY total_wickets DESC LIMIT $2
+            SELECT b.bowler,
+                   (ARRAY_AGG(
+                     CASE WHEN b.batting_team = m.team1 THEN m.team2 ELSE m.team1 END
+                     ORDER BY b.match_date DESC
+                   ))[1] as team,
+                   p.espn_player_id,
+                   COUNT(*) as innings,
+                   SUM(b.wickets) as total_wickets,
+                   ROUND(AVG(b.economy_rate), 2) as avg_economy,
+                   ROUND(SUM(b.runs_conceded) * 1.0 / NULLIF(SUM(b.wickets), 0), 2) as bowling_avg
+            FROM {BOWLING_INNINGS} b
+            JOIN {MATCHES} m ON b.match_id = m.match_id
+            LEFT JOIN {PLAYERS} p ON b.bowler = p.player_name
+            WHERE b.season = $1
+            GROUP BY b.bowler, p.espn_player_id ORDER BY total_wickets DESC LIMIT $2
             """,
             [season, limit],
         )
     return db(
         f"""
-        SELECT bowler, COUNT(*) as innings,
-               SUM(wickets) as total_wickets,
-               ROUND(AVG(economy_rate), 2) as avg_economy,
-               ROUND(SUM(runs_conceded) * 1.0 / NULLIF(SUM(wickets), 0), 2) as bowling_avg
-        FROM {BOWLING_INNINGS}
-        GROUP BY bowler ORDER BY total_wickets DESC LIMIT $1
+        SELECT b.bowler,
+               (ARRAY_AGG(
+                 CASE WHEN b.batting_team = m.team1 THEN m.team2 ELSE m.team1 END
+                 ORDER BY b.match_date DESC
+               ))[1] as team,
+               p.espn_player_id,
+               COUNT(*) as innings,
+               SUM(b.wickets) as total_wickets,
+               ROUND(AVG(b.economy_rate), 2) as avg_economy,
+               ROUND(SUM(b.runs_conceded) * 1.0 / NULLIF(SUM(b.wickets), 0), 2) as bowling_avg
+        FROM {BOWLING_INNINGS} b
+        JOIN {MATCHES} m ON b.match_id = m.match_id
+        LEFT JOIN {PLAYERS} p ON b.bowler = p.player_name
+        GROUP BY b.bowler, p.espn_player_id ORDER BY total_wickets DESC LIMIT $1
         """,
         [limit],
     )

@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { MatchSpotlight } from "@/components/home/match-spotlight";
-import { SeasonSummary } from "@/components/home/season-summary";
 import { NewsFeed } from "@/components/home/news-feed";
 import { TopPerformers } from "@/components/home/top-performers";
+import { PointsTable } from "@/components/home/points-table";
 import { ExploreCards } from "@/components/home/explore-cards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLatestSeason } from "@/lib/landing-utils";
@@ -44,10 +44,10 @@ export default function Home() {
       const latest = getLatestSeason(seasonData);
       if (latest) {
         const [battingData, bowlingData] = await Promise.all([
-          fetch(`${API}/api/v1/batting/?season=${latest}&limit=5`)
+          fetch(`${API}/api/v1/batting/top?season=${latest}&limit=5`)
             .then((r) => (r.ok ? r.json() : []))
             .catch(() => [] as BattingStats[]),
-          fetch(`${API}/api/v1/bowling/?season=${latest}&limit=5`)
+          fetch(`${API}/api/v1/bowling/top?season=${latest}&limit=5`)
             .then((r) => (r.ok ? r.json() : []))
             .catch(() => [] as BowlingStats[]),
         ]);
@@ -64,8 +64,6 @@ export default function Home() {
   }, []);
 
   const latestSeason = getLatestSeason(seasons);
-  const latestSeasonCount =
-    seasons.find((s) => s.season === latestSeason)?.matches ?? 0;
 
   if (loading) {
     return (
@@ -101,25 +99,7 @@ export default function Home() {
       {/* Section 1: Match Spotlight */}
       <MatchSpotlight matches={matches} />
 
-      {/* Section 2: Season Summary */}
-      <div className="animate-section-2">
-        <SeasonSummary
-          season={latestSeason}
-          matchCount={latestSeasonCount}
-          topScorer={
-            batters[0]
-              ? { name: batters[0].batter, runs: batters[0].total_runs }
-              : null
-          }
-          topWicketTaker={
-            bowlers[0]
-              ? { name: bowlers[0].bowler, wickets: bowlers[0].total_wickets }
-              : null
-          }
-        />
-      </div>
-
-      {/* Section 3: Two-column — results + top performers */}
+      {/* Two-column — news + top performers */}
       <div className="w-full px-6 lg:px-10 py-8 grid grid-cols-1 lg:grid-cols-5 gap-6 animate-section-3">
         <div className="lg:col-span-2">
           <NewsFeed />
@@ -130,10 +110,15 @@ export default function Home() {
             bowlers={bowlers}
             season={latestSeason ?? ""}
           />
+          {latestSeason && (
+            <div className="mt-6">
+              <PointsTable season={latestSeason} />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Section 4: Explore */}
+      {/* Explore */}
       <div className="animate-section-4">
         <ExploreCards />
       </div>

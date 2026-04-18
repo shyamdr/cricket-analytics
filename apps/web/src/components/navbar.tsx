@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Activity, ChevronDown } from "lucide-react";
+import Image from "next/image";
+import { ChevronDown } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 // ---------------------------------------------------------------------------
@@ -161,12 +162,21 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur-md">
       <div className="w-full px-6 lg:px-10 flex items-center justify-between h-14">
-        <Link href="/" className="flex items-center gap-2.5">
-          <Activity className="h-5 w-5 text-primary" />
-          <div className="flex flex-col leading-tight">
-            <span className="font-semibold text-base tracking-tight">InsideEdge</span>
-            <span className="text-[10px] text-muted-foreground hidden sm:block -mt-0.5">The detail that changes everything</span>
-          </div>
+        <Link href="/" className="flex items-center h-11 w-[180px] relative">
+          <Image
+            src="/logo/design_light.png"
+            alt="InsideEdge"
+            fill
+            className="object-contain object-left dark:hidden"
+            priority
+          />
+          <Image
+            src="/logo/design_dark.png"
+            alt="InsideEdge"
+            fill
+            className="object-contain object-left hidden dark:block"
+            priority
+          />
         </Link>
         <nav className="flex items-center gap-0.5">
           {NAV_TABS.map((tab) => (

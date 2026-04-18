@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { MapPin, Calendar, ArrowRight, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,27 +23,48 @@ interface MatchSpotlightProps {
 }
 
 export function MatchSpotlight({ matches }: MatchSpotlightProps) {
+  const [activeFilter, setActiveFilter] = useState("all");
   const [index, setIndex] = useState(0);
   const [clashMap, setClashMap] = useState<Record<string, boolean>>({});
   const [transitioning, setTransitioning] = useState(false);
   const [slideDir, setSlideDir] = useState<"left" | "right">("left");
+
+  // Build tournament tabs from match data
+  const tournamentCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const m of matches) {
+      const key = m.event_name ?? "Other";
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    // Sort by count descending
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [matches]);
+
+  const filtered = activeFilter === "all"
+    ? matches
+    : matches.filter((m) => (m.event_name ?? "Other") === activeFilter);
+
+  // Reset index when filter changes
+  useEffect(() => {
+    setIndex(0);
+  }, [activeFilter]);
 
   const navigate = useCallback((dir: "left" | "right") => {
     setSlideDir(dir);
     setTransitioning(true);
     setTimeout(() => {
       setIndex((i) => {
-        if (dir === "left") return i === matches.length - 1 ? 0 : i + 1;
-        return i === 0 ? matches.length - 1 : i - 1;
+        if (dir === "left") return i === filtered.length - 1 ? 0 : i + 1;
+        return i === 0 ? filtered.length - 1 : i - 1;
       });
       setTransitioning(false);
     }, 200);
-  }, [matches.length]);
+  }, [filtered.length]);
 
   const prev = useCallback(() => navigate("right"), [navigate]);
   const next = useCallback(() => navigate("left"), [navigate]);
 
-  const match = matches[index];
+  const match = filtered[index];
 
   const inn1 = match?.innings?.find((i) => i.innings === 1);
   const inn2 = match?.innings?.find((i) => i.innings === 2);
@@ -84,7 +105,7 @@ export function MatchSpotlight({ matches }: MatchSpotlightProps) {
     analyze();
   }, [match, team1Name, team2Name, team1Logo, team2Logo, team1Primary, team2Primary]);
 
-  if (!match || matches.length === 0) return null;
+  if (!match || filtered.length === 0) return null;
 
   const team1Clashes = clashMap[team1Name] ?? checkLogoClash(team1Logo ?? "", team1Primary) ?? false;
   const team2Clashes = clashMap[team2Name] ?? checkLogoClash(team2Logo ?? "", team2Primary) ?? false;
@@ -109,6 +130,35 @@ export function MatchSpotlight({ matches }: MatchSpotlightProps) {
 
   return (
     <div className="w-full px-6 lg:px-10 py-6 animate-spotlight-fade-in">
+      {/* Tournament filter tabs */}
+      <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => setActiveFilter("all")}
+            className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+              activeFilter === "all"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border text-muted-foreground hover:text-foreground hover:bg-accent"
+            }`}
+          >
+            All ({matches.length})
+          </button>
+          {tournamentCounts.map(([name, count]) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => setActiveFilter(name)}
+              className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+                activeFilter === name
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:text-foreground hover:bg-accent"
+              }`}
+            >
+              {name.length > 25 ? name.slice(0, 23) + "…" : name} ({count})
+            </button>
+          ))}
+        </div>
+
       <div className="relative">
         {/* Left arrow */}
         <button
@@ -255,7 +305,7 @@ export function MatchSpotlight({ matches }: MatchSpotlightProps) {
                   )}
                 </div>
                 <span className="text-xs text-muted-foreground font-mono">
-                  {index + 1}/{matches.length}
+                  {index + 1}/{filtered.length}
                 </span>
                 <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/matches/${match.match_id}`} />}>
                   Scorecard

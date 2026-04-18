@@ -45,6 +45,8 @@ export interface SeasonCount {
 
 export interface BattingStats {
   batter: string;
+  team: string | null;
+  espn_player_id: number | null;
   innings: number;
   total_runs: number;
   avg_strike_rate: number;
@@ -54,6 +56,8 @@ export interface BattingStats {
 
 export interface BowlingStats {
   bowler: string;
+  team: string | null;
+  espn_player_id: number | null;
   innings: number;
   total_wickets: number;
   avg_economy: number;
