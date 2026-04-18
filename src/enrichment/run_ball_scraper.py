@@ -48,6 +48,25 @@ def _load_ball_records_to_bronze(records: list[dict]) -> int:
         )
 
 
+def _load_commentary_to_bronze(ball_comm: list[dict]) -> int:
+    """Load ball commentary records into bronze."""
+    import pyarrow as pa
+
+    from src.database import append_to_bronze, write_conn
+
+    if not ball_comm:
+        return 0
+
+    with write_conn() as conn:
+        table = pa.Table.from_pylist(ball_comm)
+        return append_to_bronze(
+            conn,
+            f"{settings.bronze_schema}.espn_ball_commentary",
+            table,
+            "espn_ball_id",
+        )
+
+
 def _get_already_scraped_match_ids(
     conn: duckdb.DuckDBPyConnection | None = None,
 ) -> set[str]:
@@ -91,7 +110,9 @@ def _ensure_status_table() -> None:
         )
 
 
-def _record_scrape_status(match_id: str, series_id: int, status: str) -> None:
+def _record_scrape_status(
+    match_id: str, series_id: int, status: str, details: dict | None = None
+) -> None:
     """Insert or update a match's scrape status."""
     from src.database import write_conn
 
@@ -151,6 +172,7 @@ def run_ball_scraper(
     logger.info("ball_scraper_starting", matches=len(pending), delay=delay)
 
     total_loaded = 0
+    total_ball_comm = 0
     batches_written = 0
 
     def persist_batch(batch: list[dict]) -> None:
@@ -165,14 +187,28 @@ def run_ball_scraper(
             total_saved=total_loaded,
         )
 
+    def persist_commentary(ball_comm: list[dict]) -> None:
+        nonlocal total_ball_comm
+        total_ball_comm += _load_commentary_to_bronze(ball_comm)
+        logger.info(
+            "commentary_saved",
+            ball_commentary=total_ball_comm,
+        )
+
     results = scrape_ball_data(
         pending,
         resolver=resolver,
         delay_seconds=delay,
         on_batch=persist_batch,
+        on_commentary_batch=persist_commentary,
         on_status=_record_scrape_status,
     )
-    logger.info("ball_scraper_complete", balls_scraped=len(results), saved_to_db=total_loaded)
+    logger.info(
+        "ball_scraper_complete",
+        balls_scraped=len(results),
+        saved_to_db=total_loaded,
+        ball_commentary=total_ball_comm,
+    )
 
 
 def main() -> None:

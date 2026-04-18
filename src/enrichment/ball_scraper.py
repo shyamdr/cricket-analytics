@@ -68,8 +68,21 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 
+def _extract_commentary_text(comment: dict) -> str | None:
+    """Extract human-readable commentary text from a comment's textItems."""
+    items = comment.get("commentTextItems") or []
+    if not items:
+        return None
+    parts = []
+    for item in items:
+        text = item.get("html") or item.get("text") or ""
+        if text:
+            parts.append(text)
+    return " ".join(parts).strip() or None
+
+
 def _extract_balls(comments: list[dict]) -> list[dict[str, Any]]:
-    """Extract fields from ESPN commentary ball objects."""
+    """Extract structured numeric/spatial fields from ESPN commentary ball objects."""
     balls = []
     for c in comments:
         preds = c.get("predictions") or {}
@@ -113,6 +126,100 @@ def _extract_balls(comments: list[dict]) -> list[dict[str, Any]]:
     return balls
 
 
+def _extract_ball_commentary(comments: list[dict]) -> list[dict[str, Any]]:
+    """Extract per-ball commentary text into separate records for the commentary table.
+
+    Captures ALL text/editorial streams per ball that ESPN returns:
+    - commentTextItems: main ball description
+    - commentPreTextItems: editorial text before the ball (over summaries, analysis)
+    - commentPostTextItems: editorial text after the ball (post-match, innings break)
+    - smartStats: contextual stats (ESPN only populates this for live matches / not in archive)
+    - batsmanStatText: batter stat summary (not populated in archived matches)
+    - bowlerStatText: bowler stat summary (not populated in archived matches)
+    - dismissalText: human-readable dismissal description (wickets only)
+    - events: structured event data (replacements, milestones, reviews)
+    - commentImages: photo attachments (key moments)
+    - over: end-of-over summary dict with team stats
+
+    Note: smartStats/batsmanStatText/bowlerStatText columns exist in the DDL
+    for forward compatibility but are empirically NULL across archived matches
+    (verified via probe on 2023 and 2026 IPL matches). Keeping them captured
+    in case ESPN populates them during live matches or adds them retroactively.
+    """
+    entries = []
+    for c in comments:
+        if c.get("overNumber") is None or c.get("ballNumber") is None:
+            continue
+
+        main_text = _extract_commentary_text(c)
+        title = c.get("title")
+
+        # Pre-ball editorial
+        pre_items = c.get("commentPreTextItems") or []
+        pre_text = " ".join(
+            item.get("html") or item.get("text") or "" for item in pre_items
+        ).strip() or None
+
+        # Post-ball editorial
+        post_items = c.get("commentPostTextItems") or []
+        post_text = " ".join(
+            item.get("html") or item.get("text") or "" for item in post_items
+        ).strip() or None
+
+        # Smart stats (contextual stats ESPN shows — typically empty in archive)
+        smart_stats_raw = c.get("smartStats") or []
+        smart_stats = json.dumps(smart_stats_raw) if smart_stats_raw else None
+
+        # Batter/bowler stat text (typically NULL in archived matches)
+        batsman_stat_text = c.get("batsmanStatText")
+        bowler_stat_text = c.get("bowlerStatText")
+
+        # Dismissal text (dict with short/long/commentary/fielder/bowler)
+        dismissal_raw = c.get("dismissalText")
+        dismissal_text = json.dumps(dismissal_raw) if dismissal_raw else None
+
+        # Events (milestones, reviews, replacements, etc.)
+        events_raw = c.get("events") or []
+        events = json.dumps(events_raw) if events_raw else None
+
+        # Photo attachments (key moments)
+        comment_images_raw = c.get("commentImages") or []
+        comment_images = json.dumps(comment_images_raw) if comment_images_raw else None
+
+        # End-of-over summary (present only on the last ball of each over)
+        over_raw = c.get("over")
+        over_summary = json.dumps(over_raw) if over_raw else None
+
+        if not any([
+            main_text, title, pre_text, post_text, smart_stats,
+            batsman_stat_text, bowler_stat_text, dismissal_text, events,
+            comment_images, over_summary,
+        ]):
+            continue
+
+        entries.append(
+            {
+                "espn_ball_id": c.get("id"),
+                "inning_number": c.get("inningNumber"),
+                "over_number": c.get("overNumber"),
+                "ball_number": c.get("ballNumber"),
+                "title": title,
+                "commentary_text": main_text,
+                "pre_text": pre_text,
+                "post_text": post_text,
+                "smart_stats": smart_stats,
+                "batsman_stat_text": batsman_stat_text,
+                "bowler_stat_text": bowler_stat_text,
+                "dismissal_text": dismissal_text,
+                "events": events,
+                "comment_images": comment_images,
+                "over_summary": over_summary,
+            }
+        )
+    return entries
+
+
+
 async def _bounce_scroll(page: Any) -> None:
     """Bounce scroll to trigger ESPN's IntersectionObserver for commentary loading."""
     height = await page.evaluate("document.body.scrollHeight")
@@ -143,6 +250,22 @@ def _flatten_match_balls(
     return rows
 
 
+def _flatten_commentary(
+    cricsheet_match_id: str,
+    espn_match_id: int,
+    commentary: list[dict],
+) -> list[dict[str, Any]]:
+    """Flatten commentary entries with match IDs attached."""
+    return [
+        {
+            "cricsheet_match_id": cricsheet_match_id,
+            "espn_match_id": espn_match_id,
+            **entry,
+        }
+        for entry in commentary
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Scrolling & innings switching (two-load approach)
 # ---------------------------------------------------------------------------
@@ -154,13 +277,10 @@ async def _scroll_until_complete(
     balls: list[dict],
     seen_ids: set[int],
     target_inning: int,
+    ball_commentary: list[dict] | None = None,
     max_scrolls: int = 30,
 ) -> bool:
-    """Scroll until all balls for target_inning are loaded.
-
-    Tracks a single innings' ball list. Returns True if we reached the
-    end (nextInningOver=None).
-    """
+    """Scroll until all balls for target_inning are loaded."""
     stale_rounds = 0
 
     for _scroll in range(max_scrolls):
@@ -179,6 +299,10 @@ async def _scroll_until_complete(
                 if bid and bid not in seen_ids and inn == target_inning:
                     seen_ids.add(bid)
                     balls.append(ball)
+
+            # Collect per-ball commentary text
+            if ball_commentary is not None:
+                ball_commentary.extend(_extract_ball_commentary(comments))
 
             if api_next is None and comments:
                 reached_end = True
@@ -265,27 +389,16 @@ async def _load_and_scrape_innings(
     default_inning: int,
     is_super_over_match: bool = False,
     extract_metadata: bool = False,
-) -> tuple[list[dict], set[int], dict | None]:
+) -> tuple[list[dict], set[int], dict | None, list[dict]]:
     """Load a fresh page and scrape a single innings.
 
-    If target_inning != default_inning (or is_super_over_match), switches
-    via dropdown BEFORE scrolling.
-
-    On super over matches the page defaults to the "Super Over" view, not
-    regular innings commentary. The IntersectionObserver for loading more
-    balls isn't active, so scrolling produces zero API calls. We must
-    switch to a regular innings via the dropdown first.
-
-    When ``extract_metadata=True``, also parses __NEXT_DATA__ and returns
-    the content dict as the third element. This lets the first page load
-    double as the metadata load, eliminating a separate page load.
-
     Returns:
-        Tuple of (ball list, seen ball IDs, metadata dict or None).
+        Tuple of (ball list, seen ball IDs, metadata dict or None, ball commentary).
     """
     captured: list[dict] = []
     balls: list[dict] = []
     seen_ids: set[int] = set()
+    ball_comm: list[dict] = []
     metadata: dict | None = None
 
     async def handle_route(route: Route) -> None:
@@ -337,21 +450,23 @@ async def _load_and_scrape_innings(
 
             if not target_abbr:
                 logger.warning("missing_team_abbreviation", inning=target_inning)
-                return balls, seen_ids, metadata
+                return balls, seen_ids, metadata, ball_comm
 
             switched = await _switch_innings(page, target_abbr, current_abbr)
             if not switched:
                 logger.warning("innings_switch_failed", inning=target_inning)
-                return balls, seen_ids, metadata
+                return balls, seen_ids, metadata, ball_comm
 
             # Collect any balls from the switch response
             while captured:
                 api_data = captured.pop(0)
-                for ball in _extract_balls(api_data.get("comments", [])):
+                switch_comments = api_data.get("comments", [])
+                for ball in _extract_balls(switch_comments):
                     bid = ball["espn_ball_id"]
                     if bid and bid not in seen_ids and ball["inning_number"] == target_inning:
                         seen_ids.add(bid)
                         balls.append(ball)
+                ball_comm.extend(_extract_ball_commentary(switch_comments))
         else:
             # Collect initial balls from __NEXT_DATA__
             html = await page.content()
@@ -369,19 +484,21 @@ async def _load_and_scrape_innings(
                 if extract_metadata:
                     metadata = content
 
-                for ball in _extract_balls(content.get("comments", [])):
+                initial_comments = content.get("comments", [])
+                for ball in _extract_balls(initial_comments):
                     bid = ball["espn_ball_id"]
                     if bid and bid not in seen_ids and ball["inning_number"] == target_inning:
                         seen_ids.add(bid)
                         balls.append(ball)
+                ball_comm.extend(_extract_ball_commentary(initial_comments))
 
         # Scroll to load remaining balls
-        await _scroll_until_complete(page, captured, balls, seen_ids, target_inning)
+        await _scroll_until_complete(page, captured, balls, seen_ids, target_inning, ball_comm)
     finally:
         await context.close()
 
     balls.sort(key=lambda b: (b["over_number"] or 0, b["ball_number"] or 0))
-    return balls, seen_ids, metadata
+    return balls, seen_ids, metadata, ball_comm
 
 
 # ---------------------------------------------------------------------------
@@ -425,7 +542,7 @@ async def _scrape_single_match(
     # metadata from __NEXT_DATA__ before the switch happens.
 
     # First pass: load page, extract metadata, scrape default innings
-    first_balls, first_seen, metadata = await _load_and_scrape_innings(
+    first_balls, first_seen, metadata, first_ball_comm = await _load_and_scrape_innings(
         url,
         browser,
         target_inning=2,  # assume default; corrected below if needed
@@ -482,8 +599,11 @@ async def _scrape_single_match(
     # Sort: default innings first (no switch needed) if not yet scraped
     remaining.sort(key=lambda i: (i != default_inning, i))
 
+
+    all_ball_comm: list[dict] = list(first_ball_comm)
+
     for inn_num in remaining:
-        balls, seen, _ = await _load_and_scrape_innings(
+        balls, seen, _, inn_ball_comm = await _load_and_scrape_innings(
             url,
             browser,
             inn_num,
@@ -493,6 +613,7 @@ async def _scrape_single_match(
         )
         all_balls[inn_num] = balls
         global_seen.update(seen)
+        all_ball_comm.extend(inn_ball_comm)
 
     total = sum(len(v) for v in all_balls.values())
 
@@ -507,6 +628,7 @@ async def _scrape_single_match(
     return {
         "espn_match_id": espn_match_id,
         "innings": all_balls,
+        "ball_commentary": all_ball_comm,
         "total_balls": total,
     }
 
@@ -521,6 +643,7 @@ async def scrape_ball_data_async(
     resolver: SeriesResolver | None = None,
     delay_seconds: float = 4.0,
     on_batch: Callable | None = None,
+    on_commentary_batch: Callable | None = None,
     on_status: Callable | None = None,
     batch_size: int = 10,
 ) -> list[dict[str, Any]]:
@@ -531,6 +654,7 @@ async def scrape_ball_data_async(
         resolver: SeriesResolver instance (created if not provided).
         delay_seconds: Seconds to wait between matches (default 4).
         on_batch: Callback with list of flat ball records every batch_size matches.
+        on_commentary_batch: Callback with list of non-ball commentary records.
         on_status: Callback(match_id, series_id, status) for tracking outcomes.
         batch_size: Number of matches between DB writes (default 10).
 
@@ -543,6 +667,8 @@ async def scrape_ball_data_async(
     total_matches = len(matches)
     all_results: list[dict[str, Any]] = []
     batch_buffer: list[dict[str, Any]] = []
+    ball_comm_buffer: list[dict[str, Any]] = []
+
     batch_match_count = 0
     failed_matches: list[str] = []
 
@@ -574,8 +700,12 @@ async def scrape_ball_data_async(
                 flat_balls = _flatten_match_balls(
                     match_id, result["espn_match_id"], result["innings"]
                 )
+                flat_ball_comm = _flatten_commentary(
+                    match_id, result["espn_match_id"], result.get("ball_commentary", [])
+                )
                 all_results.extend(flat_balls)
                 batch_buffer.extend(flat_balls)
+                ball_comm_buffer.extend(flat_ball_comm)
                 batch_match_count += 1
                 scrape_count += 1
 
@@ -649,7 +779,10 @@ async def scrape_ball_data_async(
             # Persist every batch_size matches
             if on_batch and batch_match_count >= batch_size:
                 on_batch(batch_buffer)
+                if on_commentary_batch:
+                    on_commentary_batch(ball_comm_buffer)
                 batch_buffer = []
+                ball_comm_buffer = []
                 batch_match_count = 0
 
             if i < total_matches - 1:
@@ -658,6 +791,8 @@ async def scrape_ball_data_async(
         # Flush remaining
         if on_batch and batch_buffer:
             on_batch(batch_buffer)
+        if on_commentary_batch and ball_comm_buffer:
+            on_commentary_batch(ball_comm_buffer)
 
         await browser.close()
 
@@ -674,6 +809,7 @@ def scrape_ball_data(
     resolver: SeriesResolver | None = None,
     delay_seconds: float = 4.0,
     on_batch: Callable | None = None,
+    on_commentary_batch: Callable | None = None,
     on_status: Callable | None = None,
     batch_size: int = 10,
 ) -> list[dict[str, Any]]:
@@ -684,6 +820,7 @@ def scrape_ball_data(
             resolver=resolver,
             delay_seconds=delay_seconds,
             on_batch=on_batch,
+            on_commentary_batch=on_commentary_batch,
             on_status=on_status,
             batch_size=batch_size,
         )

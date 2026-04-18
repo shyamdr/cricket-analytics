@@ -144,6 +144,7 @@ def espn_ball_enrichment(
         _ensure_status_table,
         _get_already_scraped_match_ids,
         _load_ball_records_to_bronze,
+        _load_commentary_to_bronze,
         _record_scrape_status,
     )
 
@@ -178,6 +179,7 @@ def espn_ball_enrichment(
 
     resolver = SeriesResolver()
     total_loaded = 0
+    total_ball_comm = 0
     batches_written = 0
     scrape_count = 0
 
@@ -187,6 +189,11 @@ def espn_ball_enrichment(
         total_loaded += loaded
         batches_written += 1
         context.log.info(f"Batch {batches_written}: {loaded} balls saved (total: {total_loaded})")
+
+    def persist_commentary(ball_comm: list[dict]) -> None:
+        nonlocal total_ball_comm
+        total_ball_comm += _load_commentary_to_bronze(ball_comm)
+        context.log.info(f"Commentary saved: {total_ball_comm} ball commentary total")
 
     def track_status(
         match_id: str, series_id: int, status: str, details: dict | None = None
@@ -219,16 +226,20 @@ def espn_ball_enrichment(
         resolver=resolver,
         delay_seconds=config.delay,
         on_batch=persist_batch,
+        on_commentary_batch=persist_commentary,
         on_status=track_status,
         batch_size=10,
     )
 
-    context.log.info(f"Ball data complete: {len(results)} balls from {len(pending)} matches")
+    context.log.info(
+        f"Ball data complete: {len(results)} balls, {total_ball_comm} ball commentary"
+    )
 
     return MaterializeResult(
         metadata={
             "scraped_balls": MetadataValue.int(len(results)),
             "loaded_balls": MetadataValue.int(total_loaded),
+            "ball_commentary": MetadataValue.int(total_ball_comm),
             "batches_written": MetadataValue.int(batches_written),
             "already_scraped": MetadataValue.int(len(already_scraped)),
             "total_matches": MetadataValue.int(len(all_matches)),

@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Block Destructive Operations",
+  "description": "Blocks any shell command that contains DELETE, DROP, TRUNCATE, or other destructive SQL operations. Forces the agent to ask for permission before executing.",
+  "version": "1",
+  "when": {
+    "type": "preToolUse",
+    "toolTypes": [
+      "shell"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Check if this command contains any destructive database operations (DELETE, DROP, TRUNCATE, UPDATE, ALTER, or any SQL that modifies/removes data). If it does, you are FORBIDDEN from executing it. Tell the user what the command would do and ask for explicit permission. Do NOT proceed without their approval."
+  }
+}

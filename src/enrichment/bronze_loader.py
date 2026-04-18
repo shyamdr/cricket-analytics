@@ -184,6 +184,28 @@ CREATE TABLE IF NOT EXISTS {schema}.espn_ball_data (
 )
 """
 
+_ESPN_BALL_COMMENTARY_DDL = """
+CREATE TABLE IF NOT EXISTS {schema}.espn_ball_commentary (
+    espn_ball_id                BIGINT,
+    cricsheet_match_id          VARCHAR,
+    espn_match_id               BIGINT,
+    inning_number               BIGINT,
+    over_number                 BIGINT,
+    ball_number                 BIGINT,
+    title                       VARCHAR,
+    commentary_text             VARCHAR,
+    pre_text                    VARCHAR,
+    post_text                   VARCHAR,
+    smart_stats                 VARCHAR,
+    batsman_stat_text           VARCHAR,
+    bowler_stat_text            VARCHAR,
+    dismissal_text              VARCHAR,
+    events                      VARCHAR,
+    comment_images              VARCHAR,
+    over_summary                VARCHAR
+)
+"""
+
 
 _VENUE_COORDINATES_DDL = """
 CREATE TABLE IF NOT EXISTS {schema}.venue_coordinates (
@@ -228,6 +250,7 @@ def _ensure_espn_tables(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute(_ESPN_GROUNDS_DDL.format(schema=schema))
     conn.execute(_ESPN_INNINGS_DDL.format(schema=schema))
     conn.execute(_ESPN_BALL_DATA_DDL.format(schema=schema))
+    conn.execute(_ESPN_BALL_COMMENTARY_DDL.format(schema=schema))
     conn.execute(_VENUE_COORDINATES_DDL.format(schema=schema))
     conn.execute(_WEATHER_DDL.format(schema=schema))
 
@@ -246,6 +269,8 @@ def _migrate_image_columns(conn: duckdb.DuckDBPyConnection, schema: str) -> None
         (f"{schema}.espn_matches", "venue_image_url", "VARCHAR"),
         (f"{schema}.espn_matches", "team1_long_name", "VARCHAR"),
         (f"{schema}.espn_matches", "team2_long_name", "VARCHAR"),
+        (f"{schema}.espn_ball_commentary", "comment_images", "VARCHAR"),
+        (f"{schema}.espn_ball_commentary", "over_summary", "VARCHAR"),
     ]
     for table, column, dtype in migrations:
         try:
