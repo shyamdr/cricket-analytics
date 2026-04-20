@@ -42,18 +42,30 @@ select
     ts.first_match_date,
     ts.last_match_date,
     ts.total_matches,
-    -- ESPN enrichment (fallback to seed for teams not in ESPN)
-    coalesce(et.espn_team_id, tbc.espn_team_id) as espn_team_id,
-    coalesce(et.team_abbreviation, tbc.team_name) as team_abbreviation,
-    et.is_country,
-    -- Brand colors from curated seed (ESPN colors are unreliable)
-    coalesce(tbc.brand_color, et.primary_color) as primary_color,
+    -- ESPN enrichment keyed on the CURRENT franchise name for historical variants.
+    -- E.g. "Delhi Daredevils" has no ESPN match, so look up "Delhi Capitals" instead.
+    -- Falls back to the team's own name when there's no rename mapping.
+    coalesce(et_current.espn_team_id, et.espn_team_id) as espn_team_id,
+    coalesce(et_current.team_abbreviation, et.team_abbreviation) as team_abbreviation,
+    coalesce(et_current.is_country, et.is_country) as is_country,
+    -- Brand colors from curated seed, joined by team_name (the seed lists each
+    -- name variant explicitly — including spelling variants like
+    -- "Rising Pune Supergiants" vs "Rising Pune Supergiant").
+    coalesce(
+        tbc.brand_color,
+        et_current.primary_color,
+        et.primary_color
+    ) as primary_color,
     tbc.brand_color_alt,
-    et.logo_url
+    coalesce(et_current.logo_url, et.logo_url) as logo_url
 from team_stats ts
 left join {{ ref('team_name_mappings') }} tnm
     on ts.team_name = tnm.team_name
+-- Direct ESPN match on the team's own name (works for current/active teams)
 left join espn_teams et
     on ts.team_name = et.team_long_name
+-- ESPN match via the current franchise name (works for historical rename variants)
+left join espn_teams et_current
+    on nullif(tnm.current_franchise_name, '') = et_current.team_long_name
 left join {{ ref('team_brand_colors') }} tbc
     on ts.team_name = tbc.team_name
