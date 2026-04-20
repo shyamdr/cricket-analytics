@@ -54,8 +54,20 @@ def run_enrichment(
     dry_run: bool = False,
     all_seasons: bool = False,
     delay: float = 4.0,
+    refresh: bool = False,
 ) -> None:
-    """Run the ESPN enrichment pipeline."""
+    """Run the ESPN enrichment pipeline.
+
+    Args:
+        season: Single season to scrape (e.g. '2024').
+        limit: Max matches to scrape.
+        dry_run: Show plan without scraping.
+        all_seasons: Scrape all seasons.
+        delay: Seconds between requests.
+        refresh: If True, re-scrape matches already in bronze and replace
+            their rows (use to backfill new columns on existing matches).
+            Default False — skip matches already scraped.
+    """
     # Single connection for all read queries
     conn = get_read_conn()
     try:
@@ -72,7 +84,10 @@ def run_enrichment(
     finally:
         conn.close()
 
-    pending = [m for m in all_matches if m["match_id"] not in already_scraped]
+    if refresh:
+        pending = list(all_matches)
+    else:
+        pending = [m for m in all_matches if m["match_id"] not in already_scraped]
 
     if limit:
         pending = pending[:limit]
@@ -117,7 +132,7 @@ def run_enrichment(
     total_counts: dict[str, int] = {"matches": 0, "players": 0, "innings": 0, "balls": 0}
 
     def persist_batch(batch: list[dict]) -> None:
-        counts = load_espn_to_bronze(batch)
+        counts = load_espn_to_bronze(batch, refresh=refresh)
         for k, v in counts.items():
             total_counts[k] = total_counts.get(k, 0) + v
         logger.info("batch_persisted", **total_counts)

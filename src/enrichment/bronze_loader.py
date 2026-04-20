@@ -60,7 +60,24 @@ CREATE TABLE IF NOT EXISTS {schema}.espn_matches (
     replacement_players_json    VARCHAR,
     debut_players_json          VARCHAR,
     teams_enrichment_json       VARCHAR,
-    cricsheet_match_id          VARCHAR
+    cricsheet_match_id          VARCHAR,
+    mvp_player_id               BIGINT,
+    mvp_player_name             VARCHAR,
+    mvp_team_id                 BIGINT,
+    mvp_team_name               VARCHAR,
+    mvp_batted_type             VARCHAR,
+    mvp_runs                    BIGINT,
+    mvp_balls_faced             BIGINT,
+    mvp_smart_runs              DOUBLE,
+    mvp_bowled_type             VARCHAR,
+    mvp_wickets                 BIGINT,
+    mvp_conceded                BIGINT,
+    mvp_smart_wickets           DOUBLE,
+    mvp_fielded_type            VARCHAR,
+    mvp_batting_impact          DOUBLE,
+    mvp_bowling_impact          DOUBLE,
+    mvp_total_impact            DOUBLE,
+    player_of_match_json        VARCHAR
 )
 """
 
@@ -271,6 +288,25 @@ def _migrate_image_columns(conn: duckdb.DuckDBPyConnection, schema: str) -> None
         (f"{schema}.espn_matches", "team2_long_name", "VARCHAR"),
         (f"{schema}.espn_ball_commentary", "comment_images", "VARCHAR"),
         (f"{schema}.espn_ball_commentary", "over_summary", "VARCHAR"),
+        # MVP (ESPN's "Most Valued Player of the Match" smart metrics)
+        (f"{schema}.espn_matches", "mvp_player_id", "BIGINT"),
+        (f"{schema}.espn_matches", "mvp_player_name", "VARCHAR"),
+        (f"{schema}.espn_matches", "mvp_team_id", "BIGINT"),
+        (f"{schema}.espn_matches", "mvp_team_name", "VARCHAR"),
+        (f"{schema}.espn_matches", "mvp_batted_type", "VARCHAR"),
+        (f"{schema}.espn_matches", "mvp_runs", "BIGINT"),
+        (f"{schema}.espn_matches", "mvp_balls_faced", "BIGINT"),
+        (f"{schema}.espn_matches", "mvp_smart_runs", "DOUBLE"),
+        (f"{schema}.espn_matches", "mvp_bowled_type", "VARCHAR"),
+        (f"{schema}.espn_matches", "mvp_wickets", "BIGINT"),
+        (f"{schema}.espn_matches", "mvp_conceded", "BIGINT"),
+        (f"{schema}.espn_matches", "mvp_smart_wickets", "DOUBLE"),
+        (f"{schema}.espn_matches", "mvp_fielded_type", "VARCHAR"),
+        (f"{schema}.espn_matches", "mvp_batting_impact", "DOUBLE"),
+        (f"{schema}.espn_matches", "mvp_bowling_impact", "DOUBLE"),
+        (f"{schema}.espn_matches", "mvp_total_impact", "DOUBLE"),
+        # Player(s) of the Match with per-innings stats
+        (f"{schema}.espn_matches", "player_of_match_json", "VARCHAR"),
     ]
     for table, column, dtype in migrations:
         try:
@@ -296,12 +332,18 @@ def _migrate_image_columns(conn: duckdb.DuckDBPyConnection, schema: str) -> None
         logger.warning("backfill_team_long_names_failed")
 
 
-def load_espn_to_bronze(records: list[dict[str, Any]]) -> dict[str, int]:
+def load_espn_to_bronze(records: list[dict[str, Any]], refresh: bool = False) -> dict[str, int]:
     """Load ESPN enrichment records into bronze tables.
 
     Each record is a dict with keys: match, players, innings, balls.
     Appends to bronze.espn_matches, bronze.espn_players,
     bronze.espn_innings, and bronze.espn_ball_data.
+
+    Args:
+        records: List of enrichment dicts from match_scraper.
+        refresh: If True, delete existing rows for these matches before
+            inserting (use to backfill new columns on already-scraped
+            matches). Default False — skip matches already in bronze.
 
     Returns:
         Dict with counts of new rows per table.
@@ -354,6 +396,31 @@ def load_espn_to_bronze(records: list[dict[str, Any]]) -> dict[str, int]:
     with write_conn() as conn:
         # Ensure tables exist with correct types before any data is inserted
         _ensure_espn_tables(conn)
+
+        # Refresh mode: delete existing rows for these matches so the
+        # re-scrape replaces them (instead of being skipped by dedup).
+        if refresh and match_rows:
+            match_ids = [
+                r.get("cricsheet_match_id") for r in match_rows if r.get("cricsheet_match_id")
+            ]
+            espn_match_ids = [r.get("espn_match_id") for r in match_rows if r.get("espn_match_id")]
+            if match_ids:
+                conn.execute(
+                    f"DELETE FROM {settings.bronze_schema}.espn_matches "
+                    f"WHERE cricsheet_match_id IN ({','.join(['?'] * len(match_ids))})",
+                    match_ids,
+                )
+            if espn_match_ids:
+                conn.execute(
+                    f"DELETE FROM {settings.bronze_schema}.espn_innings "
+                    f"WHERE espn_match_id IN ({','.join(['?'] * len(espn_match_ids))})",
+                    espn_match_ids,
+                )
+            logger.info(
+                "refresh_deleted_rows",
+                matches=len(match_ids),
+                innings_matches=len(espn_match_ids),
+            )
 
         if match_rows:
             table = pa.Table.from_pylist(match_rows)

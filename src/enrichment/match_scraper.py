@@ -306,9 +306,36 @@ def _extract_match_data(next_data: dict[str, Any]) -> dict[str, Any]:
                 }
             )
 
-        # Over group phases (powerplay/middle/death)
+        # Over group phases (powerplay/middle/death) — with top performers
         over_groups = []
         for og in inn.get("inningOverGroups") or []:
+            top_batsmen = []
+            for tb in og.get("topBatsmen") or []:
+                tbp = tb.get("player") or {}
+                top_batsmen.append(
+                    {
+                        "espn_player_id": tbp.get("objectId"),
+                        "player_name": tbp.get("name"),
+                        "runs": tb.get("runs"),
+                        "balls": tb.get("balls"),
+                        "fours": tb.get("fours"),
+                        "sixes": tb.get("sixes"),
+                    }
+                )
+            top_bowlers = []
+            for tbw in og.get("topBowlers") or []:
+                tbwp = tbw.get("player") or {}
+                top_bowlers.append(
+                    {
+                        "espn_player_id": tbwp.get("objectId"),
+                        "player_name": tbwp.get("name"),
+                        "overs": tbw.get("overs"),
+                        "balls": tbw.get("balls"),
+                        "maidens": tbw.get("maidens"),
+                        "conceded": tbw.get("conceded"),
+                        "wickets": tbw.get("wickets"),
+                    }
+                )
             over_groups.append(
                 {
                     "phase_type": og.get("type"),
@@ -316,6 +343,10 @@ def _extract_match_data(next_data: dict[str, Any]) -> dict[str, Any]:
                     "end_over": og.get("endOverNumber"),
                     "runs": og.get("oversRuns"),
                     "wickets": og.get("oversWickets"),
+                    "total_runs": og.get("totalRuns"),
+                    "total_wickets": og.get("totalWickets"),
+                    "top_batsmen": top_batsmen,
+                    "top_bowlers": top_bowlers,
                 }
             )
 
@@ -378,6 +409,29 @@ def _extract_match_data(next_data: dict[str, Any]) -> dict[str, Any]:
                     }
                 )
 
+    # --- MVP ("Most Valued Player of the Match") + Player of the Match ---
+    # ESPN's proprietary player-impact metric (smartRuns, smartWickets,
+    # battingImpact, bowlingImpact, totalImpact). Unique to ESPN.
+    support_info = content.get("supportInfo") or {}
+    mvp = support_info.get("mostValuedPlayerOfTheMatch") or {}
+    mvp_player = mvp.get("player") or {}
+    mvp_team = mvp.get("team") or {}
+
+    pom_records: list[dict[str, Any]] = []
+    for pom in support_info.get("playersOfTheMatch") or []:
+        pp = pom.get("player") or {}
+        pt = pom.get("team") or {}
+        pom_records.append(
+            {
+                "type": pom.get("type"),
+                "player_id": pp.get("objectId"),
+                "player_name": pp.get("name"),
+                "team_id": pt.get("objectId"),
+                "team_name": pt.get("name"),
+                "inning_stats": pom.get("inningStats"),
+            }
+        )
+
     # --- Match record ---
     match_record = {
         "espn_match_id": espn_match_id,
@@ -430,6 +484,25 @@ def _extract_match_data(next_data: dict[str, Any]) -> dict[str, Any]:
         "debut_players_json": json.dumps(match_info.get("debutPlayers")),
         # Legacy (kept for backward compat)
         "teams_enrichment_json": json.dumps(teams_enrichment),
+        # MVP — ESPN's "Most Valued Player of the Match" with smart metrics
+        "mvp_player_id": mvp_player.get("objectId"),
+        "mvp_player_name": mvp_player.get("name"),
+        "mvp_team_id": mvp_team.get("objectId"),
+        "mvp_team_name": mvp_team.get("name"),
+        "mvp_batted_type": mvp.get("battedType"),
+        "mvp_runs": mvp.get("runs"),
+        "mvp_balls_faced": mvp.get("ballsFaced"),
+        "mvp_smart_runs": mvp.get("smartRuns"),
+        "mvp_bowled_type": mvp.get("bowledType"),
+        "mvp_wickets": mvp.get("wickets"),
+        "mvp_conceded": mvp.get("conceded"),
+        "mvp_smart_wickets": mvp.get("smartWickets"),
+        "mvp_fielded_type": mvp.get("fieldedType"),
+        "mvp_batting_impact": mvp.get("battingImpact"),
+        "mvp_bowling_impact": mvp.get("bowlingImpact"),
+        "mvp_total_impact": mvp.get("totalImpact"),
+        # Player(s) of the Match with per-innings stats
+        "player_of_match_json": json.dumps(pom_records) if pom_records else None,
     }
 
     return {
