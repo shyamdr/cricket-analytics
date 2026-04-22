@@ -203,7 +203,7 @@ flowchart TB
 
     subgraph GH["GitHub"]
         Repo[shyamdr/cricket-analytics]
-        VRepo[apps/web nested git]
+        VRepo[apps/web subdirectory]
         CI[GitHub Actions CI]
     end
 

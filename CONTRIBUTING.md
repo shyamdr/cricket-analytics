@@ -141,7 +141,7 @@ All three must pass for a PR to merge. pip cache is keyed on `pyproject.toml` ha
 
 ## Deployments
 
-- **Frontend** → Vercel (auto from `main` of `apps/web/` nested git)
+- **Frontend** → Vercel (auto from `main` of root repo; Root Directory = `apps/web` in Vercel project settings)
 - **API** → Render (auto from `main` of root repo; builds via `Dockerfile.api`)
 - **Pipeline** → Local or CI only; not deployed continuously
 

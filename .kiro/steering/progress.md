@@ -13,7 +13,7 @@ Everything below is actually built, tested, and running. Use this as ground trut
 - Pages: home, about, matches list + detail, players list + profile, teams list + detail, venues list, 404
 - Deploy: Vercel at https://insideedge.vercel.app (auto from main)
 - Env var: `NEXT_PUBLIC_API_URL` points to Render API
-- Note: `apps/web/` has nested `.git` folder
+- Note: `apps/web/` is part of the root repo (Vercel deploys from shyamdr/cricket-analytics with Root Directory = apps/web). No nested `.git` — removed 2026-04-22 (see ADR-003 revision).
 
 ### Backend (FastAPI — deployed on Render)
 - 9 routers (all under `/api/v1`):
@@ -109,9 +109,10 @@ Everything below is actually built, tested, and running. Use this as ground trut
 - [x] End-to-end verified: 1169 IPL matches, 278K deliveries, 927 players, 19 teams, 63 venues
 - [x] ADR-001: DuckDB as storage engine
 - [x] ADR-002: Image serving strategy (API serves cached images from data/images/)
-- [x] ADR-003: Monorepo with nested frontend git repo
+- [x] ADR-003: Monorepo with frontend under apps/web (revised 2026-04-22 — nested git removed)
 - [x] ADR-004: Natural keys over surrogate keys
 - [x] ADR-005: Format-agnostic schema design
+- [x] Laptop migration tooling (2026-04-22) — `scripts/setup_new_laptop.sh` restores secrets, DuckDB, images, Python + Node deps, and runs smoke tests. `docs/MIGRATION.md` explains the full process. Vestigial nested `apps/web/.git` removed (Vercel was deploying from root repo the whole time — ADR-003 revised).
 - [x] CONTRIBUTING.md (setup, code style, where to add things, git/CI conventions)
 - [x] Architecture diagrams (docs/architecture.md — Mermaid for system, medallion, Dagster, request path, deployment)
 - [x] README with architecture, quick start, commands
@@ -153,8 +154,8 @@ Everything below is actually built, tested, and running. Use this as ground trut
   - Shared components: Navbar, ThemeProvider, ThemeToggle (dark/light mode), Loading
   - `src/lib/`: `api.ts` (API client), `landing-utils.ts`, `team-logos.ts`, `types.ts`, `utils.ts`
   - Configured via `NEXT_PUBLIC_API_URL` env var (points to Render API)
-  - Deploy: Vercel auto-deploys from main
-  - The `apps/web/` directory has its own `.git` folder (nested git repo) — keep in mind when doing git operations
+  - Deploy: Vercel auto-deploys from `main` of root repo (Root Directory = `apps/web` in Vercel project settings)
+  - Single git repo at the root tracks both backend and frontend — one `git push` updates both
 - [~] Auction data pipeline — HALTED at 2013. Manual curation too tedious. See "Pending — Next Up" for details.
 - [x] Streamlit UI — LEGACY, no further investment. 4 pages still present (Player Stats, Team Analytics, Match Explorer, Trends) for internal exploration.
 
@@ -479,7 +480,7 @@ Scope: IPL-only for now. Streamlit is legacy (will be replaced by React web app)
 - Streamlit UI: LEGACY, now superseded by the deployed Next.js frontend. Kept for internal data exploration, not public use. No further investment.
 - Default profile: `minimal` (IPL only) is intentional for current scope. T20I bronze is loaded but gold models are still IPL-only in production. Will expand to other leagues later.
 - `render.yaml` uses `--profile minimal` — correct for now since only IPL is in gold. Update when expanding to more leagues.
-- `apps/web/` has its own nested `.git` folder (separate git repo inside the monorepo). Be aware when doing git operations from repo root — changes inside apps/web/ don't show up in `git status` at the root.
+- `apps/web/` is tracked by the root repo (single monorepo, no nested `.git`). Vercel deploys from `shyamdr/cricket-analytics` with Root Directory = `apps/web`. Revised 2026-04-22 — earlier nested-git setup was vestigial and never used.
 
 ## Technical Notes
 - Python 3.13.2 on macOS (company laptop, Homebrew Python)

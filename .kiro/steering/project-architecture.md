@@ -86,7 +86,7 @@ cricket-analytics/
 ├── .github/workflows/          # CI/CD (lint, test, dbt test, deploy)
 ├── .kiro/steering/             # project context (persists across sessions)
 ├── apps/
-│   └── web/                    # Next.js 16 frontend (deploys to Vercel) — has nested .git
+│   └── web/                    # Next.js 16 frontend (deploys to Vercel from root repo, Root Directory = apps/web)
 ├── config/                     # datasets.yml — dataset & enrichment configuration
 ├── docs/                       # ADRs (001 DuckDB, 002 image serving), data dictionary, enrichment strategy
 ├── scripts/                    # utility scripts (player photo viewer, ESPN squad scraper, audit tools)

@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "name": "Lint & Format Check",
-  "description": "Runs ruff check and ruff format --check on src/ and tests/ after every agent stop, so CI lint failures are caught before pushing to main.",
+  "description": "Runs ruff check and ruff format --check on src/ and tests/ before git commit, so CI lint failures are caught before pushing to main.",
   "version": "1",
   "when": {
     "type": "agentStop"
@@ -10,5 +10,7 @@
     "type": "runCommand",
     "command": ".venv/bin/ruff check src/ tests/ && .venv/bin/ruff format --check src/ tests/",
     "timeout": 30
-  }
+  },
+  "workspaceFolderName": "cricket-analytics",
+  "shortName": "lint-before-push"
 }
