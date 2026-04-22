@@ -9,10 +9,10 @@
 #   5. Installs Next.js dependencies
 #   6. Runs the smoke + dbt test suites to verify everything works
 #
-# Usage:
+# Usage (recommended — everything in one folder):
 #   bash scripts/setup_new_laptop.sh \
-#     --secrets /path/to/secrets.env \
-#     --backup-dir /path/to/gdrive/backup
+#     --secrets ~/Downloads/cricket-analytics-backup/cricket-analytics-secrets.env \
+#     --backup-dir ~/Downloads/cricket-analytics-backup
 #
 # The secrets.env file should contain BOTH sets of env vars in one file,
 # prefixed so we know where each line goes:
@@ -21,6 +21,7 @@
 #   WEB_ENV  NEXT_PUBLIC_API_URL=https://insideedge-api.onrender.com
 #
 # The backup directory should contain:
+#   - cricket-analytics-secrets.env  (can also live elsewhere, wherever --secrets points)
 #   - cricket.duckdb
 #   - data-images.tar.gz
 #

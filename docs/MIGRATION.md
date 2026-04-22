@@ -52,13 +52,7 @@ Every step is a Terminal command. Open Terminal (⌘+Space → "Terminal" → En
 
 ## Step 1 — Download the three backup files from Google Drive
 
-On the new laptop, download the three files into this exact structure:
-
-```
-~/Downloads/cricket-analytics-secrets.env
-~/Downloads/cricket-analytics-backup/cricket.duckdb
-~/Downloads/cricket-analytics-backup/data-images.tar.gz
-```
+Put all three files into one folder on the new laptop. This folder exists only so the setup script can find all the backup files at a single path — no files need to live outside it.
 
 Create the folder first (paste in Terminal):
 
@@ -66,15 +60,24 @@ Create the folder first (paste in Terminal):
 mkdir -p ~/Downloads/cricket-analytics-backup
 ```
 
-Then drag-drop the downloaded files into the right places through Finder, OR verify from Terminal:
+Now download the three files from Google Drive and put them inside `~/Downloads/cricket-analytics-backup/`. The Finder way: open Finder → Downloads → `cricket-analytics-backup` folder → drag the three downloaded files into it.
 
-```bash
-ls -lh ~/Downloads/cricket-analytics-secrets.env \
-       ~/Downloads/cricket-analytics-backup/cricket.duckdb \
-       ~/Downloads/cricket-analytics-backup/data-images.tar.gz
+The final structure should look like this:
+
+```
+~/Downloads/cricket-analytics-backup/
+    ├── cricket-analytics-secrets.env
+    ├── cricket.duckdb
+    └── data-images.tar.gz
 ```
 
-All three files must show up. If any is missing, re-download before continuing.
+Verify from Terminal:
+
+```bash
+ls -lh ~/Downloads/cricket-analytics-backup/
+```
+
+You should see all three filenames. If any is missing, re-download before continuing.
 
 ## Step 2 — Install Xcode Command Line Tools
 
@@ -160,7 +163,7 @@ This one command restores secrets, DuckDB, images, creates the Python virtualenv
 
 ```bash
 bash scripts/setup_new_laptop.sh \
-  --secrets ~/Downloads/cricket-analytics-secrets.env \
+  --secrets ~/Downloads/cricket-analytics-backup/cricket-analytics-secrets.env \
   --backup-dir ~/Downloads/cricket-analytics-backup
 ```
 
