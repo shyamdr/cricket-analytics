@@ -57,14 +57,21 @@ step "1/6 Verifying prerequisites"
 command -v git >/dev/null || fail "git not installed"
 ok "git: $(git --version)"
 
-command -v python3 >/dev/null || fail "python3 not installed (need 3.11+)"
-PY_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+# Prefer python3.13 if installed, fall back to python3
+if command -v python3.13 >/dev/null; then
+  PYTHON_BIN=python3.13
+elif command -v python3 >/dev/null; then
+  PYTHON_BIN=python3
+else
+  fail "python3 not installed (need 3.11+). Run: brew install python@3.13"
+fi
+PY_VERSION=$($PYTHON_BIN -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 PY_MAJOR=$(echo "$PY_VERSION" | cut -d. -f1)
 PY_MINOR=$(echo "$PY_VERSION" | cut -d. -f2)
 if [[ $PY_MAJOR -lt 3 || ($PY_MAJOR -eq 3 && $PY_MINOR -lt 11) ]]; then
-  fail "Python $PY_VERSION found — need 3.11+"
+  fail "Python $PY_VERSION found ($PYTHON_BIN) — need 3.11+. Run: brew install python@3.13"
 fi
-ok "python: $(python3 --version)"
+ok "python: $($PYTHON_BIN --version) via $PYTHON_BIN"
 
 command -v node >/dev/null || fail "node not installed (need 20+)"
 ok "node: $(node --version)"
@@ -132,8 +139,8 @@ fi
 step "4/6 Installing Python dependencies"
 
 if [[ ! -d .venv ]]; then
-  python3 -m venv .venv
-  ok "created .venv"
+  $PYTHON_BIN -m venv .venv
+  ok "created .venv using $PYTHON_BIN"
 fi
 
 # shellcheck disable=SC1091
