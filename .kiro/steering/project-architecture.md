@@ -62,7 +62,7 @@ Raw (Cricsheet JSON/CSV)
 - `stg_weather_hourly`, `stg_weather_daily` — Open-Meteo weather
 - `stg_venue_coordinates` — geocoded venue lat/lng
 
-### Gold Layer Models (9)
+### Gold Layer Models (9 today; analytical shapes planned per ADR-006)
 - `dim_players` — player profiles, linked to people.csv identifiers
 - `dim_teams` — team info with historical name changes (from `team_name_mappings` seed CSV)
 - `dim_venues` — venues and cities (with geocoded coordinates)
@@ -72,6 +72,17 @@ Raw (Cricsheet JSON/CSV)
 - `fact_bowling_innings` — per-bowler-per-match aggregates (overs, runs, wickets, econ, etc.)
 - `fact_match_summary` — team-level match aggregates
 - `fact_weather` — weather facts per match (hourly + daily aggregates, with `weather_description` macro for code→text mapping)
+
+### Gold Layer — Analytical Shapes (planned, ADR-006 + ADR-007)
+On top of the 9 existing gold models, four analytical shapes are being added inside `main_gold` (no new schema). Existing `dim_*` and per-match `fact_*` tables stay as serving tables; shapes below live alongside with distinct prefixes.
+
+- **OBT / Event Spine** — `fact_deliveries_enriched`: one row per legal ball with all context pre-joined (match, in-match score state, player attrs, environment, derived tags). Primary target for ad-hoc slicing and the NL agent.
+- **Entity Snapshots** — `snapshot_player_career`, `snapshot_team_state`, `snapshot_venue_state`, `snapshot_match_state`: one row per (entity, match) carrying point-in-time state. Single source of truth for as-of state; ML features pull from here.
+- **Relationship Cubes** — `cube_matchup_batter_bowler`, `cube_team_head_to_head`, `cube_player_at_venue`, `cube_player_vs_bowler_type`, plus `cube_ref_*` classification tables. Materialized, with Empirical Bayes shrinkage + confidence scores for small-sample robustness.
+- **Model Outputs** — `model_win_probability_timeline`, `model_ball_outcome_predictions`, `model_player_ratings_timeline`, `model_matchup_projections`. ML predictions stored as queryable tables, versioned via `model_version` + `trained_at`.
+- **Embeddings** — deferred until NL agent work starts.
+
+Point-in-time correctness (ADR-007) is mandatory: as-of columns use the naming convention `*_before` / `rolling_N_*` / `*_at_ball` / `as_of_*` and are computed via shared dbt macros (`point_in_time_window`, `rolling_window`, `in_match_window`).
 
 ## Project Structure (Monorepo)
 Single GitHub repo, multiple independently deployable apps. Monorepo chosen because:

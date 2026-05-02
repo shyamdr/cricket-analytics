@@ -233,3 +233,288 @@ def get_match_bowling(match_id: str, db: DbQuery):
         """,
         [match_id],
     )
+
+
+@router.get("/{match_id}/playing-xi")
+def get_playing_xi(match_id: str, db: DbQuery):
+    """Get full playing XI for both teams with batting + bowling stats and ESPN player IDs.
+
+    Returns players grouped by team, ordered by batting position, with
+    both batting and bowling stats for each player in this match.
+    """
+    from src.tables import DELIVERIES_ENRICHED
+
+    # Get team names
+    match = db(f"SELECT team1, team2 FROM {MATCHES} WHERE match_id = $1", [match_id])
+    if not match:
+        raise HTTPException(status_code=404, detail=f"Match '{match_id}' not found")
+    team1, team2 = match[0]["team1"], match[0]["team2"]
+
+    # Get all players who participated, with batting + bowling stats
+    rows = db(
+        f"""
+        WITH batters AS (
+            SELECT
+                batter as player_name,
+                batting_team as team,
+                batter_espn_id as espn_player_id,
+                batter_batting_position as batting_position,
+                batter_playing_roles as playing_role,
+                batter_is_captain_this_match as is_captain,
+                batter_is_keeper_this_match as is_keeper,
+                sum(batter_runs) as runs_scored,
+                sum(case when is_legal_delivery then 1 else 0 end) as balls_faced,
+                sum(case when is_four then 1 else 0 end) as fours,
+                sum(case when is_six then 1 else 0 end) as sixes,
+                case when sum(case when is_legal_delivery then 1 else 0 end) > 0
+                    then round(sum(batter_runs) * 100.0 / sum(case when is_legal_delivery then 1 else 0 end), 2)
+                    else 0 end as strike_rate,
+                max(case when is_wicket and wicket_player_out = batter then wicket_kind end) as dismissal_kind,
+                max(case when is_wicket and wicket_player_out = batter then bowler end) as dismissed_by,
+                max(case when is_wicket and wicket_player_out = batter then true else false end) as is_out
+            FROM {DELIVERIES_ENRICHED}
+            WHERE match_id = $1
+            GROUP BY batter, batting_team, batter_espn_id, batter_batting_position, batter_playing_roles, batter_is_captain_this_match, batter_is_keeper_this_match
+        ),
+        bowlers AS (
+            SELECT
+                bowler as player_name,
+                bowling_team as team,
+                bowler_espn_id as espn_player_id,
+                sum(case when is_legal_delivery then 1 else 0 end) as legal_balls,
+                floor(sum(case when is_legal_delivery then 1 else 0 end) / 6)
+                    + (sum(case when is_legal_delivery then 1 else 0 end) % 6) * 0.1 as overs_bowled,
+                sum(batter_runs + extras_wides + extras_noballs) as runs_conceded,
+                sum(case when is_wicket and wicket_kind not in ('run out', 'retired hurt', 'retired out', 'obstructing the field') then 1 else 0 end) as wickets,
+                case when sum(case when is_legal_delivery then 1 else 0 end) > 0
+                    then round(sum(batter_runs + extras_wides + extras_noballs) * 6.0 / sum(case when is_legal_delivery then 1 else 0 end), 2)
+                    else 0 end as economy_rate,
+                sum(case when is_dot_ball then 1 else 0 end) as dot_balls
+            FROM {DELIVERIES_ENRICHED}
+            WHERE match_id = $1
+            GROUP BY bowler, bowling_team, bowler_espn_id
+        )
+        SELECT
+            coalesce(b.player_name, bw.player_name) as player_name,
+            coalesce(b.team, bw.team) as team,
+            coalesce(b.espn_player_id, bw.espn_player_id) as espn_player_id,
+            b.batting_position,
+            b.playing_role,
+            b.is_captain,
+            b.is_keeper,
+            b.runs_scored,
+            b.balls_faced,
+            b.fours,
+            b.sixes,
+            b.strike_rate,
+            b.dismissal_kind,
+            b.dismissed_by,
+            b.is_out,
+            bw.overs_bowled,
+            bw.runs_conceded,
+            bw.wickets,
+            bw.economy_rate,
+            bw.dot_balls
+        FROM batters b
+        FULL OUTER JOIN bowlers bw
+            ON b.player_name = bw.player_name AND b.team = bw.team
+        ORDER BY
+            coalesce(b.team, bw.team),
+            coalesce(b.batting_position, 99),
+            coalesce(b.player_name, bw.player_name)
+        """,
+        [match_id],
+    )
+
+    # Split by team
+    t1_players = [r for r in rows if r["team"] == team1]
+    t2_players = [r for r in rows if r["team"] == team2]
+
+    return {
+        "match_id": match_id,
+        "team1": {"team_name": team1, "players": t1_players},
+        "team2": {"team_name": team2, "players": t2_players},
+    }
+
+
+@router.get("/{match_id}/highlights")
+def get_match_highlights(match_id: str, db: DbQuery):
+    """Get match highlights — MVP, POM, key events (dropped catches, big wickets, milestones).
+
+    Returns structured data for building a match narrative summary.
+    """
+    from src.tables import DELIVERIES_ENRICHED
+
+    match = db(
+        f"SELECT team1, team2, player_of_match, outcome_winner, winning_margin FROM {MATCHES} WHERE match_id = $1",
+        [match_id],
+    )
+    if not match:
+        raise HTTPException(status_code=404, detail=f"Match '{match_id}' not found")
+    m = match[0]
+
+    # MVP data
+    mvp = db(
+        f"""
+        SELECT DISTINCT
+            match_mvp_player_name, match_mvp_total_impact,
+            match_mvp_batting_impact, match_mvp_bowling_impact,
+            match_mvp_smart_runs, match_mvp_smart_wickets
+        FROM {DELIVERIES_ENRICHED}
+        WHERE match_id = $1 AND match_mvp_player_name IS NOT NULL
+        LIMIT 1
+        """,
+        [match_id],
+    )
+
+    # Key wickets (top 5 by impact — early wickets or big-name dismissals)
+    key_wickets = db(
+        f"""
+        SELECT innings, over_num, ball_num, batter, bowler,
+               wicket_kind, wicket_player_out, wicket_fielder1,
+               commentary_text, espn_dismissal_text_commentary,
+               batter_score_at_ball, team_score_at_ball, team_wickets_at_ball
+        FROM {DELIVERIES_ENRICHED}
+        WHERE match_id = $1 AND is_wicket = true
+        ORDER BY innings, over_num, ball_num
+        """,
+        [match_id],
+    )
+
+    # Dropped catches
+    dropped = db(
+        f"""
+        SELECT innings, over_num, ball_num, batter, bowler,
+               dropped_catch_fielders, commentary_text,
+               batter_score_at_ball, team_score_at_ball
+        FROM {DELIVERIES_ENRICHED}
+        WHERE match_id = $1 AND had_dropped_catch = true
+        ORDER BY innings, over_num, ball_num
+        """,
+        [match_id],
+    )
+
+    # Top scorer per team
+    top_scorers = db(
+        f"""
+        SELECT batting_team as team, batter, batter_espn_id as espn_player_id,
+               sum(batter_runs) as runs, sum(case when is_legal_delivery then 1 else 0 end) as balls,
+               sum(case when is_four then 1 else 0 end) as fours,
+               sum(case when is_six then 1 else 0 end) as sixes
+        FROM {DELIVERIES_ENRICHED}
+        WHERE match_id = $1
+        GROUP BY batting_team, batter, batter_espn_id
+        QUALIFY row_number() over (partition by batting_team order by sum(batter_runs) desc) = 1
+        """,
+        [match_id],
+    )
+
+    # Top wicket taker per team
+    top_bowlers = db(
+        f"""
+        SELECT bowling_team as team, bowler, bowler_espn_id as espn_player_id,
+               sum(case when is_wicket and wicket_kind not in ('run out','retired hurt','retired out','obstructing the field') then 1 else 0 end) as wickets,
+               sum(batter_runs + extras_wides + extras_noballs) as runs_conceded,
+               floor(sum(case when is_legal_delivery then 1 else 0 end) / 6)
+                   + (sum(case when is_legal_delivery then 1 else 0 end) % 6) * 0.1 as overs
+        FROM {DELIVERIES_ENRICHED}
+        WHERE match_id = $1
+        GROUP BY bowling_team, bowler, bowler_espn_id
+        QUALIFY row_number() over (partition by bowling_team order by sum(case when is_wicket and wicket_kind not in ('run out','retired hurt','retired out','obstructing the field') then 1 else 0 end) desc) = 1
+        """,
+        [match_id],
+    )
+
+    # Generate a smart match summary (300-500 chars, proper narrative)
+    winner = m["outcome_winner"]
+    margin = m["winning_margin"]
+    pom = m["player_of_match"]
+    loser = m["team2"] if winner == m["team1"] else m["team1"]
+    ts = {s["team"]: s for s in top_scorers}
+    tb = {s["team"]: s for s in top_bowlers}
+    drop_count = len(dropped)
+
+    summary_text = ""
+    if winner and margin:
+        winner_scorer = ts.get(winner)
+        loser_scorer = ts.get(loser)
+        winner_bowler = tb.get(winner)
+        loser_bowler = tb.get(loser)
+
+        parts = []
+
+        # Opening — result + star performer
+        if winner_scorer and winner_scorer["runs"] >= 50:
+            sr = round(winner_scorer["runs"] * 100 / max(winner_scorer["balls"], 1))
+            parts.append(
+                f"{winner_scorer['batter']}'s brilliant {winner_scorer['runs']} off "
+                f"{winner_scorer['balls']} balls (SR {sr}) was the highlight of the match "
+                f"as {winner} beat {loser} by {margin}."
+            )
+        elif winner_bowler and winner_bowler["wickets"] >= 3:
+            parts.append(
+                f"{winner_bowler['bowler']} produced a devastating spell of "
+                f"{winner_bowler['wickets']}/{winner_bowler['runs_conceded']} to lead "
+                f"{winner} to a {margin} victory over {loser}."
+            )
+        elif pom:
+            parts.append(
+                f"{pom} was the star of the show as {winner} registered a comprehensive "
+                f"{margin} win over {loser}."
+            )
+        else:
+            parts.append(f"{winner} produced a clinical team effort to beat {loser} by {margin}.")
+
+        # Middle — losing team's effort
+        if loser_scorer and loser_scorer["runs"] >= 30:
+            parts.append(
+                f"{loser_scorer['batter']}'s fighting {loser_scorer['runs']} off "
+                f"{loser_scorer['balls']} balls was the lone bright spot for {loser} "
+                f"but it wasn't enough to change the outcome."
+            )
+
+        # Bowling from the other side
+        if loser_bowler and loser_bowler["wickets"] >= 2 and len(" ".join(parts)) < 350:
+            parts.append(
+                f"{loser_bowler['bowler']} picked up {loser_bowler['wickets']} wickets "
+                f"for {loser} but couldn't prevent the defeat."
+            )
+
+        # Dropped catches
+        if drop_count > 0 and len(" ".join(parts)) < 400:
+            parts.append(
+                f"The fielding was sloppy with {drop_count} dropped "
+                f"catch{'es' if drop_count > 1 else ''} that could have altered "
+                f"the course of the game."
+            )
+
+        # POM mention if not already the star
+        if pom and pom != (winner_scorer or {}).get("batter") and len(" ".join(parts)) < 420:
+            parts.append(f"{pom} was named Player of the Match.")
+
+        summary_text = " ".join(parts)
+    else:
+        summary_text = (
+            "The match ended without a result after play was called off. "
+            "Neither team could be separated as external factors brought "
+            "an early end to the contest."
+        )
+
+    # Enforce 300-500 char range
+    if len(summary_text) > 500:
+        trimmed = summary_text[:500]
+        last_period = trimmed.rfind(".")
+        summary_text = trimmed[: last_period + 1] if last_period > 250 else trimmed[:497] + "..."
+
+    return {
+        "match_id": match_id,
+        "summary_text": summary_text,
+        "player_of_match": m["player_of_match"],
+        "outcome_winner": m["outcome_winner"],
+        "winning_margin": m["winning_margin"],
+        "mvp": mvp[0] if mvp else None,
+        "key_wickets": key_wickets,
+        "dropped_catches": dropped,
+        "top_scorers": top_scorers,
+        "top_bowlers": top_bowlers,
+    }

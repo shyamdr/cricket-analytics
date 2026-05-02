@@ -267,3 +267,240 @@ models:
         description: "Geocoding result status (always 'ok' in this table — failed geocodes filtered out)"
       - name: _loaded_at
         description: "Timestamp when this row was loaded into the silver layer"
+
+  # ==========================================================================
+  # New silver models (Phase B — OBT expansion)
+  # ==========================================================================
+
+  - name: stg_espn_ball_commentary
+    description: "Staged ESPN per-ball commentary. One row per ball with text, dismissal descriptions, fielding events (dropped catches, run-out chances, stumping chances, DRS reviews), smart stats, and over summaries."
+    columns:
+      - name: espn_ball_id
+        description: "ESPN ball ID — join key to stg_espn_ball_data"
+        tests:
+          - not_null
+      - name: match_id
+        description: "Cricsheet match ID"
+      - name: ball_title
+        description: "Ball title (e.g. 'Bumrah to Kohli')"
+      - name: commentary_text
+        description: "Main commentary sentence for this ball"
+      - name: pre_text
+        description: "Reader/editorial text before the ball"
+      - name: post_text
+        description: "Reader/editorial text after the ball"
+      - name: batsman_stat_text
+        description: "Per-ball batter stat summary text"
+      - name: bowler_stat_text
+        description: "Per-ball bowler stat summary text"
+      - name: smart_stat_raw_json
+        description: "Full smart_stats JSON blob — ESPN's contextual historical stats for this ball (0.78% coverage)"
+      - name: espn_dismissal_text_short
+        description: "Short dismissal text (e.g. 'caught')"
+      - name: espn_dismissal_text_long
+        description: "Long dismissal text (e.g. 'c Kohli b Bumrah')"
+      - name: espn_dismissal_text_commentary
+        description: "Full dismissal commentary sentence"
+      - name: espn_dismissal_fielder_text
+        description: "Fielder portion of dismissal (e.g. 'c Kohli')"
+      - name: espn_dismissal_bowler_text
+        description: "Bowler portion of dismissal (e.g. 'b Bumrah')"
+      - name: had_dropped_catch
+        description: "True if a catch was dropped on this ball"
+      - name: dropped_catch_fielders
+        description: "Comma-separated fielder names who dropped the catch"
+      - name: had_drs_review
+        description: "True if a DRS review occurred on this ball"
+      - name: drs_review_successful
+        description: "True if the DRS review was successful (overturned)"
+      - name: had_run_out_chance
+        description: "True if there was a run-out chance on this ball"
+      - name: run_out_chance_fielders
+        description: "Comma-separated fielder names involved in the run-out chance"
+      - name: had_stumping_chance
+        description: "True if there was a stumping chance on this ball"
+      - name: stumping_chance_fielder
+        description: "Fielder (keeper) involved in the stumping chance"
+      - name: had_player_replacement
+        description: "True if an impact player replacement happened on this ball"
+      - name: is_maiden_over
+        description: "True if this over was a maiden (last ball of over only)"
+      - name: over_runs_total
+        description: "Total runs in this over (last ball of over only)"
+      - name: over_wickets_total
+        description: "Total wickets in this over (last ball of over only)"
+      - name: is_complete_over
+        description: "True if this over was completed (last ball of over only)"
+
+  - name: stg_espn_batting_innings
+    description: "Staged ESPN batting innings details. One row per (match, innings, player). Extracted from batsmen_details_json. Provides batting position (1-11) and dismissal text."
+    columns:
+      - name: espn_match_id
+        description: "ESPN match ID"
+        tests:
+          - not_null
+      - name: inning_number
+        description: "Innings number"
+        tests:
+          - not_null
+      - name: espn_player_id
+        description: "ESPN player ID"
+        tests:
+          - not_null
+      - name: player_name
+        description: "Player name as listed by ESPN"
+      - name: batted_type
+        description: "'yes' if batted, 'no' or null if did not bat"
+      - name: minutes
+        description: "Minutes at crease (null for older matches)"
+      - name: batting_position
+        description: "Batting order position (1 = opener, 11 = last)"
+      - name: dismissal_text_short
+        description: "Short dismissal text (e.g. 'caught', 'not out')"
+
+  - name: stg_espn_team_players
+    description: "Staged ESPN team player roster per match. One row per (match, team, player). Provides per-player per-match role (captain, keeper, player)."
+    columns:
+      - name: espn_match_id
+        description: "ESPN match ID"
+        tests:
+          - not_null
+      - name: match_id
+        description: "Cricsheet match ID"
+      - name: espn_team_id
+        description: "ESPN team ID"
+      - name: espn_player_id
+        description: "ESPN player ID"
+        tests:
+          - not_null
+      - name: player_name
+        description: "Player short name"
+      - name: role_code
+        description: "Role code: C (captain), WK (keeper), P (player)"
+      - name: role
+        description: "Role text: captain, wicketkeeper, player"
+      - name: is_captain
+        description: "True if this player is captain for this match"
+      - name: is_keeper
+        description: "True if this player is wicketkeeper for this match"
+
+  - name: stg_espn_debut_players
+    description: "Staged ESPN debut players per match. One row per (match, player) for players making their debut."
+    columns:
+      - name: espn_match_id
+        description: "ESPN match ID"
+        tests:
+          - not_null
+      - name: match_id
+        description: "Cricsheet match ID"
+      - name: espn_player_id
+        description: "ESPN player ID of the debutant"
+        tests:
+          - not_null
+      - name: player_name
+        description: "Player short name"
+      - name: team_name
+        description: "Team the player debuted for"
+
+  - name: stg_espn_drs_reviews
+    description: "Staged ESPN DRS reviews per innings. One row per review event. Extracted from drs_reviews_json."
+    columns:
+      - name: espn_match_id
+        description: "ESPN match ID"
+        tests:
+          - not_null
+      - name: inning_number
+        description: "Innings number"
+        tests:
+          - not_null
+      - name: review_number
+        description: "Sequential review number within the innings"
+      - name: review_side
+        description: "Which side called the review: 'batting' or 'bowling'"
+      - name: is_umpire_call
+        description: "True if the DRS result was 'umpire's call'"
+      - name: remaining_count
+        description: "Number of DRS reviews remaining for the reviewing team after this review"
+      - name: original_decision
+        description: "Umpire's original decision: 'out' or 'notout'"
+      - name: drs_decision
+        description: "DRS final decision: 'out' or 'notout'"
+      - name: overs_actual
+        description: "Over at which the review occurred (decimal, e.g. 13.1)"
+
+  - name: stg_espn_replacements
+    description: "Staged ESPN replacement (impact) players per match. One row per replacement event. Extracted from replacement_players_json."
+    columns:
+      - name: espn_match_id
+        description: "ESPN match ID"
+        tests:
+          - not_null
+      - name: match_id
+        description: "Cricsheet match ID"
+      - name: player_in_espn_id
+        description: "ESPN player ID of the player coming in"
+      - name: player_in_name
+        description: "Name of the player coming in"
+      - name: player_out_espn_id
+        description: "ESPN player ID of the player going out"
+      - name: player_out_name
+        description: "Name of the player going out"
+      - name: team_name
+        description: "Team making the replacement"
+      - name: inning_number
+        description: "Innings in which the replacement occurred"
+      - name: over_decimal
+        description: "Over at which the replacement occurred (decimal, e.g. 18.6)"
+      - name: replacement_type_code
+        description: "ESPN replacement type code (8 = impact player)"
+
+  - name: stg_espn_partnerships
+    description: "Staged ESPN partnerships per innings. One row per partnership. NOT joined to OBT (wrong grain). Extracted from partnerships_json."
+    columns:
+      - name: espn_match_id
+        description: "ESPN match ID"
+        tests:
+          - not_null
+      - name: inning_number
+        description: "Innings number"
+        tests:
+          - not_null
+      - name: partnership_number
+        description: "Sequential partnership number within the innings (1 = opening)"
+      - name: player1_espn_id
+        description: "ESPN player ID of first partner"
+      - name: player1_name
+        description: "Name of first partner"
+      - name: player1_runs
+        description: "Runs scored by first partner in this partnership"
+      - name: player1_balls
+        description: "Balls faced by first partner"
+      - name: player2_espn_id
+        description: "ESPN player ID of second partner"
+      - name: player2_name
+        description: "Name of second partner"
+      - name: player2_runs
+        description: "Runs scored by second partner"
+      - name: player2_balls
+        description: "Balls faced by second partner"
+      - name: total_runs
+        description: "Total partnership runs"
+      - name: total_balls
+        description: "Total partnership balls"
+      - name: out_player_espn_id
+        description: "ESPN player ID of the player dismissed to end this partnership (null if not out)"
+
+  - name: stg_espn_series
+    description: "Staged ESPN series reference data. One row per series."
+    columns:
+      - name: series_id
+        description: "ESPN series ID"
+        tests:
+          - unique
+          - not_null
+      - name: series_name
+        description: "Series name (e.g. 'Indian Premier League')"
+      - name: season
+        description: "Season string from ESPN"
+      - name: series_slug
+        description: "URL slug for the series"

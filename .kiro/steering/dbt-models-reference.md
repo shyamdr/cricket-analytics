@@ -145,9 +145,68 @@ from src.tables import BRONZE_MATCHES, BRONZE_ESPN_MATCHES, BRONZE_WEATHER, ...
 
 Rename a schema or table → update `src/tables.py` once, everyone gets it.
 
+## Planned — Analytical shapes on top of gold (ADR-006 + ADR-007)
+
+Phase 2+ adds four analytical shapes **inside `main_gold`** (no new schema). Existing `dim_*` and per-match `fact_*` tables stay as-is; the new shapes live alongside them with distinct prefixes. Folder layout under `src/dbt/models/gold/` will be `dim/`, `fact/`, `snapshot/`, `cube/`, `model/`.
+
+**Source-of-truth rule:** silver is the canonical source for everything. OBT, snapshots, cubes, and the existing `dim_*`/`fact_*` tables are all siblings fed from silver — they do not read from each other. Model outputs are the only exception (they read from OBT and snapshots because ML features need pre-assembled point-in-time state).
+
+### Shape 1 — OBT / Event Spine
+
+- **`fact_deliveries_enriched`** — one row per legal ball, incremental by `match_id`. Extends today's `fact_deliveries` with every piece of context that existed at the moment of the ball: in-match score state (`*_at_ball`), player attributes, environmental columns, derived tags (`is_attack`, `is_pressure_ball`), and rolling/career columns joined in from `snapshot_player_career`. Primary target for ad-hoc OLAP and the NL agent.
+
+### Shape 2 — Entity Snapshots (point-in-time state)
+
+- **`snapshot_player_career`** — one row per (player, match). `as_of_match_id`, `as_of_date`, `career_*_before`, `rolling_N_*`, rating/Elo. Single source of truth for as-of player state.
+- **`snapshot_team_state`** — one row per (team, match). Team cumulative stats + team Elo + recent form.
+- **`snapshot_venue_state`** — rolling venue characteristics (first-innings avg, chase success, boundary density) over time.
+- **`snapshot_match_state`** — per-ball in-match state (WP timeline, pressure timeline). Driven by model outputs in Phase 3.
+
+All snapshot rows carry `as_of_match_id` and `as_of_date`, with unique constraint on (entity, `as_of_match_id`).
+
+### Shape 3 — Relationship Cubes (materialized, with shrinkage)
+
+- **`cube_matchup_batter_bowler`** — (batter, bowler) and (batter, bowler, phase). Raw + shrunken stats + confidence + sample size. Empirical Bayes shrinkage.
+- **`cube_team_head_to_head`** — (team_a, team_b, venue_optional). Rolling W/L and margins.
+- **`cube_player_at_venue`** — (player, venue).
+- **`cube_player_vs_bowler_type`** — (player, bowler_type) and (bowler, batter_type).
+- **`cube_ref_bowler_classification`** — (bowler) → pace/spin/medium.
+- **`cube_ref_batter_style`** — (batter) → anchor/accelerator/finisher/power-hitter.
+
+Cubes are **materialized**, not views — shrinkage is a statistical product that benefits from being pre-computed, and materialized tables give the NL agent clean column names (`shrunken_avg_runs`, `confidence_score`) instead of asking an LLM to write shrinkage SQL.
+
+### Shape 4 — Model Outputs (ML predictions as tables)
+
+- **`model_win_probability_timeline`** — per (match_id, innings, over_num, ball_num). WP + CI + `model_version` + `trained_at`.
+- **`model_ball_outcome_predictions`** — per ball expected runs + dismissal probability.
+- **`model_player_ratings_timeline`** — per (player, match). Rating/Elo.
+- **`model_matchup_projections`** — per (batter, bowler, phase, context). For unseen or low-sample combinations.
+
+Every model-output row carries `model_version` and `trained_at`. API reads latest; reproducibility analyses pin to a version.
+
+### Shape 5 — Embeddings (deferred)
+
+Player-profile vectors and text embeddings. Deferred until NL agent work begins. Storage TBD — DuckDB `FLOAT[]` or sibling LanceDB/sqlite-vss.
+
+### Point-in-time correctness (ADR-007)
+
+Every as-of column follows a strict naming convention and is computed via shared dbt macros:
+- `*_before` — cumulative using only rows strictly before the reference row
+- `rolling_N_*` — N rows preceding, **excluding** the current row
+- `*_at_ball` — in-match running state (current ball included; same-match only, no cross-match leakage)
+- `as_of_*` — explicit as-of reference (snapshot primary keys)
+
+Macros (to be added under `src/dbt/macros/`):
+- `{{ point_in_time_window(expr, partition_by, order_by) }}` → `rows between unbounded preceding and 1 preceding`
+- `{{ rolling_window(expr, partition_by, order_by, rows=N) }}` → `rows between N preceding and 1 preceding`
+- `{{ in_match_window(expr, partition_by, order_by) }}` → `rows between unbounded preceding and current row`
+
+Raw `OVER (... ORDER BY ...)` without a frame clause is disallowed for as-of columns. Singular SQL tests guard against leakage on real data.
+
 ## What's NOT here
 
 - No `staging`/`marts` dbt convention — we use `silver`/`gold` from the medallion pattern instead
-- No snapshot tables — SCD tracking done via derived `first_match_date`/`last_match_date` in `dim_teams`
+- No snapshot tables **yet** — planned per ADR-006; SCD tracking in `dim_teams` continues via derived `first_match_date`/`last_match_date`
 - No surrogate keys (intentional — see progress.md architecture review decision). Natural keys (`match_id`, `player_id`, `player_name`, `team_name`) are stable and human-readable
 - No sources for future ML feature tables — Phase 3 not started
+- No `main_platinum` schema — analytical shapes live in `main_gold` with prefixed table names (ADR-006 decision)

@@ -41,11 +41,11 @@
 /* Dark theme */
 .dark {
   --background: oklch(0.13 0.005 260);
-  --foreground: oklch(0.93 0 0);
+  --foreground: oklch(0.87 0.01 250);
   --card: oklch(0.18 0.005 260);
-  --card-foreground: oklch(0.93 0 0);
+  --card-foreground: oklch(0.87 0.01 250);
   --popover: oklch(0.18 0.005 260);
-  --popover-foreground: oklch(0.93 0 0);
+  --popover-foreground: oklch(0.87 0.01 250);
   --primary: oklch(0.78 0.14 190);
   --primary-foreground: oklch(0.13 0 0);
   --secondary: oklch(0.24 0.005 260);
@@ -140,6 +140,22 @@
 .animate-section-2 { animation: section-fade-in 0.4s ease-out 0.2s both; }
 .animate-section-3 { animation: section-fade-in 0.4s ease-out 0.3s both; }
 .animate-section-4 { animation: section-fade-in 0.4s ease-out 0.4s both; }
+
+/* Generic fade-in for dynamic content */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
 
 @layer base {
   * {

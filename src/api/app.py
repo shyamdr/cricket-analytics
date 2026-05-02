@@ -8,7 +8,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.database import close_conn, get_conn
-from src.api.routers import batting, bowling, images, matches, news, players, standings, teams
+from src.api.routers import (
+    analytics,
+    batting,
+    bowling,
+    images,
+    matches,
+    news,
+    players,
+    standings,
+    teams,
+)
 
 
 @asynccontextmanager
@@ -42,6 +52,7 @@ app.include_router(bowling.router)
 app.include_router(images.router)
 app.include_router(news.router)
 app.include_router(standings.router)
+app.include_router(analytics.router)
 
 
 @app.get("/", tags=["health"])

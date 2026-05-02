@@ -42,6 +42,8 @@ select
     -- Predictions
     predicted_score,
     win_probability,
+    -- Ball timestamp (ISO-8601 datetime — ~37% coverage, NULL for older matches)
+    try_cast(timestamp as timestamptz) as ball_timestamp,
     -- Audit
     current_timestamp as _loaded_at
 
@@ -81,6 +83,7 @@ select
     null::integer as shot_control,
     null::double as predicted_score,
     null::double as win_probability,
+    null::timestamptz as ball_timestamp,
     current_timestamp as _loaded_at
 where false
 {% endif %}

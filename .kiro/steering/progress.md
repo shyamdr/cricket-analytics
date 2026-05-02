@@ -78,7 +78,7 @@ Everything below is actually built, tested, and running. Use this as ground trut
 - `/api/v1/images/{type}/{id}` serves them
 
 ### Docs (docs/)
-- ADRs: 001-duckdb-as-storage, 002-image-serving-strategy, 003-monorepo-with-nested-frontend-git, 004-natural-keys-over-surrogate-keys, 005-format-agnostic-schema-design
+- ADRs: 001-duckdb-as-storage, 002-image-serving-strategy, 003-monorepo-with-nested-frontend-git, 004-natural-keys-over-surrogate-keys, 005-format-agnostic-schema-design, 006-analytical-data-shapes-post-gold, 007-point-in-time-correctness
 - `architecture.md` — Mermaid diagrams (system, medallion, Dagster, request path, deployment topology)
 - Other: data-enrichment-strategy, espn-ball-data-scraping, espn-json-field-reference, image-strategy, open-meteo-weather-api-reference, auction-data-research, auction-seed-process, ui-design-notes
 - Root: `CONTRIBUTING.md` (setup, workflow, code style, where-to-add-things, git conventions, CI)
@@ -112,6 +112,8 @@ Everything below is actually built, tested, and running. Use this as ground trut
 - [x] ADR-003: Monorepo with frontend under apps/web (revised 2026-04-22 — nested git removed)
 - [x] ADR-004: Natural keys over surrogate keys
 - [x] ADR-005: Format-agnostic schema design
+- [x] ADR-006: Analytical data shapes post-gold — four shapes (OBT, Entity Snapshots, Relationship Cubes, Model Outputs) on top of gold. DuckDB stays. No `main_platinum` schema; everything lives in `main_gold` with prefixed table names (`fact_*`, `snapshot_*`, `cube_*`, `model_*`). Existing `dim_*` and per-match `fact_*` tables are retained as serving tables. Embeddings deferred until NL agent work starts.
+- [x] ADR-007: Point-in-time correctness — mandatory naming convention (`*_before`, `rolling_N_*`, `*_at_ball`, `as_of_*`), dbt macros to wrap window functions with safe frames, snapshots are the single source of truth for as-of state, singular SQL tests guard against leakage.
 - [x] Laptop migration tooling (2026-04-22) — `scripts/setup_new_laptop.sh` restores secrets, DuckDB, images, Python + Node deps, and runs smoke tests. `docs/MIGRATION.md` explains the full process. Vestigial nested `apps/web/.git` removed (Vercel was deploying from root repo the whole time — ADR-003 revised).
 - [x] CONTRIBUTING.md (setup, code style, where to add things, git/CI conventions)
 - [x] Architecture diagrams (docs/architecture.md — Mermaid for system, medallion, Dagster, request path, deployment)
@@ -386,6 +388,63 @@ Gaps between "it works" and "a team can operate and evolve it."
 - [ ] No runbook — "how do I add a new league?" "how do I backfill enrichment for season X?" "what do I do when ESPN scraping breaks?" 5-6 common workflows documented.
 - [ ] Naming inconsistencies across source systems — `over_num`/`ball_num` (Cricsheet) vs `over_number`/`ball_number` (ESPN), `match_date` (gold) vs `date` (bronze), `innings` vs `inning_number`. Silver layer should normalize ESPN names to match Cricsheet convention.
 
+## Pending — Analytics Platform Build-out (ADR-006 + ADR-007)
+Four analytical shapes on top of gold. See `docs/adr/006-analytical-data-shapes-post-gold.md` for rationale and `docs/adr/007-point-in-time-correctness.md` for the no-leakage conventions that gate every as-of column.
+
+### Foundations (must land first — enable everything else)
+- [x] dbt macros for point-in-time correctness — `point_in_time_window()` (expands to `rows between unbounded preceding and 1 preceding`), `rolling_window()` (N rows preceding, excluding current), `in_match_window()` (inclusive of current ball, for `*_at_ball` columns). Live in `src/dbt/macros/`.
+- [x] dbt folder reorg under `src/dbt/models/gold/` — subfolders `dim/`, `fact/`, `snapshot/`, `cube/`, `model/`. Existing 9 models moved into `dim/` and `fact/`. Empty subfolders with `.gitkeep` for the new shapes. `dbt parse`, `dbt compile`, `dbt run --select gold`, `dbt test` (59) and pytest (117) all pass after the reorg — zero behavioral change.
+- [ ] Singular dbt tests for leakage — `assert_career_runs_before_is_strictly_prior.sql`, `assert_rolling_sr_excludes_current_innings.sql`, `assert_snapshot_monotonic.sql`. **Must ship alongside `snapshot_player_career`**, because dbt compilation fails if tests `ref()` a model that doesn't exist yet. Deferred to the snapshot-building session.
+- [ ] Schema-level `not_null` on `as_of_match_id` + `as_of_date` + composite unique key on every snapshot — also ships with the first snapshot.
+
+### Shape 1 — OBT (Event Spine)
+- [ ] `fact_deliveries_enriched` — one row per legal ball with all context pre-joined. Incremental by match_id. Starting column set: match context (match_id, season, date, venue, phase, innings, is_super_over), in-match score state (`batter_score_at_ball`, `team_score_at_ball`, `wickets_in_hand`, `balls_faced_by_batter`, `required_run_rate`, `par_score_delta`), player attributes (`batter_handedness`, `bowler_type`, roles), environmental (`is_floodlit`, weather columns), derived tags (`is_attack`, `is_pressure_ball`, `is_boundary_streak`). Rolling / career columns come from snapshot joins (see Shape 2).
+- [ ] Migrate API `fact_deliveries` consumers (if any) to read from enriched table; keep old table briefly during transition then retire.
+
+### Shape 2 — Entity Snapshots
+- [ ] `snapshot_player_career` — one row per (player, match). Cumulative career stats (`career_runs_before`, `career_wickets_before`, `career_matches_before`) + rolling-N stats (`rolling_10_innings_sr`, `rolling_10_innings_avg`, `rolling_5_matches_econ`) + basic Elo/rating. All computed via the point-in-time macros.
+- [ ] OBT re-plumbed so its rolling columns join to this snapshot instead of recomputing inline.
+- [ ] `snapshot_team_state` — one row per (team, match). Cumulative team stats + team Elo + recent form.
+- [ ] `snapshot_venue_state` — rolling venue characteristics (avg first-innings score, chase success rate, boundary density) over time.
+- [ ] `snapshot_match_state` — per-ball WP + pressure timeline. Initially deterministic (pre-ML); ML model populates it in Phase 3.
+
+### Shape 3 — Relationship Cubes (materialized, with shrinkage)
+- [ ] `cube_matchup_batter_bowler` — (batter, bowler) and (batter, bowler, phase). Columns: raw stats + shrunken stats + confidence + sample size. Empirical Bayes shrinkage toward (batter-type × bowler-type) prior.
+- [ ] `cube_ref_bowler_classification` — (bowler) → pace/spin/medium from ESPN `bowling_styles` + derived signals. Prerequisite for shrinkage priors.
+- [ ] `cube_ref_batter_style` — (batter) → anchor/accelerator/finisher/power-hitter classification based on historical SR curves.
+- [ ] `cube_team_head_to_head` — (team_a, team_b, venue_optional). Rolling W/L, margins.
+- [ ] `cube_player_at_venue` — (player, venue).
+- [ ] `cube_player_vs_bowler_type` — (player, bowler_type) and (bowler, batter_type).
+- [ ] No cube beyond this list without a concrete product feature justifying it. Cubes must stay <1M rows each.
+
+### Shape 4 — Model Outputs (ML predictions as tables)
+- [ ] `model_win_probability_timeline` — per (match_id, innings, over_num, ball_num). WP + confidence interval + `model_version` + `trained_at`.
+- [ ] `model_ball_outcome_predictions` — per ball, expected runs + dismissal probability. Source for live "what's likely next" UI.
+- [ ] `model_player_ratings_timeline` — per (player, match). Custom rating + Elo + `model_version`.
+- [ ] `model_matchup_projections` — per (batter, bowler, phase, context). Used for unseen or low-sample combinations the cube can't cover.
+- [ ] Every model-output table carries `model_version` and `trained_at`. API reads latest; analytics can pin to a version for reproducibility.
+
+### Shape 5 — Embeddings (deferred)
+- [ ] Player-profile vectors for similarity search. Commentary / match-report embeddings for NL-agent retrieval. Build when NL agent work starts. Storage: DuckDB `FLOAT[]` columns or sibling LanceDB/sqlite-vss.
+
+### NL Agent (Ask Anything)
+- [ ] Schema metadata YAML describing every analytical table + column + example queries, fed to the LLM as context.
+- [ ] Query budget guardrails — 5s timeout, row-scan limit, read-only connection, parameterized whitelist.
+- [ ] Entity resolution layer — fuzzy name match ("Virat" → "V Kohli") before SQL generation.
+- [ ] Result cache (15 min TTL) keyed on normalized question.
+
+### Cheap Insurance
+- [ ] Nightly Parquet mirror of gold + snapshots + cubes + model outputs to `data/parquet/`. Buys engine portability if we ever migrate off DuckDB.
+
+### Build Order (from ADR-006)
+1. Foundations (macros + tests + folder reorg).
+2. OBT with minimal context columns.
+3. `snapshot_player_career` + re-plumb OBT rolling columns.
+4. `cube_matchup_batter_bowler` (+ ref cubes it needs).
+5. Team + venue snapshots as specific features call for them.
+6. `model_win_probability_timeline` (Phase 3).
+7. Additional cubes and model outputs only when a concrete feature justifies each.
+
 ## Pending — Future (Phased Roadmap)
 
 ### Phase 2: Live Match Data
@@ -395,10 +454,10 @@ Gaps between "it works" and "a team can operate and evolve it."
 - [ ] Deploy poller on laptop during matches, VPS later
 
 ### Phase 3: ML Models + Advanced Analytics
-- [ ] Win probability model (XGBoost on historical features)
+- [ ] Win probability model (XGBoost on historical features) — outputs land in `model_win_probability_timeline`
 - [ ] Batting quality index (shot_control rolling window)
 - [ ] Bowling heat maps, wagon wheels from ESPN spatial data
-- [ ] Elo rating system (team + player)
+- [ ] Elo rating system (team + player) — lands in `snapshot_player_career` and `model_player_ratings_timeline`
 
 ### Phase 4: Polish + Growth
 - [ ] More leagues (BBL, PSL, T20 World Cup)
@@ -407,7 +466,6 @@ Gaps between "it works" and "a team can operate and evolve it."
 
 ### Parked
 - [ ] Delete old data/ folder from parent Projects directory .git issue
-- [ ] NL query interface
 
 ## Pending — Senior Code Review (April 2026, Week 2)
 Full line-by-line review of every file in the project. Findings organized by severity.

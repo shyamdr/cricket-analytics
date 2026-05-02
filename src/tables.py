@@ -9,6 +9,9 @@ update it here — one place, not 20 files.
 from src.config import settings
 
 __all__ = [
+    "AGG_BATTER_VS_BOWLER",
+    "AGG_PLAYER_RATINGS",
+    "AGG_TEAM_HEAD_TO_HEAD",
     "BATTING_INNINGS",
     "BOWLING_INNINGS",
     "BRONZE_DELIVERIES",
@@ -21,9 +24,11 @@ __all__ = [
     "BRONZE_VENUE_COORDS",
     "BRONZE_WEATHER",
     "DELIVERIES",
+    "DELIVERIES_ENRICHED",
     "MATCHES",
     "MATCH_SUMMARY",
     "PLAYERS",
+    "SNAPSHOT_PLAYER_CAREER",
     "TEAMS",
     "VENUES",
     "WEATHER",
@@ -39,6 +44,11 @@ BATTING_INNINGS = f"{settings.gold_schema}.fact_batting_innings"
 BOWLING_INNINGS = f"{settings.gold_schema}.fact_bowling_innings"
 MATCH_SUMMARY = f"{settings.gold_schema}.fact_match_summary"
 WEATHER = f"{settings.gold_schema}.fact_weather"
+DELIVERIES_ENRICHED = f"{settings.gold_schema}.fact_deliveries_enriched"
+SNAPSHOT_PLAYER_CAREER = f"{settings.gold_schema}.snapshot_player_career"
+AGG_BATTER_VS_BOWLER = f"{settings.gold_schema}.agg_batter_vs_bowler"
+AGG_TEAM_HEAD_TO_HEAD = f"{settings.gold_schema}.agg_team_head_to_head"
+AGG_PLAYER_RATINGS = f"{settings.gold_schema}.agg_player_ratings"
 
 # Bronze layer (raw)
 BRONZE_MATCHES = f"{settings.bronze_schema}.matches"

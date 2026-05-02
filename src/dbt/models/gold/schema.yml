@@ -397,3 +397,136 @@ models:
           - not_null
       - name: overs_played
         description: "Number of overs completed (max over_num + 1)"
+
+  # ==========================================================================
+  # Shape 2 — Entity Snapshots (ADR-006 / ADR-007)
+  # ==========================================================================
+  - name: snapshot_player_career
+    description: >
+      One row per (player, match). Point-in-time player state: career totals
+      and rolling-form metrics as-of BEFORE this match. Single source of
+      truth for as-of state (ADR-007). All *_before columns use safe
+      point-in-time window macros; all rolling_N_* columns exclude the
+      current row.
+    columns:
+      - name: player_name
+        description: "Player name (natural key, matches stg_deliveries.batter/bowler)"
+        tests:
+          - not_null
+      - name: as_of_match_id
+        description: "Reference match for this snapshot row (Cricsheet match_id)"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_matches')
+              field: match_id
+      - name: as_of_date
+        description: "Date of the reference match"
+        tests:
+          - not_null
+      - name: season
+        description: "Season of the reference match (calendar-year derivation, format-agnostic)"
+      - name: did_bat
+        description: "1 if the player batted in this match, 0 otherwise"
+      - name: did_bowl
+        description: "1 if the player bowled in this match, 0 otherwise"
+      - name: career_runs_before
+        description: "Cumulative runs scored in all matches strictly BEFORE this match"
+      - name: career_balls_faced_before
+        description: "Cumulative legal balls faced before this match"
+      - name: career_innings_batted_before
+        description: "Count of matches batted before this match"
+      - name: career_wickets_before
+        description: "Cumulative wickets taken before this match (excludes run-outs, retired, obstructing)"
+      - name: career_legal_balls_bowled_before
+        description: "Cumulative legal balls bowled before this match"
+      - name: career_runs_conceded_before
+        description: "Cumulative runs conceded before this match (batter_runs + wides + noballs, byes/legbyes excluded)"
+      - name: rolling_10_runs
+        description: "Runs in last 10 innings prior to this match (NULL if fewer than 1 prior match)"
+      - name: rolling_10_wickets
+        description: "Wickets in last 10 innings prior to this match"
+    tests:
+      - unique:
+          column_name: "player_name || '|' || as_of_match_id"
+
+  # ==========================================================================
+  # Shape 1 — OBT (Event Spine) (ADR-006)
+  # ==========================================================================
+  - name: fact_deliveries_enriched
+    description: >
+      OBT / Event Spine. One row per delivery (super overs excluded) with 205
+      columns of pre-joined context: match, venue, ESPN enrichment, umpires,
+      DRS reviews, impact player replacements, ESPN spatial/shot data (wagon
+      wheel, pitch map, shot type, shot control), ball commentary (text,
+      dismissal descriptions, fielding events — dropped catches, run-out
+      chances, stumping chances), player bio (handedness, age, overseas flag,
+      role, batting position), MVP impact scores, weather at match start,
+      in-match running state (*_at_ball), batter/bowler career+rolling columns
+      from snapshot_player_career, chase context (target, required run rate,
+      balls remaining), and phase classification. Incremental by match_id.
+      See docs/obt-field-catalog.md for the full field inventory.
+    columns:
+      - name: match_id
+        description: "Cricsheet match identifier"
+        tests:
+          - not_null
+      - name: innings
+        description: "Innings number (1-based)"
+        tests:
+          - not_null
+      - name: over_num
+        description: "0-indexed over number"
+        tests:
+          - not_null
+      - name: ball_num
+        description: "1-indexed ball number within the over"
+        tests:
+          - not_null
+      - name: batter
+        description: "Batter's name"
+        tests:
+          - not_null
+      - name: bowler
+        description: "Bowler's name"
+        tests:
+          - not_null
+      - name: phase
+        description: "Match phase (powerplay/middle/death) — format-agnostic, NULL for Tests"
+      - name: team_score_at_ball
+        description: "Cumulative team runs at the end of this ball"
+      - name: team_wickets_at_ball
+        description: "Cumulative team wickets at the end of this ball"
+      - name: batter_score_at_ball
+        description: "Batter's runs in this innings up to and including this ball"
+      - name: batter_career_runs_before
+        description: "Batter's career runs BEFORE this match (from snapshot — no leakage)"
+      - name: bowler_career_wickets_before
+        description: "Bowler's career wickets BEFORE this match"
+      - name: wagon_x
+        description: "ESPN wagon wheel X coordinate"
+      - name: wagon_y
+        description: "ESPN wagon wheel Y coordinate"
+      - name: pitch_line
+        description: "ESPN delivery line (ON_THE_STUMPS, OUTSIDE_OFFSTUMP, etc.)"
+      - name: pitch_length
+        description: "ESPN delivery length (GOOD_LENGTH, YORKER, SHORT, etc.)"
+      - name: shot_type
+        description: "ESPN shot type (COVER_DRIVE, CUT_SHOT, DEFENDED, etc.)"
+      - name: shot_control
+        description: "ESPN shot control rating (1=controlled, 2=uncontrolled)"
+      - name: commentary_text
+        description: "ESPN ball-by-ball commentary text"
+      - name: had_dropped_catch
+        description: "True if a catch was dropped on this ball"
+      - name: batter_batting_position
+        description: "Batter's batting order position (1-11) from ESPN"
+      - name: batter_age_at_match
+        description: "Batter's age in years at the time of this match"
+      - name: required_run_rate
+        description: "Required run rate at this ball (2nd innings only)"
+      - name: ball_timestamp
+        description: "ISO-8601 datetime of this delivery (~37% coverage)"
+    tests:
+      - unique:
+          column_name: "match_id || '|' || innings || '|' || over_num || '|' || ball_num"

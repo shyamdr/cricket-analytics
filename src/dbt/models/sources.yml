@@ -64,3 +64,13 @@ sources:
         meta:
           dagster:
             asset_key: ["espn_match_enrichment"]
+      - name: espn_ball_commentary
+        description: "ESPN per-ball commentary text, dismissal descriptions, fielding events (dropped catches, run-out chances, stumping chances, DRS reviews), smart stats, and over summaries."
+        meta:
+          dagster:
+            asset_key: ["espn_ball_enrichment"]
+      - name: espn_series
+        description: "ESPN series reference data (series_id, name, season, slug). One row per series."
+        meta:
+          dagster:
+            asset_key: ["espn_match_enrichment"]

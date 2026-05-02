@@ -16,6 +16,7 @@ select
     batter_runs,
     extras_runs,
     total_runs,
+    non_boundary,
     coalesce(extras_wides, 0) as extras_wides,
     coalesce(extras_noballs, 0) as extras_noballs,
     coalesce(extras_byes, 0) as extras_byes,
@@ -43,6 +44,19 @@ select
             then true
         else false
     end as is_dot_ball,
+    -- DRS review fields (Cricsheet per-ball — NULL if no review on this ball)
+    review_by,
+    review_umpire,
+    review_batter,
+    review_decision,
+    review_type,
+    review_umpires_call,
+    -- Impact player replacement (Cricsheet per-ball — NULL if no replacement)
+    replacements_json,
+    replace(try_cast(replacements_json::json->'$.match[0].in' as varchar), '"', '') as replacement_player_in,
+    replace(try_cast(replacements_json::json->'$.match[0].out' as varchar), '"', '') as replacement_player_out,
+    replace(try_cast(replacements_json::json->'$.match[0].team' as varchar), '"', '') as replacement_team,
+    replace(try_cast(replacements_json::json->'$.match[0].reason' as varchar), '"', '') as replacement_reason,
     -- Validation: extras components should sum to extras_runs
     case
         when extras_runs = coalesce(extras_wides, 0)
