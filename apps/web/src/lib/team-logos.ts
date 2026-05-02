@@ -79,6 +79,8 @@ function getMeta(teamName: string): TeamMeta | null {
 export function getTeamLogoUrl(teamName: string): string | null {
   const meta = getMeta(teamName);
   if (!meta?.espnTeamId) return null;
+  const cdn = process.env.NEXT_PUBLIC_IMAGE_CDN;
+  if (cdn) return `${cdn}/teams/${meta.espnTeamId}.png`;
   return `/api/v1/images/teams/${meta.espnTeamId}.png`;
 }
 

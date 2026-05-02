@@ -65,6 +65,7 @@ interface Highlights {
 interface TeamMeta { espn_team_id: number | null; team_name: string; }
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
+const IMAGE_CDN = process.env.NEXT_PUBLIC_IMAGE_CDN || `${API}/api/v1/images`;
 
 function TypewriterText({ text }: { text: string }) {
   const [displayed, setDisplayed] = useState("");
@@ -90,7 +91,7 @@ function TypewriterText({ text }: { text: string }) {
 function PlayerPhoto({ espnId, size = 96 }: { espnId: number | null; size?: number }) {
   if (!espnId) return <div className="bg-muted/30 rounded-lg" style={{ width: size, height: size }} />;
   return (
-    <Image src={`${API}/api/v1/images/players/${espnId}.png`} alt="" width={size} height={size}
+    <Image src={`${IMAGE_CDN}/players/${espnId}.png`} alt="" width={size} height={size}
       className="object-contain" style={{ background: "transparent" }} unoptimized />
   );
 }
@@ -228,8 +229,8 @@ export default function MatchDetailPage() {
         const team2Name = inn2?.batting_team ?? match.team2;
         const team1Id = (teams.find((t: any) => t.team_name === team1Name) as any)?.espn_team_id ?? null;
         const team2Id = (teams.find((t: any) => t.team_name === team2Name) as any)?.espn_team_id ?? null;
-        const team1Logo = team1Id ? `${API}/api/v1/images/teams/${team1Id}.png` : null;
-        const team2Logo = team2Id ? `${API}/api/v1/images/teams/${team2Id}.png` : null;
+        const team1Logo = team1Id ? `${IMAGE_CDN}/teams/${team1Id}.png` : null;
+        const team2Logo = team2Id ? `${IMAGE_CDN}/teams/${team2Id}.png` : null;
         const isTeam1Winner = match.outcome_winner === team1Name;
         const isTeam2Winner = match.outcome_winner === team2Name;
         const result = match.winning_margin
@@ -399,14 +400,14 @@ export default function MatchDetailPage() {
                   <span className="text-xl font-bold text-foreground">{match.team1}</span>
                   {(() => {
                     const tid = (teams.find((t: any) => t.team_name === match.team1) as any)?.espn_team_id;
-                    return tid ? <img src={`${API}/api/v1/images/teams/${tid}.png`} alt="" className="h-12 w-12 object-contain" /> : null;
+                    return tid ? <img src={`${IMAGE_CDN}/teams/${tid}.png`} alt="" className="h-12 w-12 object-contain" /> : null;
                   })()}
                 </div>
                 <div className="w-0.5 bg-border self-stretch shrink-0" />
                 <div className="flex-1 pl-6 flex items-center gap-4">
                   {(() => {
                     const tid = (teams.find((t: any) => t.team_name === match.team2) as any)?.espn_team_id;
-                    return tid ? <img src={`${API}/api/v1/images/teams/${tid}.png`} alt="" className="h-12 w-12 object-contain" /> : null;
+                    return tid ? <img src={`${IMAGE_CDN}/teams/${tid}.png`} alt="" className="h-12 w-12 object-contain" /> : null;
                   })()}
                   <span className="text-xl font-bold text-foreground">{match.team2}</span>
                 </div>
