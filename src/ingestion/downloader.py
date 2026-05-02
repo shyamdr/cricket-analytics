@@ -30,7 +30,12 @@ def _is_download_needed(url: str, local_path: Path) -> bool:
         return True
 
     try:
-        resp = httpx.head(url, follow_redirects=True, timeout=30.0)
+        resp = httpx.head(
+            url,
+            follow_redirects=True,
+            timeout=30.0,
+            headers={"Accept": "*/*", "User-Agent": "insideedge-cricket-analytics/1.0"},
+        )
         resp.raise_for_status()
     except httpx.HTTPError:
         # Can't check — download to be safe
@@ -52,7 +57,13 @@ def download_file(url: str, dest: Path) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     logger.info("downloading", url=url, dest=str(dest))
 
-    with httpx.stream("GET", url, follow_redirects=True, timeout=120.0) as response:
+    headers = {
+        "Accept": "*/*",
+        "User-Agent": "insideedge-cricket-analytics/1.0",
+    }
+    with httpx.stream(
+        "GET", url, follow_redirects=True, timeout=120.0, headers=headers
+    ) as response:
         response.raise_for_status()
         with open(dest, "wb") as f:
             for chunk in response.iter_bytes(chunk_size=8192):
