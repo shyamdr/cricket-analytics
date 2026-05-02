@@ -74,6 +74,11 @@ export function MatchSpotlight({ matches }: MatchSpotlightProps) {
 
   const team1Logo = getTeamLogoUrl(team1Name);
   const team2Logo = getTeamLogoUrl(team2Name);
+
+  // Debug: log what getTeamLogoUrl returns
+  console.log("team1Logo:", team1Name, "->", team1Logo);
+  console.log("team2Logo:", team2Name, "->", team2Logo);
+
   const team1Primary = getTeamColor(team1Name);
   const team2Primary = getTeamColor(team2Name);
 
