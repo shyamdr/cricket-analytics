@@ -40,7 +40,7 @@ function PlayerPhoto({ espnId, name }: { espnId: number | null; name: string }) 
   }
   return (
     <img
-      src={`${process.env.NEXT_PUBLIC_IMAGE_CDN || "/api/v1/images"}/players/${espnId}.png`}
+      src={`https://pub-78fc5db4e6f54c2bba7c541ea83216f6.r2.dev/players/${espnId}.png`}
       alt={name}
       className="h-8 w-8 rounded-full object-cover bg-muted shrink-0"
       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}

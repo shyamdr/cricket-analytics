@@ -103,16 +103,24 @@ function getMeta(teamName: string): TeamMeta | null {
  * keeping it same-origin for canvas pixel analysis.
  * In production, NEXT_PUBLIC_API_URL is baked into the path.
  */
+const IMAGE_BASE = "https://pub-78fc5db4e6f54c2bba7c541ea83216f6.r2.dev";
+
 export function getTeamLogoUrl(teamName: string): string | null {
   const meta = getMeta(teamName);
   if (!meta?.espnTeamId) return null;
-  const cdn = process.env.NEXT_PUBLIC_IMAGE_CDN;
-  if (cdn) return `${cdn}/teams/${meta.espnTeamId}.png`;
-  return `/api/v1/images/teams/${meta.espnTeamId}.png`;
+  return `${IMAGE_BASE}/teams/${meta.espnTeamId}.png`;
 }
 
 export function getTeamColor(teamName: string): string {
   return getMeta(teamName)?.primaryColor ?? "#6B7280";
+}
+
+/**
+ * Returns the URL for a player's photo from the R2 CDN.
+ */
+export function getPlayerImageUrl(espnPlayerId: number | null): string | null {
+  if (!espnPlayerId) return null;
+  return `${IMAGE_BASE}/players/${espnPlayerId}.png`;
 }
 
 export function getTeamColorAlt(teamName: string): string {

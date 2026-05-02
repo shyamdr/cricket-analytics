@@ -65,7 +65,7 @@ interface Highlights {
 interface TeamMeta { espn_team_id: number | null; team_name: string; }
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
-const IMAGE_CDN = process.env.NEXT_PUBLIC_IMAGE_CDN || `${API}/api/v1/images`;
+const IMAGE_CDN = "https://pub-78fc5db4e6f54c2bba7c541ea83216f6.r2.dev";
 
 function TypewriterText({ text }: { text: string }) {
   const [displayed, setDisplayed] = useState("");
