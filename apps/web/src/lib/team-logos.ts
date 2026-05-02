@@ -28,7 +28,34 @@ let _fetched = false;
 let _fetchPromise: Promise<void> | null = null;
 
 // ---------------------------------------------------------------------------
-// Fetch from API (call once on app load)
+// Static fallback — ensures logos load even when API is cold/sleeping
+// ---------------------------------------------------------------------------
+const _STATIC_TEAMS: Record<string, { espnTeamId: number; primaryColor: string; colorAlt: string; abbreviation: string }> = {
+  "Chennai Super Kings": { espnTeamId: 335974, primaryColor: "#FCCA06", colorAlt: "#F15A22", abbreviation: "CSK" },
+  "Mumbai Indians": { espnTeamId: 335978, primaryColor: "#004B8D", colorAlt: "#D1AB3E", abbreviation: "MI" },
+  "Royal Challengers Bengaluru": { espnTeamId: 335970, primaryColor: "#D4213D", colorAlt: "#000000", abbreviation: "RCB" },
+  "Kolkata Knight Riders": { espnTeamId: 335971, primaryColor: "#3A225D", colorAlt: "#D4A84B", abbreviation: "KKR" },
+  "Delhi Capitals": { espnTeamId: 335975, primaryColor: "#004C93", colorAlt: "#EF1B23", abbreviation: "DC" },
+  "Punjab Kings": { espnTeamId: 335973, primaryColor: "#D4213D", colorAlt: "#A7A9AC", abbreviation: "PBKS" },
+  "Rajasthan Royals": { espnTeamId: 335977, primaryColor: "#254AA5", colorAlt: "#FF69B4", abbreviation: "RR" },
+  "Sunrisers Hyderabad": { espnTeamId: 628333, primaryColor: "#FF822A", colorAlt: "#000000", abbreviation: "SRH" },
+  "Gujarat Titans": { espnTeamId: 1298769, primaryColor: "#1C1C2B", colorAlt: "#A0E4F1", abbreviation: "GT" },
+  "Lucknow Super Giants": { espnTeamId: 1298768, primaryColor: "#0057E2", colorAlt: "#A72056", abbreviation: "LSG" },
+};
+
+// Pre-populate cache with static data
+for (const [name, data] of Object.entries(_STATIC_TEAMS)) {
+  _cache.set(name, {
+    teamName: name,
+    espnTeamId: data.espnTeamId,
+    primaryColor: data.primaryColor,
+    colorAlt: data.colorAlt,
+    abbreviation: data.abbreviation,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Fetch from API (call once on app load — overwrites static with live data)
 // ---------------------------------------------------------------------------
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
