@@ -77,7 +77,14 @@ CREATE TABLE IF NOT EXISTS {schema}.espn_matches (
     mvp_batting_impact          DOUBLE,
     mvp_bowling_impact          DOUBLE,
     mvp_total_impact            DOUBLE,
-    player_of_match_json        VARCHAR
+    player_of_match_json        VARCHAR,
+    ground_name                 VARCHAR,
+    ground_long_name            VARCHAR,
+    ground_country_name         VARCHAR,
+    ground_country_abbreviation VARCHAR,
+    ground_image_url            VARCHAR,
+    team1_abbreviation          VARCHAR,
+    team2_abbreviation          VARCHAR
 )
 """
 
@@ -307,6 +314,14 @@ def _migrate_image_columns(conn: duckdb.DuckDBPyConnection, schema: str) -> None
         (f"{schema}.espn_matches", "mvp_total_impact", "DOUBLE"),
         # Player(s) of the Match with per-innings stats
         (f"{schema}.espn_matches", "player_of_match_json", "VARCHAR"),
+        # Ground details + team abbreviations (added for OBT expansion)
+        (f"{schema}.espn_matches", "ground_name", "VARCHAR"),
+        (f"{schema}.espn_matches", "ground_long_name", "VARCHAR"),
+        (f"{schema}.espn_matches", "ground_country_name", "VARCHAR"),
+        (f"{schema}.espn_matches", "ground_country_abbreviation", "VARCHAR"),
+        (f"{schema}.espn_matches", "ground_image_url", "VARCHAR"),
+        (f"{schema}.espn_matches", "team1_abbreviation", "VARCHAR"),
+        (f"{schema}.espn_matches", "team2_abbreviation", "VARCHAR"),
     ]
     for table, column, dtype in migrations:
         try:
