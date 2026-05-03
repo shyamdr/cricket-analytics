@@ -94,7 +94,25 @@ export function isTeamMetaLoaded(): boolean {
 // ---------------------------------------------------------------------------
 
 function getMeta(teamName: string): TeamMeta | null {
-  return _cache.get(teamName) ?? null;
+  // Check live cache first (populated by fetchTeamMeta or static init)
+  const cached = _cache.get(teamName);
+  if (cached) return cached;
+
+  // Fallback to static data if cache miss (handles tree-shaking edge cases)
+  const s = _STATIC_TEAMS[teamName];
+  if (s) {
+    const meta: TeamMeta = {
+      teamName,
+      espnTeamId: s.espnTeamId,
+      primaryColor: s.primaryColor,
+      colorAlt: s.colorAlt,
+      abbreviation: s.abbreviation,
+    };
+    _cache.set(teamName, meta);
+    return meta;
+  }
+
+  return null;
 }
 
 /**
