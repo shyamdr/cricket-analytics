@@ -31,16 +31,25 @@ let _fetchPromise: Promise<void> | null = null;
 // Static fallback — ensures logos load even when API is cold/sleeping
 // ---------------------------------------------------------------------------
 const _STATIC_TEAMS: Record<string, { espnTeamId: number; primaryColor: string; colorAlt: string; abbreviation: string }> = {
-  "Chennai Super Kings": { espnTeamId: 335974, primaryColor: "#FCCA06", colorAlt: "#F15A22", abbreviation: "CSK" },
-  "Mumbai Indians": { espnTeamId: 335978, primaryColor: "#004B8D", colorAlt: "#D1AB3E", abbreviation: "MI" },
-  "Royal Challengers Bengaluru": { espnTeamId: 335970, primaryColor: "#D4213D", colorAlt: "#000000", abbreviation: "RCB" },
-  "Kolkata Knight Riders": { espnTeamId: 335971, primaryColor: "#3A225D", colorAlt: "#D4A84B", abbreviation: "KKR" },
+  "Chennai Super Kings": { espnTeamId: 335974, primaryColor: "#FDB913", colorAlt: "#004BA0", abbreviation: "CSK" },
+  "Mumbai Indians": { espnTeamId: 335978, primaryColor: "#004BA0", colorAlt: "#004BA0", abbreviation: "MI" },
+  "Royal Challengers Bengaluru": { espnTeamId: 335970, primaryColor: "#D4213D", colorAlt: "#1C1C2B", abbreviation: "RCB" },
+  "Royal Challengers Bangalore": { espnTeamId: 335970, primaryColor: "#D4213D", colorAlt: "#1C1C2B", abbreviation: "RCB" },
+  "Kolkata Knight Riders": { espnTeamId: 335971, primaryColor: "#3A225D", colorAlt: "#FDB913", abbreviation: "KKR" },
   "Delhi Capitals": { espnTeamId: 335975, primaryColor: "#004C93", colorAlt: "#EF1B23", abbreviation: "DC" },
-  "Punjab Kings": { espnTeamId: 335973, primaryColor: "#D4213D", colorAlt: "#A7A9AC", abbreviation: "PBKS" },
-  "Rajasthan Royals": { espnTeamId: 335977, primaryColor: "#254AA5", colorAlt: "#FF69B4", abbreviation: "RR" },
-  "Sunrisers Hyderabad": { espnTeamId: 628333, primaryColor: "#FF822A", colorAlt: "#000000", abbreviation: "SRH" },
-  "Gujarat Titans": { espnTeamId: 1298769, primaryColor: "#1C1C2B", colorAlt: "#A0E4F1", abbreviation: "GT" },
-  "Lucknow Super Giants": { espnTeamId: 1298768, primaryColor: "#0057E2", colorAlt: "#A72056", abbreviation: "LSG" },
+  "Delhi Daredevils": { espnTeamId: 335975, primaryColor: "#004C93", colorAlt: "#EF1B23", abbreviation: "DC" },
+  "Punjab Kings": { espnTeamId: 335973, primaryColor: "#DD1F2D", colorAlt: "#1C1C2B", abbreviation: "PBKS" },
+  "Kings XI Punjab": { espnTeamId: 335973, primaryColor: "#DD1F2D", colorAlt: "#1C1C2B", abbreviation: "PBKS" },
+  "Rajasthan Royals": { espnTeamId: 335977, primaryColor: "#EA1A85", colorAlt: "#254AA5", abbreviation: "RR" },
+  "Sunrisers Hyderabad": { espnTeamId: 628333, primaryColor: "#FF822A", colorAlt: "#E03A16", abbreviation: "SRH" },
+  "Deccan Chargers": { espnTeamId: 628333, primaryColor: "#1C1C2B", colorAlt: "#E03A16", abbreviation: "SRH" },
+  "Gujarat Titans": { espnTeamId: 1298769, primaryColor: "#1C1C2B", colorAlt: "#B8860B", abbreviation: "GT" },
+  "Gujarat Lions": { espnTeamId: 968725, primaryColor: "#E04F16", colorAlt: "#1C1C2B", abbreviation: "GL" },
+  "Lucknow Super Giants": { espnTeamId: 1298768, primaryColor: "#A72056", colorAlt: "#004BA0", abbreviation: "LSG" },
+  "Rising Pune Supergiant": { espnTeamId: 968721, primaryColor: "#6F2C91", colorAlt: "#D4213D", abbreviation: "RPS" },
+  "Rising Pune Supergiants": { espnTeamId: 968721, primaryColor: "#6F2C91", colorAlt: "#D4213D", abbreviation: "RPS" },
+  "Pune Warriors": { espnTeamId: 474666, primaryColor: "#2F9BE3", colorAlt: "#6F2C91", abbreviation: "PWI" },
+  "Kochi Tuskers Kerala": { espnTeamId: 474668, primaryColor: "#6F2C91", colorAlt: "#FDB913", abbreviation: "Kochi" },
 };
 
 // Pre-populate cache with static data
