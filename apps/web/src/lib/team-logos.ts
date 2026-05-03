@@ -68,12 +68,14 @@ export function fetchTeamMeta(): Promise<void> {
     .then((res) => (res.ok ? res.json() : []))
     .then((teams) => {
       for (const t of teams) {
+        const existing = _cache.get(t.team_name);
         _cache.set(t.team_name, {
           teamName: t.team_name,
-          espnTeamId: t.espn_team_id ?? null,
-          primaryColor: t.primary_color ?? "#6B7280",
-          colorAlt: t.brand_color_alt ?? t.primary_color ?? "#6B7280",
-          abbreviation: t.team_abbreviation ?? null,
+          // Prefer API value, but keep static fallback if API returns null
+          espnTeamId: t.espn_team_id ?? existing?.espnTeamId ?? null,
+          primaryColor: t.primary_color ?? existing?.primaryColor ?? "#6B7280",
+          colorAlt: t.brand_color_alt ?? t.primary_color ?? existing?.colorAlt ?? "#6B7280",
+          abbreviation: t.team_abbreviation ?? existing?.abbreviation ?? null,
         });
       }
       _fetched = true;
