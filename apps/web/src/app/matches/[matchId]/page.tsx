@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { AnalyticsTabs } from "@/components/analytics/analytics-tabs";
-import { getTeamColor, fetchTeamMeta } from "@/lib/team-logos";
+import { getTeamColor, fetchTeamMeta, getTeamLogoUrl, getTeamGradientColor, checkLogoClash, analyzeLogoClashAsync } from "@/lib/team-logos";
 
 interface Match {
   match_id: string; team1: string; team2: string; venue: string;
@@ -65,7 +65,7 @@ interface Highlights {
 interface TeamMeta { espn_team_id: number | null; team_name: string; }
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
-const IMAGE_CDN = "https://pub-78fc5db4e6f54c2bba7c541ea83216f6.r2.dev";
+const IMAGE_CDN = `${API}/api/v1/images`;
 
 function TypewriterText({ text }: { text: string }) {
   const [displayed, setDisplayed] = useState("");
@@ -180,6 +180,7 @@ export default function MatchDetailPage() {
   const [error, setError] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [scorecardMode, setScorecardMode] = useState<"batting" | "bowling">("batting");
+  const [clashMap, setClashMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchTeamMeta().then(() => {
@@ -197,6 +198,33 @@ export default function MatchDetailPage() {
     }).catch(() => { setError(true); setLoading(false); });
     });
   }, [matchId]);
+
+  // Clash detection for spotlight card gradients (same logic as home page)
+  useEffect(() => {
+    if (!match || !teams.length) return;
+    const inn1 = summary.find((i) => i.innings === 1);
+    const inn2 = summary.find((i) => i.innings === 2);
+    const t1 = inn1?.batting_team ?? match.team1;
+    const t2 = inn2?.batting_team ?? match.team2;
+    const t1Logo = getTeamLogoUrl(t1);
+    const t2Logo = getTeamLogoUrl(t2);
+    const t1Color = getTeamColor(t1);
+    const t2Color = getTeamColor(t2);
+
+    const analyze = async () => {
+      const updates: Record<string, boolean> = {};
+      if (t1Logo) {
+        const cached = checkLogoClash(t1Logo, t1Color);
+        if (cached === null) updates[t1] = await analyzeLogoClashAsync(t1Logo, t1Color);
+      }
+      if (t2Logo) {
+        const cached = checkLogoClash(t2Logo, t2Color);
+        if (cached === null) updates[t2] = await analyzeLogoClashAsync(t2Logo, t2Color);
+      }
+      if (Object.keys(updates).length > 0) setClashMap(prev => ({ ...prev, ...updates }));
+    };
+    analyze();
+  }, [match, teams, summary]);
 
   if (loading) return <Spinner className="py-16" />;
   if (error || !match) {
@@ -229,16 +257,18 @@ export default function MatchDetailPage() {
         const team2Name = inn2?.batting_team ?? match.team2;
         const team1Id = (teams.find((t: any) => t.team_name === team1Name) as any)?.espn_team_id ?? null;
         const team2Id = (teams.find((t: any) => t.team_name === team2Name) as any)?.espn_team_id ?? null;
-        const team1Logo = team1Id ? `${IMAGE_CDN}/teams/${team1Id}.png` : null;
-        const team2Logo = team2Id ? `${IMAGE_CDN}/teams/${team2Id}.png` : null;
+        const team1Logo = getTeamLogoUrl(team1Name);
+        const team2Logo = getTeamLogoUrl(team2Name);
         const isTeam1Winner = match.outcome_winner === team1Name;
         const isTeam2Winner = match.outcome_winner === team2Name;
         const result = match.winning_margin
           ? `${match.outcome_winner} won by ${match.winning_margin}`
           : match.match_result_type === "no_result" ? "No Result" : null;
         const tossInfo = `${match.toss_winner} won toss · chose to ${match.toss_decision}`;
-        const team1Color = getTeamColor(team1Name);
-        const team2Color = getTeamColor(team2Name);
+        const team1Clashes = clashMap[team1Name] ?? checkLogoClash(team1Logo ?? "", getTeamColor(team1Name)) ?? false;
+        const team2Clashes = clashMap[team2Name] ?? checkLogoClash(team2Logo ?? "", getTeamColor(team2Name)) ?? false;
+        const team1Color = getTeamGradientColor(team1Name, team1Clashes);
+        const team2Color = getTeamGradientColor(team2Name, team2Clashes);
 
         return (
           <Card className="overflow-hidden">

@@ -1,0 +1,135 @@
+[
+  {
+    "team_name": "Chennai Super Kings",
+    "espn_team_id": 335974,
+    "primary_color": "#FDB913",
+    "brand_color_alt": "#004BA0",
+    "team_abbreviation": "CSK"
+  },
+  {
+    "team_name": "Deccan Chargers",
+    "espn_team_id": 628333,
+    "primary_color": "#1C1C2B",
+    "brand_color_alt": "#E03A16",
+    "team_abbreviation": "SRH"
+  },
+  {
+    "team_name": "Delhi Capitals",
+    "espn_team_id": 335975,
+    "primary_color": "#004C93",
+    "brand_color_alt": "#EF1B23",
+    "team_abbreviation": "DC"
+  },
+  {
+    "team_name": "Delhi Daredevils",
+    "espn_team_id": 335975,
+    "primary_color": "#004C93",
+    "brand_color_alt": "#EF1B23",
+    "team_abbreviation": "DC"
+  },
+  {
+    "team_name": "Gujarat Lions",
+    "espn_team_id": 968725,
+    "primary_color": "#E04F16",
+    "brand_color_alt": "#1C1C2B",
+    "team_abbreviation": "GL"
+  },
+  {
+    "team_name": "Gujarat Titans",
+    "espn_team_id": 1298769,
+    "primary_color": "#1C1C2B",
+    "brand_color_alt": "#B8860B",
+    "team_abbreviation": "GT"
+  },
+  {
+    "team_name": "Kings XI Punjab",
+    "espn_team_id": 335973,
+    "primary_color": "#DD1F2D",
+    "brand_color_alt": "#1C1C2B",
+    "team_abbreviation": "PBKS"
+  },
+  {
+    "team_name": "Kochi Tuskers Kerala",
+    "espn_team_id": 474668,
+    "primary_color": "#6F2C91",
+    "brand_color_alt": "#FDB913",
+    "team_abbreviation": "Kochi"
+  },
+  {
+    "team_name": "Kolkata Knight Riders",
+    "espn_team_id": 335971,
+    "primary_color": "#3A225D",
+    "brand_color_alt": "#FDB913",
+    "team_abbreviation": "KKR"
+  },
+  {
+    "team_name": "Lucknow Super Giants",
+    "espn_team_id": 1298768,
+    "primary_color": "#A72056",
+    "brand_color_alt": "#004BA0",
+    "team_abbreviation": "LSG"
+  },
+  {
+    "team_name": "Mumbai Indians",
+    "espn_team_id": 335978,
+    "primary_color": "#004BA0",
+    "brand_color_alt": "#004BA0",
+    "team_abbreviation": "MI"
+  },
+  {
+    "team_name": "Pune Warriors",
+    "espn_team_id": 474666,
+    "primary_color": "#2F9BE3",
+    "brand_color_alt": "#6F2C91",
+    "team_abbreviation": "PWI"
+  },
+  {
+    "team_name": "Punjab Kings",
+    "espn_team_id": 335973,
+    "primary_color": "#DD1F2D",
+    "brand_color_alt": "#1C1C2B",
+    "team_abbreviation": "PBKS"
+  },
+  {
+    "team_name": "Rajasthan Royals",
+    "espn_team_id": 335977,
+    "primary_color": "#EA1A85",
+    "brand_color_alt": "#254AA5",
+    "team_abbreviation": "RR"
+  },
+  {
+    "team_name": "Rising Pune Supergiant",
+    "espn_team_id": 968721,
+    "primary_color": "#6F2C91",
+    "brand_color_alt": "#D4213D",
+    "team_abbreviation": "RPS"
+  },
+  {
+    "team_name": "Rising Pune Supergiants",
+    "espn_team_id": null,
+    "primary_color": "#6F2C91",
+    "brand_color_alt": "#D4213D",
+    "team_abbreviation": null
+  },
+  {
+    "team_name": "Royal Challengers Bangalore",
+    "espn_team_id": 335970,
+    "primary_color": "#D4213D",
+    "brand_color_alt": "#1C1C2B",
+    "team_abbreviation": "RCB"
+  },
+  {
+    "team_name": "Royal Challengers Bengaluru",
+    "espn_team_id": 335970,
+    "primary_color": "#D4213D",
+    "brand_color_alt": "#1C1C2B",
+    "team_abbreviation": "RCB"
+  },
+  {
+    "team_name": "Sunrisers Hyderabad",
+    "espn_team_id": 628333,
+    "primary_color": "#FF822A",
+    "brand_color_alt": "#E03A16",
+    "team_abbreviation": "SRH"
+  }
+]

@@ -28,43 +28,7 @@ let _fetched = false;
 let _fetchPromise: Promise<void> | null = null;
 
 // ---------------------------------------------------------------------------
-// Static fallback — ensures logos load even when API is cold/sleeping
-// ---------------------------------------------------------------------------
-const _STATIC_TEAMS: Record<string, { espnTeamId: number; primaryColor: string; colorAlt: string; abbreviation: string }> = {
-  "Chennai Super Kings": { espnTeamId: 335974, primaryColor: "#FCCA06", colorAlt: "#F15A22", abbreviation: "CSK" },
-  "Mumbai Indians": { espnTeamId: 335978, primaryColor: "#004B8D", colorAlt: "#D1AB3E", abbreviation: "MI" },
-  "Royal Challengers Bengaluru": { espnTeamId: 335970, primaryColor: "#D4213D", colorAlt: "#000000", abbreviation: "RCB" },
-  "Royal Challengers Bangalore": { espnTeamId: 335970, primaryColor: "#D4213D", colorAlt: "#000000", abbreviation: "RCB" },
-  "Kolkata Knight Riders": { espnTeamId: 335971, primaryColor: "#3A225D", colorAlt: "#D4A84B", abbreviation: "KKR" },
-  "Delhi Capitals": { espnTeamId: 335975, primaryColor: "#004C93", colorAlt: "#EF1B23", abbreviation: "DC" },
-  "Delhi Daredevils": { espnTeamId: 335975, primaryColor: "#004C93", colorAlt: "#EF1B23", abbreviation: "DC" },
-  "Punjab Kings": { espnTeamId: 335973, primaryColor: "#D4213D", colorAlt: "#A7A9AC", abbreviation: "PBKS" },
-  "Kings XI Punjab": { espnTeamId: 335973, primaryColor: "#D4213D", colorAlt: "#A7A9AC", abbreviation: "PBKS" },
-  "Rajasthan Royals": { espnTeamId: 335977, primaryColor: "#254AA5", colorAlt: "#FF69B4", abbreviation: "RR" },
-  "Sunrisers Hyderabad": { espnTeamId: 628333, primaryColor: "#FF822A", colorAlt: "#000000", abbreviation: "SRH" },
-  "Deccan Chargers": { espnTeamId: 628333, primaryColor: "#1C1C2B", colorAlt: "#E03A16", abbreviation: "SRH" },
-  "Gujarat Titans": { espnTeamId: 1298769, primaryColor: "#1C1C2B", colorAlt: "#A0E4F1", abbreviation: "GT" },
-  "Gujarat Lions": { espnTeamId: 968725, primaryColor: "#E04F16", colorAlt: "#1C1C2B", abbreviation: "GL" },
-  "Lucknow Super Giants": { espnTeamId: 1298768, primaryColor: "#0057E2", colorAlt: "#A72056", abbreviation: "LSG" },
-  "Rising Pune Supergiant": { espnTeamId: 968721, primaryColor: "#6F2C91", colorAlt: "#D4213D", abbreviation: "RPS" },
-  "Rising Pune Supergiants": { espnTeamId: 968721, primaryColor: "#6F2C91", colorAlt: "#D4213D", abbreviation: "RPS" },
-  "Pune Warriors": { espnTeamId: 474666, primaryColor: "#2F9BE3", colorAlt: "#6F2C91", abbreviation: "PWI" },
-  "Kochi Tuskers Kerala": { espnTeamId: 474668, primaryColor: "#6F2C91", colorAlt: "#FDB913", abbreviation: "Kochi" },
-};
-
-// Pre-populate cache with static data
-for (const [name, data] of Object.entries(_STATIC_TEAMS)) {
-  _cache.set(name, {
-    teamName: name,
-    espnTeamId: data.espnTeamId,
-    primaryColor: data.primaryColor,
-    colorAlt: data.colorAlt,
-    abbreviation: data.abbreviation,
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Fetch from API (call once on app load — overwrites static with live data)
+// Fetch from API (call once on app load)
 // ---------------------------------------------------------------------------
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
@@ -77,14 +41,12 @@ export function fetchTeamMeta(): Promise<void> {
     .then((res) => (res.ok ? res.json() : []))
     .then((teams) => {
       for (const t of teams) {
-        const existing = _cache.get(t.team_name);
         _cache.set(t.team_name, {
           teamName: t.team_name,
-          // Prefer API value, but keep static fallback if API returns null
-          espnTeamId: t.espn_team_id ?? existing?.espnTeamId ?? null,
-          primaryColor: t.primary_color ?? existing?.primaryColor ?? "#6B7280",
-          colorAlt: t.brand_color_alt ?? t.primary_color ?? existing?.colorAlt ?? "#6B7280",
-          abbreviation: t.team_abbreviation ?? existing?.abbreviation ?? null,
+          espnTeamId: t.espn_team_id ?? null,
+          primaryColor: t.primary_color ?? "#6B7280",
+          colorAlt: t.brand_color_alt ?? t.primary_color ?? "#6B7280",
+          abbreviation: t.team_abbreviation ?? null,
         });
       }
       _fetched = true;
@@ -105,25 +67,7 @@ export function isTeamMetaLoaded(): boolean {
 // ---------------------------------------------------------------------------
 
 function getMeta(teamName: string): TeamMeta | null {
-  // Check live cache first (populated by fetchTeamMeta or static init)
-  const cached = _cache.get(teamName);
-  if (cached) return cached;
-
-  // Fallback to static data if cache miss (handles tree-shaking edge cases)
-  const s = _STATIC_TEAMS[teamName];
-  if (s) {
-    const meta: TeamMeta = {
-      teamName,
-      espnTeamId: s.espnTeamId,
-      primaryColor: s.primaryColor,
-      colorAlt: s.colorAlt,
-      abbreviation: s.abbreviation,
-    };
-    _cache.set(teamName, meta);
-    return meta;
-  }
-
-  return null;
+  return _cache.get(teamName) ?? null;
 }
 
 /**
@@ -132,24 +76,14 @@ function getMeta(teamName: string): TeamMeta | null {
  * keeping it same-origin for canvas pixel analysis.
  * In production, NEXT_PUBLIC_API_URL is baked into the path.
  */
-const IMAGE_BASE = "https://pub-78fc5db4e6f54c2bba7c541ea83216f6.r2.dev";
-
 export function getTeamLogoUrl(teamName: string): string | null {
   const meta = getMeta(teamName);
   if (!meta?.espnTeamId) return null;
-  return `${IMAGE_BASE}/teams/${meta.espnTeamId}.png`;
+  return `/api/v1/images/teams/${meta.espnTeamId}.png`;
 }
 
 export function getTeamColor(teamName: string): string {
   return getMeta(teamName)?.primaryColor ?? "#6B7280";
-}
-
-/**
- * Returns the URL for a player's photo from the R2 CDN.
- */
-export function getPlayerImageUrl(espnPlayerId: number | null): string | null {
-  if (!espnPlayerId) return null;
-  return `${IMAGE_BASE}/players/${espnPlayerId}.png`;
 }
 
 export function getTeamColorAlt(teamName: string): string {
